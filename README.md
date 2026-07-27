@@ -92,16 +92,24 @@ means a subscription fires on changes a CWMP session caused, and vice versa.
 Point the agent at your controller's MQTT broker. No ACS, no `--acs-url`:
 
 ```bash
-# One TR-181 CPE as a USP agent
-bin/cpe-sim --profile=profiles/example-tr181-minimal.yaml --usp-broker=broker:1883
+# One TR-181 CPE as a USP agent, against an authenticated broker
+bin/cpe-sim --profile=profiles/example-tr181-minimal.yaml \
+    --usp-broker=broker:1883 \
+    --usp-mqtt-secret="$USP_SHARED_SECRET"
 
 # A replayable fleet: set fleet.count in the profile, seed the run
 bin/cpe-sim --profile=profiles/example-sagemcom-fast5598/ --usp-broker=broker:1883 --seed=42
 ```
 
+Most brokers require credentials; without them the agent loops on
+"Connection Refused: Not Authorised". `--usp-mqtt-secret` derives one MQTT
+password per agent from a single shared secret, or pass
+`--usp-mqtt-username` / `--usp-mqtt-password` directly. An open broker needs
+neither. The [USP guide](docs/guides/usp.md) documents the derivation and the
+rest of the MTP flags.
+
 The agent onboards itself (OnBoardRequest, then Boot!), serves controller
 requests, and pushes notifications for whatever the controller subscribes to.
-See the [USP guide](docs/guides/usp.md).
 
 ### TR-069 (CWMP)
 
@@ -129,7 +137,11 @@ over one shared tree.
 No clone needed: the image ships with the reference profiles at `/profiles/`.
 
 ```bash
-docker run --rm ispxhq/cpe-labs --profile=/profiles/example-tr181-minimal.yaml --usp-broker=broker:1883
+docker run --rm ispxhq/cpe-labs \
+    --profile=/profiles/example-tr181-minimal.yaml \
+    --usp-broker=broker:1883 \
+    --usp-mqtt-secret="$USP_SHARED_SECRET"
+
 docker run --rm ispxhq/cpe-labs --profile=/profiles/example-tr181-minimal.yaml --acs-url=http://acs:7547/
 ```
 
