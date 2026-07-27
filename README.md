@@ -105,19 +105,20 @@ See the [USP guide](docs/guides/usp.md).
 
 ### TR-069 (CWMP)
 
-Point the fleet at your ACS:
+Point the fleet at your ACS. CWMP covers both data models, so this is where
+the TR-098 reference profile earns its keep:
 
 ```bash
-# One TR-181 CPE, minimal profile
-bin/cpe-sim --profile=profiles/example-tr181-minimal.yaml --acs-url=http://acs:7547/
+# A TR-098 device (InternetGatewayDevice.*): the ARRIS NVG578LX profile
+bin/cpe-sim --profile=profiles/example-arris/ --acs-url=http://acs:7547/
 
-# The same fleet, replayable
+# A TR-181 fleet, replayable: set fleet.count in the profile, seed the run
 bin/cpe-sim --profile=profiles/example-sagemcom-fast5598/ --acs-url=http://acs:7547/ --seed=42
 
-# Answer connection requests
-bin/cpe-sim --profile=profiles/example-sagemcom-fast5598/ --acs-url=http://acs:7547/ \
+# Answer connection requests (note the TR-098 publish path)
+bin/cpe-sim --profile=profiles/example-arris/ --acs-url=http://acs:7547/ \
     --cr-bind-addr=0.0.0.0:7547 \
-    --cr-publish-path=Device.ManagementServer.ConnectionRequestURL
+    --cr-publish-path=InternetGatewayDevice.ManagementServer.ConnectionRequestURL
 ```
 
 Passing both `--usp-broker` and `--acs-url` runs the same fleet dual-stack
