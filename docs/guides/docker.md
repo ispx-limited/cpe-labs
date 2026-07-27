@@ -67,8 +67,7 @@ docker run --rm \
   -v "$PWD/my-fleet.yaml:/profile.yaml:ro" \
   cpe-sim:dev \
   --profile=/profile.yaml \
-  --usp-mtp=mqtt \
-  --usp-mqtt-addr=broker.example.com:1883 \
+  --usp-broker=broker.example.com:1883 \
   --seed=1
 ```
 

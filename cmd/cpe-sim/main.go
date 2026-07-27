@@ -108,8 +108,11 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 		return err
 	}
 
-	if cfg.ACSURL == "" {
-		return fmt.Errorf("--acs-url is required")
+	if cfg.ACSURL == "" && cfg.USPBroker == "" {
+		return fmt.Errorf("--acs-url is required unless --usp-broker is set (TR-369 / USP-only mode)")
+	}
+	if cfg.CRBindAddr != "" && cfg.ACSURL == "" {
+		return fmt.Errorf("--cr-bind-addr requires --acs-url: connection requests are a CWMP (TR-069) mechanism")
 	}
 
 	if cfg.ProfilePath == "" {
@@ -245,6 +248,7 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 	logger.Info("cpe-sim starting",
 		"version", version.Version,
 		"acs_url", cfg.ACSURL,
+		"usp_broker", cfg.USPBroker,
 		"profile", cfg.ProfilePath,
 		"cr_bind_addr", cfg.CRBindAddr,
 		"fleet_count", count,
@@ -270,10 +274,13 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 	// Bootstrap all CPEs in parallel. One slow / failing CPE shouldn't
 	// gate the others. We log per-CPE outcomes; the run() return value
 	// only reflects the very-first hard failure (typically transport
-	// misconfig that affects everyone).
-	bootstrapErr := bootstrapAll(ctx, stacks, templateProf.EventSchedule.BootDelay, logger)
-	if bootstrapErr != nil {
-		return bootstrapErr
+	// misconfig that affects everyone). USP-only runs have no CWMP
+	// session to bootstrap; the agent's announce below is their first
+	// contact.
+	if cfg.ACSURL != "" {
+		if bootstrapErr := bootstrapAll(ctx, stacks, templateProf.EventSchedule.BootDelay, logger); bootstrapErr != nil {
+			return bootstrapErr
+		}
 	}
 
 	// Start scheduler + generator runners after bootstrap so first
@@ -601,9 +608,11 @@ type cpeStackInputs struct {
 }
 
 // buildCPEStack constructs one CPE: fresh tree (re-loaded from disk),
-// stamped serial, transport, tracker, session, scheduler registration,
-// CR listener registration, generator runner. The returned stack's
-// genRunner is non-nil iff the profile declares generators.
+// stamped serial, generator runner, and, when an ACS URL is configured,
+// the CWMP stack (transport, tracker, session, scheduler registration,
+// CR listener registration). A USP-only run (no --acs-url) gets just the
+// tree and generators; tracker / session / runner stay nil. The returned
+// stack's genRunner is non-nil iff the profile declares generators.
 func buildCPEStack(cfg cpeconfig.Config, in cpeStackInputs) (*cpeStack, error) {
 	prof, err := paramtree.LoadProfile(cfg.ProfilePath)
 	if err != nil {
@@ -625,208 +634,9 @@ func buildCPEStack(cfg cpeconfig.Config, in cpeStackInputs) (*cpeStack, error) {
 		return nil, fmt.Errorf("fleet placeholder substitution: %w", subErr)
 	}
 
-	transportCfg := transport.Config{
-		ACSURL:   cfg.ACSURL,
-		Username: cfg.ACSUsername,
-		Password: cfg.ACSPassword,
-		Timeout:  cfg.ACSTimeout,
-	}
-	if !prof.ACSCredentialPaths.IsZero() {
-		// Per-CPE, tree-sourced ACS identity: every auth
-		// challenge reads the leaves live, so an ACS SPV rotating
-		// ManagementServer.Username/Password takes effect on the next
-		// session. Empty leaf values fall back to the global static
-		// credentials (bootstrap-before-first-rotation posture).
-		credTree := prof.Tree
-		credPaths := prof.ACSCredentialPaths
-		transportCfg.Credentials = func() (string, string) {
-			u, uerr := credTree.Get(credPaths.Username)
-			pw, perr := credTree.Get(credPaths.Password)
-			if uerr != nil || perr != nil {
-				return "", ""
-			}
-			return u.Raw, pw.Raw
-		}
-	}
-	tt, err := transport.NewTransport(in.pool, transportCfg)
-	if err != nil {
-		return nil, fmt.Errorf("transport: %w", err)
-	}
-
-	// TR-069 §3.7.1.5 Table 4 lists ConnectionRequestURL as a *forced*
-	// Inform parameter, so it rides along on every Inform regardless of
-	// what the profile author listed.
-	tracker := cwmp.NewEventTracker(withForcedInformParams(prof.InformParameters, crForcedInformPath(cfg, in.listener)))
-
-	builderOpts := inform.BuilderOptions{
-		DeviceIDPaths: inform.DeviceIDPaths{
-			Manufacturer: prof.DeviceIDPaths.Manufacturer,
-			OUI:          prof.DeviceIDPaths.OUI,
-			ProductClass: prof.DeviceIDPaths.ProductClass,
-			SerialNumber: prof.DeviceIDPaths.SerialNumber,
-		},
-	}
-	placeholder, err := inform.NewBuilder(prof.Tree, builderOpts)
-	if err != nil {
-		return nil, fmt.Errorf("inform builder: %w", err)
-	}
-
-	// Per-CPE session retry state (TR-069 3.2.1.1). The RNG stream is
-	// split per concern, same pattern as ":generators", so retry waits
-	// replay deterministically under --seed without perturbing jitter.
-	retryState := cwmp.NewRetryState(in.rngSource.ForCPE(in.id + ":retry"))
-	runOpts := &cwmp.RunSessionOptions{
-		Tracker:       tracker,
-		Tree:          prof.Tree,
-		DeviceIDPaths: builderOpts.DeviceIDPaths,
-		Retry:         retryState,
-	}
-	runner := &sessionRunner{
-		cpeID:   in.id,
-		sched:   in.sched,
-		runOpts: runOpts,
-		retry:   retryState,
-		logger:  in.logger,
-	}
-
-	scheduleTransfer := buildTransferScheduler(in.sched, in.id, tracker, prof.Transfer, runner, in.logger)
-
-	factoryReset := func() error {
-		fresh, loadErr := paramtree.LoadProfile(cfg.ProfilePath)
-		if loadErr != nil {
-			return fmt.Errorf("reload profile: %w", loadErr)
-		}
-		if resetErr := prof.Tree.Reset(fresh.Tree); resetErr != nil {
-			return fmt.Errorf("tree reset: %w", resetErr)
-		}
-		// Re-stamp serial post-reset so factory reset doesn't collapse
-		// the CPE back onto the template's base serial.
-		if stampErr := prof.Tree.SetSystem(prof.DeviceIDPaths.SerialNumber, in.serial); stampErr != nil {
-			return fmt.Errorf("re-stamp serial: %w", stampErr)
-		}
-		tracker.ResetBootstrap()
-		return nil
-	}
-
-	// pendingCancels holds the cancel funcs for in-flight scheduled
-	// reboot / factory-reset deliveries. Accessed from RPC handlers
-	// (running inside a session) and from fired one-shot goroutines,
-	// so it carries its own mutex.
-	pendingCancels := &pendingScheduledCancels{}
-
-	var scheduleReboot handlers.RebootSchedule
-	if prof.EventSchedule.RebootDelay > 0 {
-		scheduleReboot = buildRebootScheduler(in.sched, in.id, tracker, prof.EventSchedule.RebootDelay, runner, pendingCancels, in.logger)
-	}
-	var scheduleFactoryReset handlers.FactoryResetSchedule
-	if prof.EventSchedule.FactoryResetDelay > 0 {
-		scheduleFactoryReset = buildFactoryResetScheduler(in.sched, in.id, prof.EventSchedule.FactoryResetDelay, runner, pendingCancels, in.logger)
-	}
-
-	hasScheduler := !prof.PeriodicInformPaths.IsZero()
-	valueChange := func(path string) {
-		tracker.RecordValueChange(path)
-		if hasScheduler &&
-			(path == prof.PeriodicInformPaths.Interval || path == prof.PeriodicInformPaths.Enable ||
-				(prof.PeriodicInformPaths.Time != "" && path == prof.PeriodicInformPaths.Time)) {
-			in.sched.OnIntervalChange(in.id)
-		}
-	}
-
-	session, err := cwmp.NewSession(cwmp.SessionOptions{
-		Transport: tt,
-		Inform:    placeholder,
-		Logger:    in.logger.With("cpe_id", in.id),
-		Handlers: []cwmp.Handler{
-			// GetRPCMethods answers with every method this list
-			// registers plus itself; keep the slice below in sync
-			// when adding handlers.
-			handlers.NewGetRPCMethods([]string{
-				"GetRPCMethods",
-				"GetParameterValues",
-				"GetParameterNames",
-				"GetParameterAttributes",
-				"SetParameterValues",
-				"SetParameterAttributes",
-				"AddObject",
-				"DeleteObject",
-				"Reboot",
-				"FactoryReset",
-				"Download",
-				"Upload",
-			}),
-			handlers.NewGetParameterValues(prof.Tree),
-			handlers.NewGetParameterNames(prof.Tree),
-			handlers.NewGetParameterAttributes(prof.Tree),
-			handlers.NewSetParameterValues(prof.Tree, valueChange),
-			handlers.NewSetParameterAttributes(prof.Tree),
-			handlers.NewAddObject(prof.Tree),
-			handlers.NewDeleteObject(prof.Tree),
-			handlers.NewReboot(tracker, scheduleReboot),
-			handlers.NewFactoryReset(factoryReset, scheduleFactoryReset),
-			handlers.NewDownload(scheduleTransfer),
-			handlers.NewUpload(scheduleTransfer),
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("session: %w", err)
-	}
-	runOpts.Session = session
-
-	if hasScheduler {
-		// Set Notification=1 on the interval/enable leaves so SPV
-		// triggers valueChange (most stacks ship them with
-		// Notification=0 because the ACS is the writer).
-		periodicLeaves := []string{prof.PeriodicInformPaths.Interval, prof.PeriodicInformPaths.Enable}
-		if prof.PeriodicInformPaths.Time != "" {
-			periodicLeaves = append(periodicLeaves, prof.PeriodicInformPaths.Time)
-		}
-		for _, p := range periodicLeaves {
-			attrs, gerr := prof.Tree.GetAttributes(p)
-			if gerr != nil {
-				return nil, fmt.Errorf("get attributes %q: %w", p, gerr)
-			}
-			attrs.Notification = 1
-			if serr := prof.Tree.SetAttributes(p, attrs); serr != nil {
-				return nil, fmt.Errorf("set notification on %q: %w", p, serr)
-			}
-		}
-		schedRNG := in.rngSource.ForCPE(in.id)
-		cpeID := in.id
-		logger := in.logger
-		if rerr := in.sched.Schedule(scheduler.Registration{
-			CPEID: cpeID,
-			Tree:  prof.Tree,
-			Paths: scheduler.PeriodicInformPaths{
-				Interval: prof.PeriodicInformPaths.Interval,
-				Enable:   prof.PeriodicInformPaths.Enable,
-				Time:     prof.PeriodicInformPaths.Time,
-			},
-			OnTick: func(_ context.Context) error {
-				start := time.Now()
-				ran, sessErr := runner.request(context.Background(), cwmp.TriggerPeriodic)
-				if sessErr != nil {
-					logger.Warn("periodic session failed",
-						"cpe_id", cpeID,
-						"duration", time.Since(start).String(),
-						"err", sessErr.Error())
-					return sessErr
-				}
-				if ran {
-					logger.Info("periodic session completed",
-						"cpe_id", cpeID,
-						"duration", time.Since(start).String())
-				}
-				return nil
-			},
-			RNG:       schedRNG,
-			JitterPct: 0.10,
-		}); rerr != nil {
-			return nil, fmt.Errorf("scheduler.Schedule: %w", rerr)
-		}
-	}
-
-	// Generators: per-CPE Runner with its own Tree + RNG.
+	// Generators: per-CPE Runner with its own Tree + RNG. Built regardless of
+	// protocol: generators drive the tree, and the tree is what produces USP
+	// ValueChange notifies, so a USP-only run still needs its values moving.
 	var genRunner *generators.Runner
 	if len(prof.Generators) > 0 {
 		gr, gerr := buildGenerators(prof.Generators, prof.Tree, in.rngSource.ForCPE(in.id+":generators"), in.logger.With("cpe_id", in.id))
@@ -836,16 +646,233 @@ func buildCPEStack(cfg cpeconfig.Config, in cpeStackInputs) (*cpeStack, error) {
 		genRunner = gr
 	}
 
-	// CR listener registration (per-CPE path when count > 1). The URL
-	// itself is published by publishCRURLs once the listener has bound.
-	var crEndpointPath, crPublishPath string
-	if in.listener != nil {
-		regPath, regErr := registerCREndpoint(in.listener, cfg, prof, in.id, in.fleetCount, runner, in.logger)
-		if regErr != nil {
-			return nil, fmt.Errorf("register CR endpoint: %w", regErr)
+	// CWMP stack, only when an ACS URL is configured. A USP-only run builds
+	// none of it: no transport, no event tracker, no session, no Inform
+	// scheduler, no CR endpoint. Nothing would ever drain or drive them
+	// without a CWMP session, and the USP agent carries its own announce
+	// and notify paths off the shared tree.
+	var (
+		tt             *transport.Transport
+		tracker        *cwmp.EventTracker
+		session        *cwmp.Session
+		runOpts        *cwmp.RunSessionOptions
+		runner         *sessionRunner
+		hasScheduler   bool
+		crEndpointPath string
+		crPublishPath  string
+	)
+	if cfg.ACSURL != "" {
+		transportCfg := transport.Config{
+			ACSURL:   cfg.ACSURL,
+			Username: cfg.ACSUsername,
+			Password: cfg.ACSPassword,
+			Timeout:  cfg.ACSTimeout,
 		}
-		crEndpointPath = regPath
-		crPublishPath = cfg.CRPublishPath
+		if !prof.ACSCredentialPaths.IsZero() {
+			// Per-CPE, tree-sourced ACS identity: every auth
+			// challenge reads the leaves live, so an ACS SPV rotating
+			// ManagementServer.Username/Password takes effect on the next
+			// session. Empty leaf values fall back to the global static
+			// credentials (bootstrap-before-first-rotation posture).
+			credTree := prof.Tree
+			credPaths := prof.ACSCredentialPaths
+			transportCfg.Credentials = func() (string, string) {
+				u, uerr := credTree.Get(credPaths.Username)
+				pw, perr := credTree.Get(credPaths.Password)
+				if uerr != nil || perr != nil {
+					return "", ""
+				}
+				return u.Raw, pw.Raw
+			}
+		}
+		tt, err = transport.NewTransport(in.pool, transportCfg)
+		if err != nil {
+			return nil, fmt.Errorf("transport: %w", err)
+		}
+
+		// TR-069 §3.7.1.5 Table 4 lists ConnectionRequestURL as a *forced*
+		// Inform parameter, so it rides along on every Inform regardless of
+		// what the profile author listed.
+		tracker = cwmp.NewEventTracker(withForcedInformParams(prof.InformParameters, crForcedInformPath(cfg, in.listener)))
+
+		builderOpts := inform.BuilderOptions{
+			DeviceIDPaths: inform.DeviceIDPaths{
+				Manufacturer: prof.DeviceIDPaths.Manufacturer,
+				OUI:          prof.DeviceIDPaths.OUI,
+				ProductClass: prof.DeviceIDPaths.ProductClass,
+				SerialNumber: prof.DeviceIDPaths.SerialNumber,
+			},
+		}
+		placeholder, err := inform.NewBuilder(prof.Tree, builderOpts)
+		if err != nil {
+			return nil, fmt.Errorf("inform builder: %w", err)
+		}
+
+		// Per-CPE session retry state (TR-069 3.2.1.1). The RNG stream is
+		// split per concern, same pattern as ":generators", so retry waits
+		// replay deterministically under --seed without perturbing jitter.
+		retryState := cwmp.NewRetryState(in.rngSource.ForCPE(in.id + ":retry"))
+		runOpts = &cwmp.RunSessionOptions{
+			Tracker:       tracker,
+			Tree:          prof.Tree,
+			DeviceIDPaths: builderOpts.DeviceIDPaths,
+			Retry:         retryState,
+		}
+		runner = &sessionRunner{
+			cpeID:   in.id,
+			sched:   in.sched,
+			runOpts: runOpts,
+			retry:   retryState,
+			logger:  in.logger,
+		}
+
+		scheduleTransfer := buildTransferScheduler(in.sched, in.id, tracker, prof.Transfer, runner, in.logger)
+
+		factoryReset := func() error {
+			fresh, loadErr := paramtree.LoadProfile(cfg.ProfilePath)
+			if loadErr != nil {
+				return fmt.Errorf("reload profile: %w", loadErr)
+			}
+			if resetErr := prof.Tree.Reset(fresh.Tree); resetErr != nil {
+				return fmt.Errorf("tree reset: %w", resetErr)
+			}
+			// Re-stamp serial post-reset so factory reset doesn't collapse
+			// the CPE back onto the template's base serial.
+			if stampErr := prof.Tree.SetSystem(prof.DeviceIDPaths.SerialNumber, in.serial); stampErr != nil {
+				return fmt.Errorf("re-stamp serial: %w", stampErr)
+			}
+			tracker.ResetBootstrap()
+			return nil
+		}
+
+		// pendingCancels holds the cancel funcs for in-flight scheduled
+		// reboot / factory-reset deliveries. Accessed from RPC handlers
+		// (running inside a session) and from fired one-shot goroutines,
+		// so it carries its own mutex.
+		pendingCancels := &pendingScheduledCancels{}
+
+		var scheduleReboot handlers.RebootSchedule
+		if prof.EventSchedule.RebootDelay > 0 {
+			scheduleReboot = buildRebootScheduler(in.sched, in.id, tracker, prof.EventSchedule.RebootDelay, runner, pendingCancels, in.logger)
+		}
+		var scheduleFactoryReset handlers.FactoryResetSchedule
+		if prof.EventSchedule.FactoryResetDelay > 0 {
+			scheduleFactoryReset = buildFactoryResetScheduler(in.sched, in.id, prof.EventSchedule.FactoryResetDelay, runner, pendingCancels, in.logger)
+		}
+
+		hasScheduler = !prof.PeriodicInformPaths.IsZero()
+		valueChange := func(path string) {
+			tracker.RecordValueChange(path)
+			if hasScheduler &&
+				(path == prof.PeriodicInformPaths.Interval || path == prof.PeriodicInformPaths.Enable ||
+					(prof.PeriodicInformPaths.Time != "" && path == prof.PeriodicInformPaths.Time)) {
+				in.sched.OnIntervalChange(in.id)
+			}
+		}
+
+		session, err = cwmp.NewSession(cwmp.SessionOptions{
+			Transport: tt,
+			Inform:    placeholder,
+			Logger:    in.logger.With("cpe_id", in.id),
+			Handlers: []cwmp.Handler{
+				// GetRPCMethods answers with every method this list
+				// registers plus itself; keep the slice below in sync
+				// when adding handlers.
+				handlers.NewGetRPCMethods([]string{
+					"GetRPCMethods",
+					"GetParameterValues",
+					"GetParameterNames",
+					"GetParameterAttributes",
+					"SetParameterValues",
+					"SetParameterAttributes",
+					"AddObject",
+					"DeleteObject",
+					"Reboot",
+					"FactoryReset",
+					"Download",
+					"Upload",
+				}),
+				handlers.NewGetParameterValues(prof.Tree),
+				handlers.NewGetParameterNames(prof.Tree),
+				handlers.NewGetParameterAttributes(prof.Tree),
+				handlers.NewSetParameterValues(prof.Tree, valueChange),
+				handlers.NewSetParameterAttributes(prof.Tree),
+				handlers.NewAddObject(prof.Tree),
+				handlers.NewDeleteObject(prof.Tree),
+				handlers.NewReboot(tracker, scheduleReboot),
+				handlers.NewFactoryReset(factoryReset, scheduleFactoryReset),
+				handlers.NewDownload(scheduleTransfer),
+				handlers.NewUpload(scheduleTransfer),
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("session: %w", err)
+		}
+		runOpts.Session = session
+
+		if hasScheduler {
+			// Set Notification=1 on the interval/enable leaves so SPV
+			// triggers valueChange (most stacks ship them with
+			// Notification=0 because the ACS is the writer).
+			periodicLeaves := []string{prof.PeriodicInformPaths.Interval, prof.PeriodicInformPaths.Enable}
+			if prof.PeriodicInformPaths.Time != "" {
+				periodicLeaves = append(periodicLeaves, prof.PeriodicInformPaths.Time)
+			}
+			for _, p := range periodicLeaves {
+				attrs, gerr := prof.Tree.GetAttributes(p)
+				if gerr != nil {
+					return nil, fmt.Errorf("get attributes %q: %w", p, gerr)
+				}
+				attrs.Notification = 1
+				if serr := prof.Tree.SetAttributes(p, attrs); serr != nil {
+					return nil, fmt.Errorf("set notification on %q: %w", p, serr)
+				}
+			}
+			schedRNG := in.rngSource.ForCPE(in.id)
+			cpeID := in.id
+			logger := in.logger
+			if rerr := in.sched.Schedule(scheduler.Registration{
+				CPEID: cpeID,
+				Tree:  prof.Tree,
+				Paths: scheduler.PeriodicInformPaths{
+					Interval: prof.PeriodicInformPaths.Interval,
+					Enable:   prof.PeriodicInformPaths.Enable,
+					Time:     prof.PeriodicInformPaths.Time,
+				},
+				OnTick: func(_ context.Context) error {
+					start := time.Now()
+					ran, sessErr := runner.request(context.Background(), cwmp.TriggerPeriodic)
+					if sessErr != nil {
+						logger.Warn("periodic session failed",
+							"cpe_id", cpeID,
+							"duration", time.Since(start).String(),
+							"err", sessErr.Error())
+						return sessErr
+					}
+					if ran {
+						logger.Info("periodic session completed",
+							"cpe_id", cpeID,
+							"duration", time.Since(start).String())
+					}
+					return nil
+				},
+				RNG:       schedRNG,
+				JitterPct: 0.10,
+			}); rerr != nil {
+				return nil, fmt.Errorf("scheduler.Schedule: %w", rerr)
+			}
+		}
+
+		// CR listener registration (per-CPE path when count > 1). The URL
+		// itself is published by publishCRURLs once the listener has bound.
+		if in.listener != nil {
+			regPath, regErr := registerCREndpoint(in.listener, cfg, prof, in.id, in.fleetCount, runner, in.logger)
+			if regErr != nil {
+				return nil, fmt.Errorf("register CR endpoint: %w", regErr)
+			}
+			crEndpointPath = regPath
+			crPublishPath = cfg.CRPublishPath
+		}
 	}
 
 	return &cpeStack{
@@ -886,8 +913,14 @@ func bootstrapAll(ctx context.Context, stacks []*cpeStack, bootDelay time.Durati
 	}
 	results := make(chan result, len(stacks))
 	var wg sync.WaitGroup
+	spawned := 0
 	for _, st := range stacks {
 		st := st
+		if st.runner == nil {
+			// USP-only stack: no CWMP session to bootstrap.
+			continue
+		}
+		spawned++
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -935,11 +968,11 @@ func bootstrapAll(ctx context.Context, stacks []*cpeStack, bootDelay time.Durati
 	// (sessionRunner armed the Table 3 retry timer), and so do we.
 	// This also keeps the single-CPE one-shot contract: count==1 with a
 	// failed bootstrap still exits non-zero for CI.
-	if failed == len(stacks) {
-		return fmt.Errorf("all %d bootstrap session(s) failed; first: %w", len(stacks), firstErr)
+	if failed == spawned {
+		return fmt.Errorf("all %d bootstrap session(s) failed; first: %w", spawned, firstErr)
 	}
 	logger.Warn("some bootstrap sessions failed; those CPEs retry per the session retry policy",
-		"failed", failed, "total", len(stacks), "first_err", firstErr.Error())
+		"failed", failed, "total", spawned, "first_err", firstErr.Error())
 	return nil
 }
 

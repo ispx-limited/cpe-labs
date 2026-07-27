@@ -117,12 +117,19 @@ func (r *Runner) Run(ctx context.Context) error {
 }
 
 // announce sends OnBoardRequest followed by Boot!.
+func (r *Runner) announce() error {
+	return r.Announce("LocalReboot")
+}
+
+// Announce sends OnBoardRequest followed by Boot! with the given cause.
 //
 // Both, in that order, because they answer different questions: OnBoardRequest
 // says "this is who I am" with the identity triple, and Boot! says "I just
 // started" with the declared boot parameters. Controllers key device creation
-// off the first and telemetry off the second.
-func (r *Runner) announce() error {
+// off the first and telemetry off the second. Exported so a simulated factory
+// reset mid-run can re-introduce the device the way a wiped CPE would
+// (cause "RemoteFactoryReset" when a controller asked for it).
+func (r *Runner) Announce(cause string) error {
 	if err := r.send(NewOnBoardRequest(r.nextMsgID("onboard"), r.cfg.Identity)); err != nil {
 		return fmt.Errorf("onboard request: %w", err)
 	}
@@ -130,12 +137,19 @@ func (r *Runner) announce() error {
 		"endpoint_id", r.cfg.Identity.EndpointID,
 		"oui", r.cfg.Identity.OUI,
 		"serial", r.cfg.Identity.SerialNumber)
+	return r.Boot(cause)
+}
 
+// Boot sends a standalone Boot! with the given cause (TR-181
+// Device.Boot! Cause: "LocalReboot", "RemoteReboot", "LocalFactoryReset",
+// "RemoteFactoryReset"). Exported so a simulated reboot mid-run can re-fire
+// the event a restarted CPE would send, without re-onboarding.
+func (r *Runner) Boot(cause string) error {
 	boot := NewBootNotify(
 		r.nextMsgID("boot"),
 		r.cfg.BootSubscriptionID,
 		r.rootObjectPath(),
-		"LocalReboot",
+		cause,
 		r.collectBootParameters(),
 	)
 	if err := r.send(boot); err != nil {
@@ -143,6 +157,7 @@ func (r *Runner) announce() error {
 	}
 	r.log.Info("usp/agent: sent Boot!",
 		"endpoint_id", r.cfg.Identity.EndpointID,
+		"cause", cause,
 		"boot_parameters", len(r.cfg.BootParameters))
 	return nil
 }

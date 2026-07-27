@@ -208,13 +208,13 @@ Every flag has an env var (`CPE_SIM_*`) and a YAML key. Precedence is **flag > e
 
 ## TR-369 (USP) mode
 
-The same binary speaks USP over MQTT, WebSocket, or STOMP. Same profile, same parameter tree, same fleet:
+The same binary speaks USP over MQTT. Same profile, same parameter tree, same
+fleet, and `--acs-url` is optional: give it a broker and it runs USP-only.
 
 ```bash
 bin/cpe-sim \
   --profile=profiles/example-tr181-minimal.yaml \
-  --usp-mtp=mqtt \
-  --usp-mqtt-addr=broker.example.com:1883
+  --usp-broker=broker.example.com:1883
 ```
 
 See [USP Agent](usp.md) for the full set of MTP flags and Subscribe/Notify behavior.

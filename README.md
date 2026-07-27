@@ -12,10 +12,15 @@ new device is an afternoon, not a code change.
 
 ```bash
 make build
+
+# TR-369 (USP): the fleet as agents against your controller's MQTT broker
+bin/cpe-sim --profile=profiles/example-sagemcom-fast5598/ --usp-broker=your-broker:1883
+
+# TR-069 (CWMP): the same fleet against your ACS
 bin/cpe-sim --profile=profiles/example-sagemcom-fast5598/ --acs-url=http://your-acs:7547/
 ```
 
-That runs a Sagemcom Fast 5598 speaking TR-181: a PPP WAN drawing from declared
+Either command runs a Sagemcom Fast 5598 speaking TR-181: a PPP WAN drawing from declared
 address pools, five Ethernet interfaces, two WiFi radios with associated
 stations, and a LAN host table. Change `fleet.count` to 5000 and you have a
 fleet, each CPE with its own serial, MAC, IP and drift.
@@ -50,7 +55,20 @@ CPE annoying:
 
 ## What it speaks
 
-TR-069 (CWMP) over HTTP and SOAP, standards-faithful by default:
+TR-369 (USP) over MQTT. Runs standalone (no ACS required) or alongside CWMP:
+
+| Area | Detail |
+|------|--------|
+| Messages | Get (exact, partial and `*` search paths), Set, Add, Delete, GetInstances, GetSupportedDM, Operate |
+| Records | USP Record and Msg protobuf encoding, with per-path error codes rather than a blanket failure when one path in a batch is unknown |
+| Notifications | Boot!, OnBoardRequest, and pushed ValueChange, ObjectCreation and ObjectDeletion driven by real subscriptions in `Device.LocalAgent.Subscription.{i}.` |
+| Subscriptions | Wildcard reference lists, so one subscription covers every instance including those created later |
+| Commands | Device.Reboot() re-fires Boot!, Device.FactoryReset() re-fires OnBoardRequest and Boot!, the way a restarted or wiped device re-introduces itself |
+| MTP | MQTT 3.1.1 with the R-MQTT.24 reply-to-in-topic convention, which is what brokers without MQTT 5 user properties require |
+| Identity | TR-369 2.2 endpoint ids (`os::<OUI><Serial>`), derived from the same profile fields CWMP uses for its Inform DeviceId |
+
+TR-069 (CWMP) over HTTP and SOAP, standards-faithful by default, sharing the
+same parameter tree:
 
 | Area | Detail |
 |------|--------|
@@ -62,17 +80,6 @@ TR-069 (CWMP) over HTTP and SOAP, standards-faithful by default:
 | Auth | Basic and Digest against the ACS, with the challenge answered from tree-sourced credentials |
 | Faults | Spec-accurate fault codes, including 9005 for unknown parameters and multi-fault SPV responses |
 
-TR-369 (USP) over MQTT, sharing the same parameter tree:
-
-| Area | Detail |
-|------|--------|
-| Messages | Get (exact, partial and `*` search paths), Set, Add, Delete, GetInstances, GetSupportedDM, Operate |
-| Records | USP Record and Msg protobuf encoding, with per-path error codes rather than a blanket failure when one path in a batch is unknown |
-| Notifications | Boot!, OnBoardRequest, and pushed ValueChange, ObjectCreation and ObjectDeletion driven by real subscriptions in `Device.LocalAgent.Subscription.{i}.` |
-| Subscriptions | Wildcard reference lists, so one subscription covers every instance including those created later |
-| MTP | MQTT 3.1.1 with the R-MQTT.24 reply-to-in-topic convention, which is what brokers without MQTT 5 user properties require |
-| Identity | TR-369 2.2 endpoint ids (`os::<OUI><Serial>`), derived from the same profile fields CWMP uses for its Inform DeviceId |
-
 The two stacks run against one tree, not two copies. A counter a generator is
 moving reads the same over USP as over CWMP, and a Set from either protocol is
 visible to the other, which is what a dual-stack CPE actually does. That also
@@ -80,11 +87,31 @@ means a subscription fires on changes a CWMP session caused, and vice versa.
 
 ## Get going
 
+### TR-369 (USP)
+
+Point the agent at your controller's MQTT broker. No ACS, no `--acs-url`:
+
+```bash
+# One TR-181 CPE as a USP agent
+bin/cpe-sim --profile=profiles/example-tr181-minimal.yaml --usp-broker=broker:1883
+
+# A replayable fleet: set fleet.count in the profile, seed the run
+bin/cpe-sim --profile=profiles/example-sagemcom-fast5598/ --usp-broker=broker:1883 --seed=42
+```
+
+The agent onboards itself (OnBoardRequest, then Boot!), serves controller
+requests, and pushes notifications for whatever the controller subscribes to.
+See the [USP guide](docs/guides/usp.md).
+
+### TR-069 (CWMP)
+
+Point the fleet at your ACS:
+
 ```bash
 # One TR-181 CPE, minimal profile
 bin/cpe-sim --profile=profiles/example-tr181-minimal.yaml --acs-url=http://acs:7547/
 
-# The same fleet, replayable: set fleet.count in the profile, seed the run
+# The same fleet, replayable
 bin/cpe-sim --profile=profiles/example-sagemcom-fast5598/ --acs-url=http://acs:7547/ --seed=42
 
 # Answer connection requests
@@ -93,10 +120,15 @@ bin/cpe-sim --profile=profiles/example-sagemcom-fast5598/ --acs-url=http://acs:7
     --cr-publish-path=Device.ManagementServer.ConnectionRequestURL
 ```
 
-Docker, no clone required — the image ships with the reference profiles at
-`/profiles/`:
+Passing both `--usp-broker` and `--acs-url` runs the same fleet dual-stack
+over one shared tree.
+
+### Docker
+
+No clone needed: the image ships with the reference profiles at `/profiles/`.
 
 ```bash
+docker run --rm ispxhq/cpe-labs --profile=/profiles/example-tr181-minimal.yaml --usp-broker=broker:1883
 docker run --rm ispxhq/cpe-labs --profile=/profiles/example-tr181-minimal.yaml --acs-url=http://acs:7547/
 ```
 

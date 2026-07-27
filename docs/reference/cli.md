@@ -11,7 +11,7 @@ The CLI is parsed by `internal/cpeconfig`. Unknown flags, unknown YAML keys, and
 | `--profile` | `CPE_SIM_PROFILE` | `profile` | Path to a YAML/JSON profile file or directory of YAML files. No built-in fallback; the simulator is vendor-neutral and will not assume a data model. |
 | `--acs-url` | `CPE_SIM_ACS_URL` | `acsURL` | The ACS's CWMP endpoint. Required for TR-069 mode. |
 
-For TR-369 (USP) mode, `--acs-url` may be omitted as long as `--usp-mtp` is set; see [USP Agent](../guides/usp.md).
+For TR-369 (USP) mode, `--acs-url` may be omitted as long as `--usp-broker` is set; see [USP Agent](../guides/usp.md).
 
 ## ACS / TR-069
 
