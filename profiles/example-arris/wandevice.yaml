@@ -1,0 +1,291 @@
+# InternetGatewayDevice.WANDevice.{i}.*, WAN configuration.
+# Arris exposes a single WANDevice with one WANConnectionDevice
+# carrying two L3 connections, mirroring real NVG firmware which
+# pre-creates both connection flavors:
+#   WANIPConnection.1  is the primary data path (DHCP), Connected
+#   WANPPPConnection.1 is a PPPoE session for the voice/management VLAN,
+#                        Connected, with an occasional scripted redial
+#                        (enum generator on ConnectionStatus) so ACS
+#                        dashboards see realistic PPP flap noise.
+
+parameters:
+  - path: InternetGatewayDevice.WANDeviceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+  - path: InternetGatewayDevice.WANDevice.1.WANConnectionNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+  - path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnectionNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+  - path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnectionNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+
+# Single-instance object: byte/packet counters with inline generators.
+groups:
+  - prefix: InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig
+    parameters:
+      - path: EnabledForInternet
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: WANAccessType
+        value: "Ethernet"
+      - path: Layer1UpstreamMaxBitRate
+        type: xsd:unsignedInt
+        value: "1000000000"
+      - path: Layer1DownstreamMaxBitRate
+        type: xsd:unsignedInt
+        value: "1000000000"
+      - path: PhysicalLinkStatus
+        value: "Up"
+      - path: TotalBytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 12500000
+          jitter: 0.2
+      - path: TotalBytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 25000000
+          jitter: 0.2
+      - path: TotalPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 8000
+          jitter: 0.3
+      - path: TotalPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 16000
+          jitter: 0.3
+
+  # Per-connection Ethernet counters (TR-098 WANIPConnection.{i}.Stats).
+  # An ACS WAN telemetry profile GPVs the four Ethernet* counters.
+  - prefix: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Stats
+    parameters:
+      - path: EthernetBytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 12000000
+          jitter: 0.2
+      - path: EthernetBytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 24000000
+          jitter: 0.2
+      - path: EthernetPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 7500
+          jitter: 0.3
+      - path: EthernetPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 15000
+          jitter: 0.3
+
+  # PPPoE session counters. Voice/mgmt VLAN traffic is small compared
+  # to the data path, so the steps model roughly 100 kbit/s of RTP.
+  - prefix: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Stats
+    parameters:
+      - path: EthernetBytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 375000
+          jitter: 0.3
+      - path: EthernetBytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 375000
+          jitter: 0.3
+      - path: EthernetPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 1500
+          jitter: 0.3
+      - path: EthernetPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 1500
+          jitter: 0.3
+
+# WANIPConnection.{i} (single-active-instance table) + X_ARRIS_COM_*
+# IPv6 vendor extensions on the same instance.
+objects:
+  - path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: ConnectionStatus
+        value: "Connected"
+      - path: ConnectionType
+        value: "IP_Routed"
+        writable: true
+      - path: AddressingType
+        value: "DHCP"
+        writable: true
+      - path: ExternalIPAddress
+        value: "{wan_ipv4}"
+      - path: SubnetMask
+        value: "255.255.255.0"
+      - path: DefaultGateway
+        value: "203.0.113.1"
+      - path: DNSServers
+        value: "8.8.8.8,8.8.4.4"
+      - path: MACAddress
+        value: "00:00:C5:{cpe:mac:3}"
+      - path: NATEnabled
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Uptime
+        type: xsd:unsignedInt
+        value: "0"
+      - path: LastConnectionError
+        value: "ERROR_NONE"
+      - path: X_ARRIS_COM_IPv6Address
+        value: "{wan_ipv6}"
+      - path: X_ARRIS_COM_DelegatedPrefix
+        value: "{delegated_prefix}"
+      - path: X_ARRIS_COM_IPv6Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+
+  # WANPPPConnection.{i}: PPPoE session for the voice/management VLAN.
+  # ConnectionStatus mostly sits at Connected but cycles through one
+  # scripted redial (Disconnecting -> Disconnected -> Connecting) every
+  # ten minutes, the fleet-noise shape PPP dashboards care about.
+  # Writable on ConnectionStatus is a sim affordance for the generator,
+  # same convention the counter targets use.
+  - path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: ConnectionStatus
+        value: "Connected"
+        writable: true
+        generator:
+          type: enum
+          interval: 60s
+          mode: cycle
+          values:
+            - "Connected"
+            - "Connected"
+            - "Connected"
+            - "Connected"
+            - "Connected"
+            - "Connected"
+            - "Connected"
+            - "Disconnecting"
+            - "Disconnected"
+            - "Connecting"
+      - path: ConnectionType
+        value: "IP_Routed"
+        writable: true
+      - path: TransportType
+        value: "PPPoE"
+      - path: Uptime
+        type: xsd:unsignedInt
+        value: "0"
+      - path: LastConnectionError
+        value: "ERROR_NONE"
+      - path: ExternalIPAddress
+        value: "{voice_ipv4}"
+      - path: DNSServers
+        value: "8.8.8.8,8.8.4.4"
+      - path: MACAddress
+        value: "00:00:C5:{cpe:mac:3}"
+      - path: NATEnabled
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Username
+        value: "cpe-{cpe:hex:6}@voice.example.net"
+        writable: true
+      - path: PPPoEACName
+        value: "erx-dfw-01"
+        writable: true
+      - path: PPPoEServiceName
+        value: "voice"
+        writable: true

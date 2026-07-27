@@ -1,0 +1,96 @@
+groups:
+  - prefix: Device.DeviceInfo
+    parameters:
+      - path: Manufacturer
+        value: "Sagemcom"
+      - path: ManufacturerOUI
+        value: "ECFC2F"
+      - path: ModelName
+        value: "FAST5598"
+      - path: Description
+        value: "Sagemcom Fast 5598 residential gateway"
+      - path: ProductClass
+        value: "FAST5598"
+      - path: SerialNumber
+        value: "BASE"
+      - path: HardwareVersion
+        value: "1.0"
+      - path: SoftwareVersion
+        value: "SG00000000000"
+      - path: AdditionalSoftwareVersion
+        value: ""
+      - path: SpecVersion
+        value: "1.0"
+      - path: ProvisioningCode
+        value: ""
+        writable: true
+      - path: UpTime
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: uptime
+          interval: 1s
+      - path: DeviceLog
+        value: ""
+
+  - prefix: Device.DeviceInfo.MemoryStatus
+    parameters:
+      - path: Total
+        type: xsd:unsignedInt
+        value: "524288"
+      - path: Free
+        type: xsd:unsignedInt
+        value: "262144"
+
+  # ProcessStatus (TR-181 Device.DeviceInfo.ProcessStatus). CPUUsage is
+  # percent (0..100), xsd:unsignedInt per the standard. An ACS's
+  # system telemetry profile GPVs this exact path every session. Static
+  # value: the drift generator targets xsd:int gauges only, and the
+  # standard type wins over animation.
+  - prefix: Device.DeviceInfo.ProcessStatus
+    parameters:
+      - path: CPUUsage
+        type: xsd:unsignedInt
+        value: "17"
+      - path: ProcessNumberOfEntries
+        type: xsd:unsignedInt
+        value: "96"
+
+  - prefix: Device.DeviceInfo.TemperatureStatus
+    parameters:
+      - path: TemperatureSensorNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+
+# TemperatureStatus.TemperatureSensor.{i}: one on-SoC sensor. Value is
+# degrees celsius, xsd:int per the standard, so it can drift like a
+# real thermal reading under varying load.
+objects:
+  - path: Device.DeviceInfo.TemperatureStatus.TemperatureSensor
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: Name
+        value: "cpu"
+      - path: Value
+        type: xsd:int
+        value: "61"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: 48
+          max: 78
+          stepMax: 2
+      - path: MinValue
+        type: xsd:int
+        value: "44"
+      - path: MaxValue
+        type: xsd:int
+        value: "82"

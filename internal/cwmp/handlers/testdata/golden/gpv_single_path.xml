@@ -1,0 +1,6 @@
+      <ParameterList>
+        <ParameterValueStruct>
+          <Name>Device.DeviceInfo.SerialNumber</Name>
+          <Value xsi:type="xsd:string">ABC123</Value>
+        </ParameterValueStruct>
+      </ParameterList>

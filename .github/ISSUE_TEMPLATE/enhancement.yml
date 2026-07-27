@@ -1,0 +1,47 @@
+name: Enhancement
+description: Improve an existing feature
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Enhancements go through the [spec workflow](../../context/PROCESS.md) unless trivial.
+  - type: textarea
+    id: description
+    attributes:
+      label: What
+      description: What specific improvement do you want?
+      placeholder: "e.g., Add jitter to the periodic Inform interval so a fleet of simulated CPEs does not hit the ACS in a synchronised wave"
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Why
+      description: What problem does this solve or what does it improve?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: How do we know this is done?
+    validations:
+      required: true
+  - type: textarea
+    id: scope-boundary
+    attributes:
+      label: Not in scope
+      description: What is explicitly NOT part of this enhancement?
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - P0 (critical path)
+        - P1 (important)
+        - P2 (nice to have)
+    validations:
+      required: true

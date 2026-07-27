@@ -1,0 +1,20 @@
+      <DeviceId>
+        <Manufacturer>ACME</Manufacturer>
+        <OUI>001122</OUI>
+        <ProductClass>HomeGateway</ProductClass>
+        <SerialNumber>ABC123</SerialNumber>
+      </DeviceId>
+      <Event>
+        <EventStruct>
+          <EventCode>7 TRANSFER COMPLETE</EventCode>
+          <CommandKey></CommandKey>
+        </EventStruct>
+        <EventStruct>
+          <EventCode>M Download</EventCode>
+          <CommandKey>fw-1</CommandKey>
+        </EventStruct>
+      </Event>
+      <MaxEnvelopes>1</MaxEnvelopes>
+      <CurrentTime>2026-04-28T12:00:00Z</CurrentTime>
+      <RetryCount>0</RetryCount>
+      <ParameterList></ParameterList>

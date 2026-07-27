@@ -1,25 +1,58 @@
-# Contributing
+# Contributing to cpe-labs
 
-cpe-labs is in early development and the design is still settling. The most useful
-contribution right now is experience: if you operate an ACS or test against CPE
-fleets, open an issue describing your setup, the vendors and models you care about,
-and what realistic scale means for you.
+Bug reports, vendor profiles and code are all welcome. Profiles especially: the
+project is only as useful as the range of real CPE behavior it can imitate, and
+a profile needs no Go changes.
 
-## Issues
+## Getting started
 
-Include what you were doing, what you expected, and what happened. For feature
-requests, describe the problem before the solution.
+1. **Open an issue** using one of the templates in `.github/ISSUE_TEMPLATE/`
+   (`bug`, `feature`, `enhancement`). For a bug, the most useful thing you can
+   attach is the profile and the flags you ran, plus what the ACS saw.
+2. **Discuss first if the change is large.** Anything that touches the parameter
+   tree, the session state machine or the profile schema is worth agreeing on in
+   the issue before you write it.
+3. **Open a pull request** that links the issue with `Closes #<N>`.
 
-## Pull requests
+## Local checks
 
-- Open an issue first for anything larger than a small fix, so the approach is
-  agreed before you spend time on it.
-- Keep PRs focused on one change.
-- Commit subjects follow `area: imperative summary`, for example
-  `sim: handle connection request timeouts`. PRs are squash-merged.
-- Include tests for behavior changes once you touch code that has a test suite.
+Run what CI runs before pushing:
 
-## License
+```sh
+make lint    # golangci-lint run
+make vet     # go vet ./...
+make test    # go test ./...
+make build   # builds bin/cpe-sim with version metadata
+```
 
-By contributing you agree that your contributions are licensed under the
-Apache License 2.0, the same license as the project.
+Prerequisites: Go 1.25+ and `golangci-lint`. The Go module declares its
+toolchain, so a fresh clone with `GOTOOLCHAIN=auto` fetches the right Go
+automatically.
+
+Tests that compare against recorded wire output use golden files under
+`testdata/`. When a deliberate change alters the expected output, regenerate
+with `go test ./... -update` and review the resulting diff as part of your
+change; a golden file updated without a reason in the PR description will be
+questioned.
+
+## Commits and branches
+
+Conventional Commits, and a pull request per logical change:
+
+- Branch: `<type>/<scope>-<description>`, e.g. `feat/tr069-inform-retry`
+- Commit: `<type>(<scope>): <description>`
+
+Types: `feat`, `fix`, `docs`, `refactor`, `test`, `ci`, `chore`, `build`.
+
+## Architecture guardrails
+
+The [design principles](docs/overview/architecture.md#design-principles) are
+load-bearing. Two catch contributors most often:
+
+- **Behavior is config, not code.** No `switch` on vendor strings, no embedded
+  vendor data models. Vendor differences belong in profiles.
+- **Protocol-agnostic core.** TR-069 and TR-369 are transport adapters. Adding a
+  transport must not require touching the parameter tree or the behavior engine.
+
+If you find yourself special-casing a vendor, or hardcoding a TR-098 or TR-181
+path in core code, that is the signal to stop and reach for a profile instead.

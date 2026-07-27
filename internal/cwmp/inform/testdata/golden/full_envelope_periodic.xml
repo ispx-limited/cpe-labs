@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:soap-enc="http://schemas.xmlsoap.org/soap/encoding/" xmlns:cwmp="urn:dslforum-org:cwmp-1-1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soapenv:Header>
+    <cwmp:ID soapenv:mustUnderstand="1">42</cwmp:ID>
+  </soapenv:Header>
+  <soapenv:Body>
+    <cwmp:Inform>
+      <DeviceId>
+        <Manufacturer>ACME</Manufacturer>
+        <OUI>001122</OUI>
+        <ProductClass>HomeGateway</ProductClass>
+        <SerialNumber>ABC123</SerialNumber>
+      </DeviceId>
+      <Event>
+        <EventStruct>
+          <EventCode>2 PERIODIC</EventCode>
+          <CommandKey></CommandKey>
+        </EventStruct>
+      </Event>
+      <MaxEnvelopes>1</MaxEnvelopes>
+      <CurrentTime>2026-04-28T12:00:00Z</CurrentTime>
+      <RetryCount>0</RetryCount>
+      <ParameterList>
+        <ParameterValueStruct>
+          <Name>Device.DeviceInfo.UpTime</Name>
+          <Value xsi:type="xsd:unsignedInt">3600</Value>
+        </ParameterValueStruct>
+        <ParameterValueStruct>
+          <Name>Device.WiFi.SSID</Name>
+          <Value xsi:type="xsd:string">home</Value>
+        </ParameterValueStruct>
+      </ParameterList>
+
+    </cwmp:Inform>
+  </soapenv:Body>
+</soapenv:Envelope>

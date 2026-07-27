@@ -1,0 +1,1 @@
+mkdocs-shadcn>=0.6

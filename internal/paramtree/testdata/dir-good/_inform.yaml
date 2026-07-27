@@ -1,0 +1,11 @@
+deviceIdPaths:
+  manufacturer: Device.DeviceInfo.Manufacturer
+  oui:          Device.DeviceInfo.Manufacturer
+  productClass: Device.DeviceInfo.Manufacturer
+  serialNumber: Device.DeviceInfo.SerialNumber
+
+informParameters:
+  bootstrap:
+    - Device.DeviceInfo.SerialNumber
+  periodic:
+    - Device.DeviceInfo.UpTime

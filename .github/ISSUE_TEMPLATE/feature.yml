@@ -1,0 +1,55 @@
+name: Feature
+description: Request a new capability
+labels: ["feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        All features go through the [spec workflow](../../context/PROCESS.md). This issue becomes the source of truth for the spec and implementation.
+  - type: textarea
+    id: description
+    attributes:
+      label: What
+      description: What specific deliverable do you want? Be concrete.
+      placeholder: "e.g., Add TR-069 GetParameterValues RPC handling to the simulator"
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Why
+      description: What problem does this solve? What's the motivation?
+      placeholder: "e.g., Operators need their ACS to receive accurate GPV responses from simulated CPEs to test parameter polling at scale"
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: How do we know this is done? List concrete, testable criteria.
+      placeholder: |
+        - [ ] CPE responds to GetParameterValues with the correct envelope
+        - [ ] Wildcard paths (`Device.WiFi.SSID.*.`) expand to all instances
+        - [ ] Unknown parameters return fault code 9005
+        - [ ] Unit tests cover the three cases above
+    validations:
+      required: true
+  - type: textarea
+    id: scope-boundary
+    attributes:
+      label: Not in scope
+      description: What is explicitly NOT part of this issue? Prevents scope creep.
+      placeholder: "e.g., Does not include SetParameterValues, does not include attribute notifications"
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: Implementation priority.
+      options:
+        - P0 (critical path)
+        - P1 (important)
+        - P2 (nice to have)
+    validations:
+      required: true

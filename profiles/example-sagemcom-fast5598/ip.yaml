@@ -1,0 +1,179 @@
+# Device.IP.*, IP layer interfaces.
+# Two interfaces: 1 = LAN bridge (192.168.1.0/24), 2 = WAN (PPPoE-assigned IPv4 + IPv6).
+
+parameters:
+  - path: Device.IP.IPv4Capable
+    type: xsd:boolean
+    value: "true"
+  - path: Device.IP.IPv4Enable
+    type: xsd:boolean
+    value: "true"
+    writable: true
+  - path: Device.IP.IPv6Capable
+    type: xsd:boolean
+    value: "true"
+  - path: Device.IP.IPv6Enable
+    type: xsd:boolean
+    value: "true"
+    writable: true
+  - path: Device.IP.InterfaceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "2"
+
+objects:
+  - path: Device.IP.Interface
+    instances: 2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Alias
+        value: "IP_{i}"
+        writable: true
+      - path: Name
+        value: "ip{i}"
+      - path: LastChange
+        type: xsd:unsignedInt
+        value: "0"
+      - path: LowerLayers
+        value: ""
+        writable: true
+      - path: Type
+        value: "Normal"
+      - path: Loopback
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: IPv4Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: IPv6Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: IPv4AddressNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+      - path: IPv6AddressNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+      - path: IPv6PrefixNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+      - path: ULAEnable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: AutoIPEnable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: MaxMTUSize
+        type: xsd:unsignedInt
+        value: "1500"
+        writable: true
+      - path: CurrentMTUSize
+        type: xsd:unsignedInt
+        value: "1500"
+      - path: Reset
+        type: xsd:boolean
+        value: "false"
+        writable: true
+
+  # ---- LAN side: IP.Interface.1.IPv4Address.1 (static 192.168.1.1) ----
+  - path: Device.IP.Interface.1.IPv4Address
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: AddressingType
+        value: "Static"
+        writable: true
+      - path: IPAddress
+        value: "192.168.1.1"
+        writable: true
+      - path: SubnetMask
+        value: "255.255.255.0"
+        writable: true
+      - path: Alias
+        value: "LAN_ADDRESS"
+        writable: true
+
+  # ---- WAN side: IP.Interface.2.IPv4Address.1 (DHCP/PPP-assigned, per-CPE) ----
+  - path: Device.IP.Interface.2.IPv4Address
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: AddressingType
+        value: "DHCP"
+        writable: true
+      - path: IPAddress
+        value: "{wan_ipv4}"
+        writable: true
+      - path: SubnetMask
+        value: "255.255.255.0"
+        writable: true
+      - path: Alias
+        value: "WAN_ADDRESS"
+        writable: true
+
+  # ---- WAN side: IP.Interface.2.IPv6Address.1 (per-CPE) ----
+  - path: Device.IP.Interface.2.IPv6Address
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: IPAddressStatus
+        value: "Preferred"
+      - path: IPAddress
+        value: "{wan_ipv6}"
+        writable: true
+      - path: Origin
+        value: "AutoConfigured"
+        writable: true
+      - path: Anycast
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Alias
+        value: "WAN_ADDRESS_V6"
+        writable: true
+
+  # ---- WAN delegated prefix from upstream ----
+  - path: Device.IP.Interface.2.IPv6Prefix
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: Prefix
+        value: "{delegated_prefix}"
+        writable: true
+      - path: Origin
+        value: "PrefixDelegation"
+      - path: StaticType
+        value: "Static"
+        writable: true
+      - path: Alias
+        value: "DELEGATED"
+        writable: true

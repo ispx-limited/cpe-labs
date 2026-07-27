@@ -1,0 +1,110 @@
+# TR-098 (InternetGatewayDevice.*) profile, structured to match the
+# layout of genieacs-sim/data_model_202BC1-BM632w-8KA8WA1151100043.csv.
+# Representative subset, not a full 1007-row port. Use as a starting
+# point for vendor-specific profiles based on the genieacs-sim model.
+#
+#   bin/cpe-sim --profile=profiles/example-tr098-genieacs-sim.yaml
+
+deviceIdPaths:
+  manufacturer: InternetGatewayDevice.DeviceInfo.Manufacturer
+  oui:          InternetGatewayDevice.DeviceInfo.ManufacturerOUI
+  productClass: InternetGatewayDevice.DeviceInfo.ProductClass
+  serialNumber: InternetGatewayDevice.DeviceInfo.SerialNumber
+
+parameters:
+  # ---- DeviceID (top-level identifying parameters) ----
+  - path: DeviceID.Manufacturer
+    value: "Huawei Technologies Co., Ltd."
+  - path: DeviceID.OUI
+    value: "202BC1"
+  - path: DeviceID.ProductClass
+    value: "BM632w"
+  - path: DeviceID.SerialNumber
+    value: "8KA8WA1151100043"
+
+  # ---- InternetGatewayDevice.DeviceInfo ----
+  - path: InternetGatewayDevice.DeviceInfo.Manufacturer
+    value: "Huawei Technologies Co., Ltd."
+  - path: InternetGatewayDevice.DeviceInfo.ManufacturerOUI
+    value: "202BC1"
+  - path: InternetGatewayDevice.DeviceInfo.ModelName
+    value: "BM632w"
+  - path: InternetGatewayDevice.DeviceInfo.ProductClass
+    value: "BM632w"
+  - path: InternetGatewayDevice.DeviceInfo.SerialNumber
+    value: "8KA8WA1151100043"
+  - path: InternetGatewayDevice.DeviceInfo.HardwareVersion
+    value: "40501"
+  - path: InternetGatewayDevice.DeviceInfo.SoftwareVersion
+    value: "V100R001IRQC56B017"
+  - path: InternetGatewayDevice.DeviceInfo.SpecVersion
+    value: "1"
+  - path: InternetGatewayDevice.DeviceInfo.UpTime
+    type: xsd:unsignedInt
+    value: "213138"
+  - path: InternetGatewayDevice.DeviceInfo.ProvisioningCode
+    value: ""
+    writable: true
+  - path: InternetGatewayDevice.DeviceInfo.Description
+    value: "Huawei WiMAX Home Gateway"
+
+  # ---- InternetGatewayDevice.ManagementServer ----
+  - path: InternetGatewayDevice.ManagementServer.URL
+    value: "http://acs.example/cwmp"
+    writable: true
+  - path: InternetGatewayDevice.ManagementServer.Username
+    value: ""
+    writable: true
+  - path: InternetGatewayDevice.ManagementServer.Password
+    value: ""
+    writable: true
+  - path: InternetGatewayDevice.ManagementServer.PeriodicInformEnable
+    type: xsd:boolean
+    value: "true"
+    writable: true
+  - path: InternetGatewayDevice.ManagementServer.PeriodicInformInterval
+    type: xsd:unsignedInt
+    value: "300"
+    writable: true
+  - path: InternetGatewayDevice.ManagementServer.ConnectionRequestURL
+    value: "http://192.0.2.1:7547/"
+    writable: false
+  - path: InternetGatewayDevice.ManagementServer.ParameterKey
+    value: ""
+    writable: true
+
+  # ---- InternetGatewayDevice.LANDevice.1.WLANConfiguration ({i}) ----
+  - path: InternetGatewayDevice.LANDevice.1.WLANConfiguration.{i}.Enable
+    type: xsd:boolean
+    instances: 2
+    value: "true"
+    writable: true
+  - path: InternetGatewayDevice.LANDevice.1.WLANConfiguration.{i}.SSID
+    instances: 2
+    value: "Network-{i}"
+    writable: true
+  - path: InternetGatewayDevice.LANDevice.1.WLANConfiguration.{i}.BeaconType
+    instances: 2
+    value: "11i"
+    writable: true
+  - path: InternetGatewayDevice.LANDevice.1.WLANConfiguration.{i}.Channel
+    type: xsd:unsignedInt
+    instances: 2
+    value: "6"
+    writable: true
+
+  # ---- InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1 ----
+  - path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Enable
+    type: xsd:boolean
+    value: "true"
+    writable: true
+  - path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ConnectionStatus
+    value: "Connected"
+  - path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ExternalIPAddress
+    value: "203.0.113.5"
+
+  # ---- InternetGatewayDevice.X_VENDOR_* extension example ----
+  - path: InternetGatewayDevice.DeviceInfo.X_HUAWEI_PortalManagement.Enable
+    type: xsd:boolean
+    value: "false"
+    writable: true

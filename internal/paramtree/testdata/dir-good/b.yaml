@@ -1,0 +1,6 @@
+parameters:
+  - path: Device.DeviceInfo.UpTime
+    type: xsd:unsignedInt
+    value: "3600"
+  - path: Device.DeviceInfo.HardwareVersion
+    value: "v1.0"

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<soap-env:Envelope xmlns:soap-env="http://schemas.xmlsoap.org/soap/envelope/" xmlns:soap-enc="http://schemas.xmlsoap.org/soap/encoding/" xmlns:cwmp="urn:dslforum-org:cwmp-1-1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap-env:Header>
+    <cwmp:ID soap-env:mustUnderstand="1">42</cwmp:ID>
+  </soap-env:Header>
+  <soap-env:Body>
+    <cwmp:GetRPCMethods>
+
+    </cwmp:GetRPCMethods>
+  </soap-env:Body>
+</soap-env:Envelope>

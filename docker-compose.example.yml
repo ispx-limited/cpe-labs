@@ -1,0 +1,25 @@
+# Example docker-compose for running cpe-sim against an external ACS.
+# Copy to docker-compose.yml and edit as needed.
+#
+#   docker compose -f docker-compose.example.yml up --build
+
+services:
+  cpe-sim:
+    build:
+      context: .
+    image: cpe-sim:dev
+    command:
+      - --profile=/profiles/example-tr181-minimal.yaml
+      - --acs-url=${ACS_URL:-http://acs.local:7547/}
+      - --cr-bind-addr=0.0.0.0:7547
+      - --cr-publish-path=Device.ManagementServer.ConnectionRequestURL
+      - --seed=1
+      - --log-level=info
+    ports:
+      # ACS-initiated connection requests land here. When fleet.count > 1
+      # the listener routes to /cr/<cpe-id> per CPE on the same port.
+      - "7547:7547"
+    environment:
+      # Override per-deployment with .env or `--env-file`.
+      ACS_URL: ${ACS_URL:-http://acs.local:7547/}
+    restart: unless-stopped

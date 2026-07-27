@@ -1,0 +1,92 @@
+groups:
+  - prefix: InternetGatewayDevice.DeviceInfo
+    parameters:
+      - path: Manufacturer
+        value: "ARRIS"
+      - path: ManufacturerOUI
+        value: "0000C5"
+      - path: ModelName
+        value: "NVG578LX"
+      - path: Description
+        value: "ARRIS NVG578LX residential gateway"
+      - path: ProductClass
+        value: "NVG578LX"
+      - path: SerialNumber
+        value: "BASE"
+      - path: HardwareVersion
+        value: "1.0"
+      - path: SoftwareVersion
+        value: "9.0.0"
+      - path: AdditionalSoftwareVersion
+        value: ""
+      - path: SpecVersion
+        value: "1.1"
+      - path: ProvisioningCode
+        value: ""
+        writable: true
+      - path: UpTime
+        type: xsd:unsignedInt
+        value: "0"
+      - path: DeviceLog
+        value: ""
+
+  - prefix: InternetGatewayDevice.DeviceInfo.MemoryStatus
+    parameters:
+      - path: Total
+        type: xsd:unsignedInt
+        value: "262144"
+      - path: Free
+        type: xsd:unsignedInt
+        value: "131072"
+
+  # ProcessStatus (TR-098 amendment 8). CPUUsage is percent (0..100),
+  # xsd:unsignedInt per the standard. a typical ACS system telemetry profile
+  # GPVs this exact path every session; a profile without it faults
+  # 9005 per session. Static value: the drift generator targets
+  # xsd:int gauges only, and the standard type wins over animation.
+  - prefix: InternetGatewayDevice.DeviceInfo.ProcessStatus
+    parameters:
+      - path: CPUUsage
+        type: xsd:unsignedInt
+        value: "12"
+      - path: ProcessNumberOfEntries
+        type: xsd:unsignedInt
+        value: "42"
+
+  - prefix: InternetGatewayDevice.DeviceInfo.TemperatureStatus
+    parameters:
+      - path: TemperatureSensorNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+
+# TemperatureStatus.TemperatureSensor.{i} (TR-098 amendment 8): one
+# on-SoC sensor. Value is degrees celsius, xsd:int per the standard,
+# so it can drift like a real thermal reading under varying load.
+objects:
+  - path: InternetGatewayDevice.DeviceInfo.TemperatureStatus.TemperatureSensor
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: Name
+        value: "CPU"
+      - path: Value
+        type: xsd:int
+        value: "58"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: 46
+          max: 74
+          stepMax: 2
+      - path: MinValue
+        type: xsd:int
+        value: "41"
+      - path: MaxValue
+        type: xsd:int
+        value: "79"

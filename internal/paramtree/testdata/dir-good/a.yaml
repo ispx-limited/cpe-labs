@@ -1,0 +1,5 @@
+parameters:
+  - path: Device.DeviceInfo.Manufacturer
+    value: "ACME"
+  - path: Device.DeviceInfo.SerialNumber
+    value: "ABC123"

@@ -1,0 +1,38 @@
+# Device.Hosts.*, DHCP-style host table.
+
+parameters:
+  - path: Device.Hosts.HostNumberOfEntries
+    type: xsd:unsignedInt
+    value: "5"
+
+objects:
+  - path: Device.Hosts.Host
+    instances: 5
+    parameters:
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: PhysAddress
+        value: "5C:51:4F:00:02:0{i}"
+      - path: IPAddress
+        value: "192.168.1.{i}0"
+      - path: HostName
+        value: "client-{i}-cpe{cpe:hex:4}"
+      - path: AddressSource
+        value: "DHCP"
+      - path: LeaseTimeRemaining
+        type: xsd:int
+        value: "86400"
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.1"
+      - path: Layer3Interface
+        value: "Device.IP.Interface.1"
+      - path: Alias
+        value: "host-{i}"
+        writable: true
+      - path: IPv4AddressNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+      - path: IPv6AddressNumberOfEntries
+        type: xsd:unsignedInt
+        value: "0"

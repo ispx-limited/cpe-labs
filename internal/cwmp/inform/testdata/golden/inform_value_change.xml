@@ -1,0 +1,21 @@
+      <DeviceId>
+        <Manufacturer>ACME</Manufacturer>
+        <OUI>001122</OUI>
+        <ProductClass>HomeGateway</ProductClass>
+        <SerialNumber>ABC123</SerialNumber>
+      </DeviceId>
+      <Event>
+        <EventStruct>
+          <EventCode>4 VALUE CHANGE</EventCode>
+          <CommandKey></CommandKey>
+        </EventStruct>
+      </Event>
+      <MaxEnvelopes>1</MaxEnvelopes>
+      <CurrentTime>2026-04-28T12:00:00Z</CurrentTime>
+      <RetryCount>0</RetryCount>
+      <ParameterList>
+        <ParameterValueStruct>
+          <Name>Device.WiFi.SSID</Name>
+          <Value xsi:type="xsd:string">guest</Value>
+        </ParameterValueStruct>
+      </ParameterList>

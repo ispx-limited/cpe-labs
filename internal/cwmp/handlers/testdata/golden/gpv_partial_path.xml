@@ -1,0 +1,18 @@
+      <ParameterList>
+        <ParameterValueStruct>
+          <Name>Device.WiFi.AccessPoint.1.Enable</Name>
+          <Value xsi:type="xsd:boolean">true</Value>
+        </ParameterValueStruct>
+        <ParameterValueStruct>
+          <Name>Device.WiFi.AccessPoint.1.SSID</Name>
+          <Value xsi:type="xsd:string">home</Value>
+        </ParameterValueStruct>
+        <ParameterValueStruct>
+          <Name>Device.WiFi.AccessPoint.2.Enable</Name>
+          <Value xsi:type="xsd:boolean">false</Value>
+        </ParameterValueStruct>
+        <ParameterValueStruct>
+          <Name>Device.WiFi.AccessPoint.2.SSID</Name>
+          <Value xsi:type="xsd:string">guest</Value>
+        </ParameterValueStruct>
+      </ParameterList>

@@ -1,0 +1,11 @@
+acsURL: "http://acs.example/cwmp"
+acsUsername: "cpe"
+acsPassword: "secret"
+acsTimeout: "45s"
+tlsSkipVerify: true
+caCertFile: "/etc/ssl/ca.pem"
+logLevel: "debug"
+logFormat: "json"
+concurrency: 4
+seed: 42
+profile: "profiles/example.yaml"

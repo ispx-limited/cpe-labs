@@ -1,0 +1,59 @@
+# Sagemcom Fast 5598, TR-181 (Device.*) profile.
+# Modeled on a real device CSV export (TR-181 with Sagemcom OUI ECFC2F).
+
+deviceIdPaths:
+  manufacturer: Device.DeviceInfo.Manufacturer
+  oui:          Device.DeviceInfo.ManufacturerOUI
+  productClass: Device.DeviceInfo.ProductClass
+  serialNumber: Device.DeviceInfo.SerialNumber
+
+fleet:
+  count: 1
+  serialPattern: "N000000A0000{i:03}"
+  pools:
+    wan_ipv4:
+      type: ipv4
+      cidr: "203.0.113.0/24"          # RFC 5737 doc range
+    wan_ipv6:
+      type: ipv6
+      cidr: "2001:db8:2::/64"          # RFC 3849 doc range
+    delegated_prefix:
+      type: ipv6prefix
+      super: "2001:db8:beef::/48"
+      sublen: 56                       # /56 per CPE
+
+periodicInformPaths:
+  interval: Device.ManagementServer.PeriodicInformInterval
+  enable:   Device.ManagementServer.PeriodicInformEnable
+
+informParameters:
+  bootstrap:
+    - Device.DeviceInfo.Manufacturer
+    - Device.DeviceInfo.ManufacturerOUI
+    - Device.DeviceInfo.ModelName
+    - Device.DeviceInfo.ProductClass
+    - Device.DeviceInfo.SerialNumber
+    - Device.DeviceInfo.HardwareVersion
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.ManagementServer.URL
+    - Device.ManagementServer.ParameterKey
+    - Device.PPP.Interface.1.Status
+    - Device.PPP.Interface.1.Username
+    - Device.IP.Interface.2.IPv4Address.1.IPAddress
+  boot:
+    - Device.DeviceInfo.UpTime
+  periodic:
+    - Device.DeviceInfo.UpTime
+    - Device.Ethernet.Interface.1.Stats.BytesSent
+    - Device.Ethernet.Interface.1.Stats.BytesReceived
+    - Device.WiFi.SSID.1.Stats.BytesSent
+    - Device.WiFi.SSID.1.Stats.BytesReceived
+    - Device.WiFi.SSID.2.Stats.BytesSent
+    - Device.WiFi.SSID.2.Stats.BytesReceived
+  valueChange:
+    - Device.WiFi.AccessPoint.1.AssociatedDeviceNumberOfEntries
+    - Device.WiFi.AccessPoint.2.AssociatedDeviceNumberOfEntries
+    - Device.WiFi.SSID.1.Status
+    - Device.WiFi.SSID.2.Status
+  connectionRequest:
+    - Device.DeviceInfo.UpTime

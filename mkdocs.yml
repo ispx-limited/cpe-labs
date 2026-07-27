@@ -1,0 +1,61 @@
+site_name: cpe-labs
+site_description: TR-069 / TR-369 CPE simulator. Real wire-format, profile-driven, multi-CPE per process.
+site_url: https://ispx-limited.github.io/cpe-labs/
+copyright: Copyright &copy; ISPX
+
+theme:
+  name: shadcn
+  topbar_sections: false
+  pygments_style:
+    light: shadcn-light
+    dark: github-dark
+
+plugins:
+  - search
+
+markdown_extensions:
+  admonition:
+  codehilite:
+  fenced_code:
+  footnotes:
+  tables:
+  attr_list:
+  md_in_html:
+  toc:
+    permalink: true
+  pymdownx.blocks.details:
+  pymdownx.tabbed:
+    alternate_style: true
+  pymdownx.snippets:
+  pymdownx.superfences:
+    custom_fences:
+      - name: mermaid
+        class: mermaid
+        format: !!python/name:pymdownx.superfences.fence_code_format
+
+extra_css:
+  - assets/stylesheets/extra.css
+
+extra_javascript:
+  - assets/js/hero-tree.js
+  - assets/js/arch-topology.js
+  - assets/js/copy-code.js
+
+nav:
+  - Home: index.md
+  - Overview:
+      - Introduction: overview/intro.md
+      - Architecture: overview/architecture.md
+  - Guides:
+      - Quickstart: guides/quickstart.md
+      - Profile Schema: guides/profiles.md
+      - Multi-CPE Fleets: guides/multi-cpe.md
+      - Value Generators: guides/generators.md
+      - Periodic Inform Scheduler: guides/scheduler.md
+      - Connection Request Listener: guides/connection-request.md
+      - Pointing at an ACS: guides/acs-integration.md
+      - USP Agent (TR-369): guides/usp.md
+      - Docker: guides/docker.md
+  - Reference:
+      - CLI / Env / YAML: reference/cli.md
+      - Profile YAML: reference/profile-yaml.md

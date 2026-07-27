@@ -1,0 +1,10 @@
+      <ParameterList>
+        <ParameterAttributeStruct>
+          <Name>Device.WiFi.AccessPoint.1.SSID</Name>
+          <Notification>2</Notification>
+          <AccessList>
+            <string>Subscriber</string>
+            <string>Foo</string>
+          </AccessList>
+        </ParameterAttributeStruct>
+      </ParameterList>

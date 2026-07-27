@@ -1,0 +1,91 @@
+# Top-level configuration for the example-arris profile (TR-098).
+# Loads first lexicographically (underscore prefix).
+
+deviceIdPaths:
+  manufacturer: InternetGatewayDevice.DeviceInfo.Manufacturer
+  oui:          InternetGatewayDevice.DeviceInfo.ManufacturerOUI
+  productClass: InternetGatewayDevice.DeviceInfo.ProductClass
+  serialNumber: InternetGatewayDevice.DeviceInfo.SerialNumber
+
+# Fleet defaults to count=1; bump count to spawn N CPEs from this same
+# template. Pools below are referenced as {wan_ipv4} / {wan_ipv6} /
+# {delegated_prefix} / {lan_subnet} from any leaf, declare CIDRs once
+# here, reference them from every leaf that needs differentiation.
+#
+# All ranges are RFC 5737 (IPv4) / RFC 3849 (IPv6) documentation
+# prefixes, safe to use anywhere without colliding with real traffic.
+fleet:
+  count: 1
+  serialPattern: "MH00000{i:04}"
+  pools:
+    wan_ipv4:
+      type: ipv4
+      cidr: "203.0.113.0/24"           # 254 CPEs of WAN IPv4
+    wan_ipv6:
+      type: ipv6
+      cidr: "2001:db8:1::/64"
+    voice_ipv4:
+      type: ipv4
+      cidr: "198.51.100.0/24"          # PPPoE voice/mgmt session WAN IP
+                                        # (RFC 5737 TEST-NET-2)
+    delegated_prefix:
+      type: ipv6prefix
+      super: "2001:db8:cafe::/48"      # operator delegation block
+      sublen: 56                        # /56 per CPE (256 CPEs)
+    lan_ipv4:
+      type: ipv4
+      cidr: "192.168.0.0/16"           # /24 per CPE; lan_ipv4 is the
+                                        # base address for each.
+
+periodicInformPaths:
+  interval: InternetGatewayDevice.ManagementServer.PeriodicInformInterval
+  enable:   InternetGatewayDevice.ManagementServer.PeriodicInformEnable
+  time:     InternetGatewayDevice.ManagementServer.PeriodicInformTime
+
+# ACS auth identity read live from the tree, so credential rotation
+# via SetParameterValues lands on the next session. Empty values fall
+# back to --acs-username/--acs-password.
+acsCredentialPaths:
+  username: InternetGatewayDevice.ManagementServer.Username
+  password: InternetGatewayDevice.ManagementServer.Password
+
+informParameters:
+  # First-contact set, vendor identity + WAN IP + addressing type so
+  # the ACS can immediately decide DHCP/PPP routing + firmware
+  # decisions without GPV roundtrips.
+  bootstrap:
+    - InternetGatewayDevice.DeviceInfo.Manufacturer
+    - InternetGatewayDevice.DeviceInfo.ManufacturerOUI
+    - InternetGatewayDevice.DeviceInfo.ModelName
+    - InternetGatewayDevice.DeviceInfo.ProductClass
+    - InternetGatewayDevice.DeviceInfo.SerialNumber
+    - InternetGatewayDevice.DeviceInfo.HardwareVersion
+    - InternetGatewayDevice.DeviceInfo.SoftwareVersion
+    - InternetGatewayDevice.ManagementServer.URL
+    - InternetGatewayDevice.ManagementServer.ParameterKey
+    - InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.AddressingType
+    - InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ExternalIPAddress
+  boot:
+    - InternetGatewayDevice.DeviceInfo.UpTime
+  # Periodic carries the moving counters + uptime so the ACS dashboard
+  # sees activity without GPV polling.
+  periodic:
+    - InternetGatewayDevice.DeviceInfo.UpTime
+    - InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.TotalBytesSent
+    - InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.TotalBytesReceived
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalBytesSent
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalBytesReceived
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.TotalBytesSent
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.TotalBytesReceived
+  # Vendor "disassociation event" shape: WiFi association count flips
+  # on station join/leave. NOTE: today's generators write silently and
+  # don't fire ValueChange Informs on background mutations; the wifi
+  # fabricator (#62) + a "notify on update" knob will wire this through.
+  # The profile structure is ready for when that lands.
+  valueChange:
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalAssociations
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.TotalAssociations
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Status
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Status
+  connectionRequest:
+    - InternetGatewayDevice.DeviceInfo.UpTime

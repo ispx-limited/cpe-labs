@@ -1,0 +1,3 @@
+parameters:
+  - path: Device.X
+    value: "from-b"

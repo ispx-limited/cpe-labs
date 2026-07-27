@@ -1,0 +1,10 @@
+      <ParameterList>
+        <ParameterInfoStruct>
+          <Name>Device.WiFi.AccessPoint.1.</Name>
+          <Writable>false</Writable>
+        </ParameterInfoStruct>
+        <ParameterInfoStruct>
+          <Name>Device.WiFi.AccessPoint.2.</Name>
+          <Writable>false</Writable>
+        </ParameterInfoStruct>
+      </ParameterList>

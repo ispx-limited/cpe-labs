@@ -1,0 +1,13 @@
+deviceIdPaths:
+  manufacturer: Device.DeviceInfo.Manufacturer
+  oui:          Device.DeviceInfo.Manufacturer
+  productClass: Device.DeviceInfo.Manufacturer
+  serialNumber: Device.DeviceInfo.Manufacturer
+
+parameters:
+  - path: Device.DeviceInfo.Manufacturer
+    type: xsd:string
+    value: "ACME Corp"
+  - path: Device.DeviceInfo.UpTime
+    type: xsd:unsignedInt
+    value: "213138"

@@ -1,0 +1,25 @@
+      <DeviceId>
+        <Manufacturer>ACME</Manufacturer>
+        <OUI>001122</OUI>
+        <ProductClass>HomeGateway</ProductClass>
+        <SerialNumber>ABC123</SerialNumber>
+      </DeviceId>
+      <Event>
+        <EventStruct>
+          <EventCode>0 BOOTSTRAP</EventCode>
+          <CommandKey></CommandKey>
+        </EventStruct>
+      </Event>
+      <MaxEnvelopes>1</MaxEnvelopes>
+      <CurrentTime>2026-04-28T12:00:00Z</CurrentTime>
+      <RetryCount>0</RetryCount>
+      <ParameterList>
+        <ParameterValueStruct>
+          <Name>Device.DeviceInfo.SerialNumber</Name>
+          <Value xsi:type="xsd:string">ABC123</Value>
+        </ParameterValueStruct>
+        <ParameterValueStruct>
+          <Name>Device.ManagementServer.URL</Name>
+          <Value xsi:type="xsd:string">http://acs.example/cwmp</Value>
+        </ParameterValueStruct>
+      </ParameterList>

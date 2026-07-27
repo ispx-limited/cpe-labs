@@ -1,0 +1,50 @@
+name: Bug
+description: Report something that's broken
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened
+      description: Describe the bug. What did you expect vs what actually happened? Include the protocol (TR-069 or TR-369), the RPC / message, and any relevant fault codes.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: How can someone else trigger this bug?
+      placeholder: |
+        1. Start the simulator with `cpe-sim --profile profiles/example.yaml --acs http://localhost:7547`
+        2. Wait for the bootstrap Inform
+        3. Trigger a SetParameterValues from the ACS for `Device.WiFi.SSID.1.SSID`
+        4. Observe fault X / wrong response
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: How do we know this is fixed?
+      placeholder: |
+        - [ ] Error no longer occurs when following reproduction steps
+        - [ ] Existing tests still pass
+        - [ ] Regression test added
+    validations:
+      required: true
+  - type: textarea
+    id: scope-boundary
+    attributes:
+      label: Not in scope
+      description: What is explicitly NOT part of this fix?
+      placeholder: "e.g., Does not refactor surrounding code, does not add new features"
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: Complexity
+      description: Simple bugs can skip the spec workflow. Complex bugs benefit from it.
+      options:
+        - Simple (skip spec workflow, just fix and PR)
+        - Complex (use spec workflow)
+    validations:
+      required: true

@@ -1,0 +1,125 @@
+# Device.PPP.*, PPPoE WAN session.
+
+parameters:
+  - path: Device.PPP.InterfaceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+
+# PPP.Interface is a multi-instance table; one active session.
+objects:
+  - path: Device.PPP.Interface
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: ConnectionStatus
+        value: "Connected"
+      - path: Alias
+        value: "PPP_WAN"
+        writable: true
+      - path: Name
+        value: "ppp0"
+      - path: LastChange
+        type: xsd:unsignedInt
+        value: "0"
+      - path: LowerLayers
+        value: "Device.Ethernet.Link.1"
+        writable: true
+      - path: Username
+        value: "user-{cpe:hex:6}@example.net"
+        writable: true
+      - path: Password
+        value: ""
+        writable: true
+      - path: ConnectionTrigger
+        value: "AlwaysOn"
+        writable: true
+      - path: LCPEcho
+        type: xsd:unsignedInt
+        value: "30"
+      - path: LCPEchoRetry
+        type: xsd:unsignedInt
+        value: "3"
+      - path: IPCPEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: IPv6CPEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: AutoDisconnectTime
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: IdleDisconnectTime
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+
+# PPPoE / IPCP / Stats are singleton sub-objects of PPP.Interface.1
+# (no instance numbering).
+groups:
+  - prefix: Device.PPP.Interface.1.PPPoE
+    parameters:
+      - path: SessionID
+        type: xsd:unsignedInt
+        value: "1"
+      - path: ACName
+        value: ""
+        writable: true
+      - path: ServiceName
+        value: ""
+        writable: true
+
+  - prefix: Device.PPP.Interface.1.IPCP
+    parameters:
+      - path: LocalIPAddress
+        value: "{wan_ipv4}"
+      - path: RemoteIPAddress
+        value: "203.0.113.254"
+      - path: DNSServers
+        value: "1.1.1.1,1.0.0.1"
+
+  - prefix: Device.PPP.Interface.1.Stats
+    parameters:
+      - path: BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 2500000
+          jitter: 0.2
+      - path: BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 10000000
+          jitter: 0.2
+      - path: PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"

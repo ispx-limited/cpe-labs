@@ -1,0 +1,129 @@
+# Minimal TR-181 profile (modern Device.* root). Loadable via
+#
+#   bin/cpe-sim --profile=profiles/example-tr181-minimal.yaml
+#
+# Defaults applied where omitted: type -> xsd:string, writable -> false,
+# value -> type-zero (empty for strings, "0" for numerics, etc.).
+
+deviceIdPaths:
+  manufacturer: Device.DeviceInfo.Manufacturer
+  oui:          Device.DeviceInfo.ManufacturerOUI
+  productClass: Device.DeviceInfo.ProductClass
+  serialNumber: Device.DeviceInfo.SerialNumber
+
+# periodicInformPaths names the parameter-tree leaves the per-CPE
+# scheduler reads to drive its timer. Both fields are required when
+# the block is present. Interval must be xsd:unsignedInt + writable;
+# enable must be xsd:boolean + writable. Omit the block to run
+# bin/cpe-sim in one-shot mode (single bootstrap Inform, then exit
+# unless --cr-bind-addr keeps the process alive for connection requests).
+periodicInformPaths:
+  interval: Device.ManagementServer.PeriodicInformInterval
+  enable:   Device.ManagementServer.PeriodicInformEnable
+
+# generators makes parameter-tree leaves move over time without ACS
+# intervention. Each entry runs on its own profile-fixed interval
+# (independent from the periodic Inform interval) and the next periodic
+# Inform reports the new value. v0 supports type=counter; future
+# stories add drift, enum, timestamp.
+generators:
+  - path: Device.IP.Interface.1.Stats.BytesSent
+    type: counter
+    interval: 10s
+    min: 0
+    max: 4294967295
+    step: 1500
+    jitter: 0.1
+
+# informParameters tells the inform builder which parameter paths
+# ride along in each event code's Inform ParameterList. The CPE side
+# of TR-069 is "vendor-chosen", operators decide which fields are
+# worth proactively reporting per event so the ACS doesn't have to
+# GPV for them. The simulator picks the right list per session via
+# first-matching-event: if a session emits [1 BOOT, 0 BOOTSTRAP],
+# the boot list wins when set; otherwise it falls through to
+# bootstrap.
+#
+# Real-vendor patterns this mirrors:
+#  - send AddressingType + PPP.Name on bootstrap so the ACS can
+#    immediately decide DHCP vs PPP routing without a GPV roundtrip.
+#  - send SoftwareVersion / HardwareVersion on bootstrap so the ACS
+#    can decide if a firmware push is needed.
+#  - send moving counters / uptime on periodic so the ACS dashboard
+#    is fed without an explicit poll.
+informParameters:
+  bootstrap:
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.DeviceInfo.HardwareVersion
+    - Device.DeviceInfo.UpTime
+    - Device.IP.Interface.1.IPv4Address
+  boot:
+    - Device.DeviceInfo.UpTime
+  periodic:
+    - Device.IP.Interface.1.Stats.BytesSent
+    - Device.DeviceInfo.UpTime
+
+parameters:
+  # ---- DeviceInfo (read-only identifying parameters) ----
+  - path: Device.DeviceInfo.Manufacturer
+    value: "ACME Corp"
+  - path: Device.DeviceInfo.ManufacturerOUI
+    value: "001122"
+  - path: Device.DeviceInfo.ProductClass
+    value: "HomeGateway"
+  - path: Device.DeviceInfo.SerialNumber
+    value: "ABC123"
+  - path: Device.DeviceInfo.HardwareVersion
+    value: "v1.0"
+  - path: Device.DeviceInfo.SoftwareVersion
+    value: "1.0.0"
+  - path: Device.DeviceInfo.UpTime
+    type: xsd:unsignedInt
+    value: "3600"
+
+  # ---- ManagementServer (writable so the ACS can update its own URL) ----
+  - path: Device.ManagementServer.URL
+    value: "http://acs.example/cwmp"
+    writable: true
+  - path: Device.ManagementServer.Username
+    value: "cpe"
+    writable: true
+  - path: Device.ManagementServer.Password
+    value: ""
+    writable: true
+  - path: Device.ManagementServer.PeriodicInformEnable
+    type: xsd:boolean
+    value: "true"
+    writable: true
+  - path: Device.ManagementServer.PeriodicInformInterval
+    type: xsd:unsignedInt
+    value: "300"
+    writable: true
+  - path: Device.ManagementServer.ConnectionRequestURL
+    value: "http://192.0.2.1:7547/"
+    writable: false
+
+  # ---- IP interface (IPv4Address rides bootstrap; BytesSent is the
+  #      counter-generator target reported on periodic) ----
+  - path: Device.IP.Interface.1.IPv4Address
+    value: "192.0.2.10"
+    writable: true
+  - path: Device.IP.Interface.1.Stats.BytesSent
+    type: xsd:unsignedInt
+    value: "0"
+    writable: true
+
+  # ---- WiFi.AccessPoint (variable-arity table; 2 instances at load) ----
+  - path: Device.WiFi.AccessPoint.{i}.SSID
+    instances: 2
+    value: "guest-{i}"
+    writable: true
+  - path: Device.WiFi.AccessPoint.{i}.Enable
+    type: xsd:boolean
+    instances: 2
+    value: "true"
+    writable: true
+  - path: Device.WiFi.AccessPoint.{i}.SecurityMode
+    instances: 2
+    value: "WPA2-Personal"
+    writable: true

@@ -1,0 +1,9 @@
+      <ParameterList>
+        <ParameterAttributeStruct>
+          <Name>Device.DeviceInfo.SerialNumber</Name>
+          <Notification>0</Notification>
+          <AccessList>
+            <string>Subscriber</string>
+          </AccessList>
+        </ParameterAttributeStruct>
+      </ParameterList>

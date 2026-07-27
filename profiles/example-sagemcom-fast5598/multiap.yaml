@@ -1,0 +1,296 @@
+# Device.WiFi.MultiAP.* + Device.WiFi.DataElements.*: mesh topology.
+#
+# Two agents so topology enrichment sees an actual mesh:
+#   APDevice.1 / DataElements Network.Device.1 = this gateway
+#   APDevice.2 / DataElements Network.Device.2 = one paired extender
+#
+# An ACS multi-AP telemetry profile GPVs the APDevice table
+# (identity + backhaul SignalStrength + Radio/AP/AssociatedDevice) and
+# the DataElements Network.ID / ControllerID / Device.* surface. The
+# MultiAP.APDevice identity fields follow the vendor-flavored shape
+# that profile requests (Manufacturer / ModelName / SerialNumber /
+# SignalStrength alongside the TR-181 standard MACAddress /
+# ManufacturerOUI / SoftwareVersion). DataElements follows TR-181
+# 2.20's Network.Device.{i}.Radio.{i}.BSS.{i}.STA.{i} shape, trimmed
+# to the leaves dashboards read (STA SignalStrength is RCPI-style
+# unsignedInt per the standard, not dBm).
+#
+# Client MACs line up with Device.WiFi.AccessPoint.*.AssociatedDevice
+# (gateway fronthaul, 5C:51:4F:00:00:0i / 00:01:0i) and with the
+# Device.Hosts.Host table (extender clients, 5C:51:4F:00:02:0i) so
+# MAC cross-refs resolve.
+
+parameters:
+  - path: Device.WiFi.MultiAP.APDeviceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "2"
+
+groups:
+  # ---- MultiAP.APDevice.1 = gateway agent (this CPE) ----
+  # SignalStrength is backhaul RSSI toward the controller; the gateway
+  # IS the controller, so it reports 0 (no wireless backhaul).
+  - prefix: Device.WiFi.MultiAP.APDevice.1
+    parameters:
+      - path: MACAddress
+        value: "EC:FC:2F:{cpe:mac:3}"
+      - path: Manufacturer
+        value: "Sagemcom"
+      - path: ManufacturerOUI
+        value: "ECFC2F"
+      - path: ModelName
+        value: "FAST5598"
+      - path: SerialNumber
+        value: "GW-{cpe:hex:6}"
+      - path: SoftwareVersion
+        value: "SG00000000000"
+      - path: SignalStrength
+        type: xsd:int
+        value: "0"
+  - prefix: Device.WiFi.MultiAP.APDevice.1.Radio.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "6"
+  - prefix: Device.WiFi.MultiAP.APDevice.1.Radio.1.AP.1
+    parameters:
+      - path: BSSID
+        value: "EC:FC:2F:{cpe:mac:3}"
+      - path: SSID
+        value: "Sagem-{cpe:hex:4}-1"
+  - prefix: Device.WiFi.MultiAP.APDevice.1.Radio.2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+      - path: OperatingFrequencyBand
+        value: "5GHz"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "36"
+  - prefix: Device.WiFi.MultiAP.APDevice.1.Radio.2.AP.1
+    parameters:
+      - path: BSSID
+        value: "EC:FC:2F:{cpe:mac:3}"
+      - path: SSID
+        value: "Sagem-{cpe:hex:4}-2"
+
+  # ---- MultiAP.APDevice.2 = paired extender ----
+  # Locally-administered MAC variant of the gateway OUI; backhaul RSSI
+  # drifts like a real 5 GHz mesh link.
+  - prefix: Device.WiFi.MultiAP.APDevice.2
+    parameters:
+      - path: MACAddress
+        value: "0E:FC:2F:{cpe:mac:3}"
+      - path: Manufacturer
+        value: "Sagemcom"
+      - path: ManufacturerOUI
+        value: "ECFC2F"
+      - path: ModelName
+        value: "FAST-EXT"
+      - path: SerialNumber
+        value: "EXT-{cpe:hex:6}"
+      - path: SoftwareVersion
+        value: "SG00000000000"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-58"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -72
+          max: -44
+          stepMax: 3
+  - prefix: Device.WiFi.MultiAP.APDevice.2.Radio.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+      - path: OperatingFrequencyBand
+        value: "5GHz"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "40"
+  - prefix: Device.WiFi.MultiAP.APDevice.2.Radio.1.AP.1
+    parameters:
+      - path: BSSID
+        value: "0E:FC:2F:{cpe:mac:3}"
+      - path: SSID
+        value: "Sagem-{cpe:hex:4}-2"
+
+  # ---- DataElements: network identity + per-agent topology ----
+  - prefix: Device.WiFi.DataElements.Network
+    parameters:
+      - path: ID
+        value: "sagem-de-{cpe:hex:4}"
+      - path: ControllerID
+        value: "EC:FC:2F:{cpe:mac:3}"
+      - path: DeviceNumberOfEntries
+        type: xsd:unsignedInt
+        value: "2"
+      - path: TimeStamp
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+        writable: true
+        generator:
+          type: wallclock
+          interval: 60s
+
+  # DataElements Network.Device.1 = gateway agent.
+  - prefix: Device.WiFi.DataElements.Network.Device.1
+    parameters:
+      - path: ID
+        value: "EC:FC:2F:{cpe:mac:3}"
+      - path: Manufacturer
+        value: "Sagemcom"
+  # Radio.ID is a 6-octet base64 blob per TR-181 (here: the radio MAC).
+  - prefix: Device.WiFi.DataElements.Network.Device.1.Radio.1
+    parameters:
+      - path: ID
+        type: xsd:base64
+        value: "7PwvAAAB"
+      - path: Enabled
+        type: xsd:boolean
+        value: "true"
+      - path: Utilization
+        type: xsd:unsignedInt
+        value: "57"
+      - path: Noise
+        type: xsd:unsignedInt
+        value: "158"
+  - prefix: Device.WiFi.DataElements.Network.Device.1.Radio.1.BSS.1
+    parameters:
+      - path: BSSID
+        value: "EC:FC:2F:{cpe:mac:3}"
+      - path: SSID
+        value: "Sagem-{cpe:hex:4}-1"
+      - path: Enabled
+        type: xsd:boolean
+        value: "true"
+
+  # DataElements Network.Device.2 = extender agent, one client STA.
+  - prefix: Device.WiFi.DataElements.Network.Device.2
+    parameters:
+      - path: ID
+        value: "0E:FC:2F:{cpe:mac:3}"
+      - path: Manufacturer
+        value: "Sagemcom"
+  - prefix: Device.WiFi.DataElements.Network.Device.2.Radio.1
+    parameters:
+      - path: ID
+        type: xsd:base64
+        value: "DvwvAAAC"
+      - path: Enabled
+        type: xsd:boolean
+        value: "true"
+      - path: Utilization
+        type: xsd:unsignedInt
+        value: "34"
+      - path: Noise
+        type: xsd:unsignedInt
+        value: "162"
+  - prefix: Device.WiFi.DataElements.Network.Device.2.Radio.1.BSS.1
+    parameters:
+      - path: BSSID
+        value: "0E:FC:2F:{cpe:mac:3}"
+      - path: SSID
+        value: "Sagem-{cpe:hex:4}-2"
+      - path: Enabled
+        type: xsd:boolean
+        value: "true"
+  - prefix: Device.WiFi.DataElements.Network.Device.2.Radio.1.BSS.1.STA.1
+    parameters:
+      - path: MACAddress
+        value: "5C:51:4F:00:02:01"
+      - path: SignalStrength
+        type: xsd:unsignedInt
+        value: "150"
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "433000"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "433000"
+
+objects:
+  # Gateway fronthaul clients as MultiAP sees them: same station set as
+  # Device.WiFi.AccessPoint.{1,2}.AssociatedDevice, per-band. RSSI here
+  # is the vendor-flavored dBm shape the multi-AP telemetry profile reads.
+  - path: Device.WiFi.MultiAP.APDevice.1.Radio.1.AP.1.AssociatedDevice
+    instances: 3
+    parameters:
+      - path: MACAddress
+        value: "5C:51:4F:00:00:0{i}"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-55"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -75
+          max: -40
+          stepMax: 4
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "144000"
+  - path: Device.WiFi.MultiAP.APDevice.1.Radio.2.AP.1.AssociatedDevice
+    instances: 3
+    parameters:
+      - path: MACAddress
+        value: "5C:51:4F:00:01:0{i}"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-50"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -70
+          max: -38
+          stepMax: 4
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "433000"
+
+  # Extender clients (hosts 1 and 2 in Device.Hosts.Host: PhysAddress
+  # 5C:51:4F:00:02:0{i}).
+  - path: Device.WiFi.MultiAP.APDevice.2.Radio.1.AP.1.AssociatedDevice
+    instances: 2
+    parameters:
+      - path: MACAddress
+        value: "5C:51:4F:00:02:0{i}"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-61"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -78
+          max: -48
+          stepMax: 4
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "433000"
+
+  # Gateway 2.4 GHz BSS client STAs in the DataElements shape.
+  - path: Device.WiFi.DataElements.Network.Device.1.Radio.1.BSS.1.STA
+    instances: 2
+    parameters:
+      - path: MACAddress
+        value: "5C:51:4F:00:00:0{i}"
+      - path: SignalStrength
+        type: xsd:unsignedInt
+        value: "175"
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "144000"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "144000"

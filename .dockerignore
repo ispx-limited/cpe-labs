@@ -1,0 +1,22 @@
+# Git + IDE noise
+.git
+.github
+.idea
+.vscode
+
+# Local artifacts (built fresh inside the image)
+bin/
+.worktrees/
+coverage.out
+coverage.html
+
+# Docs / context not needed at runtime (image keeps profiles/ only)
+context/
+
+# Test artifacts
+**/testdata/golden/
+
+# Editor backups
+*.swp
+*.bak
+*~
