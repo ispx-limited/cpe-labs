@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"log/slog"
@@ -13,6 +14,8 @@ import (
 	"github.com/ispx-limited/cpe-labs/internal/cpeconfig"
 	"github.com/ispx-limited/cpe-labs/internal/cperng"
 	"github.com/ispx-limited/cpe-labs/internal/cwmp"
+	"github.com/ispx-limited/cpe-labs/internal/paramtree"
+	uspagent "github.com/ispx-limited/cpe-labs/internal/usp/agent"
 )
 
 // uspTestProfile is a minimal TR-181 profile with the identity leaves USP
@@ -181,5 +184,71 @@ func TestUSPOperateDualStackUsesTracker(t *testing.T) {
 	if len(fake.boots) != 0 || len(fake.announces) != 0 {
 		t.Errorf("dual-stack must route through the tracker, not the announcer: boots=%v announces=%v",
 			fake.boots, fake.announces)
+	}
+}
+
+// nullTransport satisfies uspagent.Transport without any MTP underneath.
+type nullTransport struct{}
+
+func (nullTransport) Connect(context.Context) error { return nil }
+func (nullTransport) OnRecord(func(payload []byte)) {}
+func (nullTransport) Publish([]byte) error          { return nil }
+func (nullTransport) Disconnect()                   {}
+
+// TestEndpointIDLoggedExactlyOncePerLine pins the logger wiring from
+// startUSPAgent: the runner gets a cpe_id-only logger because it stamps
+// endpoint_id on its own lines, while the operate func's lines rely on the
+// endpoint-bound logger. Getting either wrong doubles the field or drops it.
+func TestEndpointIDLoggedExactlyOncePerLine(t *testing.T) {
+	countField := func(buf *bytes.Buffer, substr string) int {
+		for _, line := range strings.Split(buf.String(), "\n") {
+			if strings.Contains(line, substr) {
+				return strings.Count(line, "endpoint_id=")
+			}
+		}
+		t.Fatalf("no log line containing %q in:\n%s", substr, buf.String())
+		return 0
+	}
+
+	prof, err := paramtree.LoadProfile(writeUSPTestProfile(t))
+	if err != nil {
+		t.Fatalf("load profile: %v", err)
+	}
+
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, nil))
+
+	// The runner side, wired the way startUSPAgent wires it.
+	runner, err := uspagent.NewRunner(uspagent.Config{
+		Identity: uspagent.Identity{
+			EndpointID:   "os::0000C5TEST0001",
+			OUI:          "0000C5",
+			SerialNumber: "TEST0001",
+		},
+		ControllerID: "self::controller",
+		Tree:         prof.Tree,
+		Transport:    nullTransport{},
+		Logger:       logger.With("cpe_id", "cpe-1"),
+	})
+	if err != nil {
+		t.Fatalf("NewRunner: %v", err)
+	}
+	if err := runner.Boot("RemoteReboot"); err != nil {
+		t.Fatalf("Boot: %v", err)
+	}
+	if n := countField(&buf, "sent Boot!"); n != 1 {
+		t.Errorf("runner line carries endpoint_id %d times, want 1", n)
+	}
+
+	// The operate side, which relies on the endpoint-bound logger.
+	buf.Reset()
+	boundLog := logger.With("cpe_id", "cpe-1", "endpoint_id", "os::0000C5TEST0001")
+	fake := &fakeAnnouncer{}
+	op := uspOperateFunc(&cpeStack{}, boundLog, func() uspAnnouncer { return fake })
+	if _, err := op("Device.Reboot()", "k1", nil); err != nil {
+		t.Fatalf("Reboot: %v", err)
+	}
+	if n := countField(&buf, "simulated reboot"); n != 1 {
+		t.Errorf("operate line carries endpoint_id %d times, want 1", n)
 	}
 }
