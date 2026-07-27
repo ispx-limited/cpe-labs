@@ -73,7 +73,11 @@ func startUSPAgent(ctx context.Context, cfg cpeconfig.Config, st *cpeStack, logg
 		Transport:      transport,
 		BootParameters: st.uspBootParams,
 		Operate:        uspOperateFunc(st, log, announcer),
-		Logger:         log,
+		// Not `log`: the runner stamps endpoint_id on its own lines, since it
+		// is usable without this caller, so passing the already-bound logger
+		// duplicates the field on every message it emits. Same reasoning as
+		// the MQTT transport logger above.
+		Logger: logger.With("cpe_id", st.id),
 	})
 	if err != nil {
 		return err
