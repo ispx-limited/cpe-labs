@@ -1,4 +1,6 @@
-# cpe-labs
+<p align="center">
+  <img src="logo.png" alt="cpe-labs" width="480">
+</p>
 
 **Simulate thousands of broadband CPEs, any vendor or model, to test an ACS at realistic scale without hardware.**
 
@@ -153,6 +155,28 @@ Profiles can be one file or a directory that loads lexicographically, which is
 how the reference profiles split a device across `wifi.yaml`, `wandevice.yaml`
 and friends. See [profiles/](profiles/README.md) and the
 [schema reference](docs/reference/profile-yaml.md).
+
+## Placeholders
+
+Profiles are templates, and placeholders are how one template becomes many
+distinct things. They resolve at two different moments: `{i}` expands
+multi-instance objects when the profile loads, and the `{cpe}` family stamps
+per-device values when `fleet.count > 1` spawns the fleet.
+
+| Placeholder | Where | Resolves to |
+|------|------|------|
+| `{i}` | `path` / `value` of a leaf with `instances: N` | Instance index at load: `Radio.{i}` becomes `Radio.1` .. `Radio.N` |
+| `{base}`, `{i}`, `{i:N}` | `fleet.serialPattern` | The declared SerialNumber, the CPE index, and the index zero-padded to N digits |
+| `{cpe}`, `{cpe:N}` | Any leaf value in a fleet | 1-based CPE index, plain or zero-padded |
+| `{cpe:hex:N}`, `{cpe:HEX:N}` | Any leaf value in a fleet | CPE index as zero-padded lower/upper hex |
+| `{cpe:mac:N}`, `{cpe:MAC:N}` | Any leaf value in a fleet | N bytes (1..3) of MAC NIC portion: `00:00:07` |
+| `{cpe:ipv4:CIDR}`, `{cpe:ipv6:CIDR}` | Any leaf value in a fleet | Nth host in the CIDR: `203.0.113.7` |
+| `{cpe:ipv6prefix:SUPER,SUBLEN}` | Any leaf value in a fleet | Nth /SUBLEN prefix carved from SUPER |
+| `{cpe_id}` | Any leaf value in a fleet | The assigned CPE id: `cpe-7` |
+| `{pool_name}` | Any leaf value in a fleet | This CPE's allocation from the matching `fleet.pools` entry |
+
+Worked examples are in the [multi-CPE guide](docs/guides/multi-cpe.md); exact
+validation rules in the [schema reference](docs/reference/profile-yaml.md).
 
 ## Development
 
