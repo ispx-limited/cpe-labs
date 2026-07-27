@@ -11,13 +11,11 @@ actually specifies. Every vendor's quirks live in a config file, so modelling a
 new device is an afternoon, not a code change.
 
 ```bash
-make build
-
 # TR-369 (USP): the fleet as agents against your controller's MQTT broker
-bin/cpe-sim --profile=profiles/example-sagemcom-fast5598/ --usp-broker=your-broker:1883
+./cpe-sim --profile=profiles/example-sagemcom-fast5598/ --usp-broker=your-broker:1883
 
 # TR-069 (CWMP): the same fleet against your ACS
-bin/cpe-sim --profile=profiles/example-sagemcom-fast5598/ --acs-url=http://your-acs:7547/
+./cpe-sim --profile=profiles/example-sagemcom-fast5598/ --acs-url=http://your-acs:7547/
 ```
 
 Either command runs a Sagemcom Fast 5598 speaking TR-181: a PPP WAN drawing from declared
@@ -87,18 +85,34 @@ means a subscription fires on changes a CWMP session caused, and vice versa.
 
 ## Get going
 
+### Download
+
+Releases ship prebuilt binaries with the reference profiles included, so this
+is the whole install:
+
+```bash
+curl -LO https://github.com/ispx-limited/cpe-labs/releases/latest/download/cpe-labs_linux_amd64.tar.gz
+tar xzf cpe-labs_linux_amd64.tar.gz
+./cpe-sim --version
+```
+
+Linux and macOS arm64 builds, Windows, and checksums are on the
+[releases page](https://github.com/ispx-limited/cpe-labs/releases). Building
+from source instead needs Go 1.25+: `make build` puts the binary at
+`bin/cpe-sim`.
+
 ### TR-369 (USP)
 
 Point the agent at your controller's MQTT broker. No ACS, no `--acs-url`:
 
 ```bash
 # One TR-181 CPE as a USP agent, against an authenticated broker
-bin/cpe-sim --profile=profiles/example-tr181-minimal.yaml \
+./cpe-sim --profile=profiles/example-tr181-minimal.yaml \
     --usp-broker=broker:1883 \
     --usp-mqtt-secret="$USP_SHARED_SECRET"
 
 # A replayable fleet: set fleet.count in the profile, seed the run
-bin/cpe-sim --profile=profiles/example-sagemcom-fast5598/ --usp-broker=broker:1883 --seed=42
+./cpe-sim --profile=profiles/example-sagemcom-fast5598/ --usp-broker=broker:1883 --seed=42
 ```
 
 Most brokers require credentials; without them the agent loops on
@@ -118,13 +132,13 @@ the TR-098 reference profile earns its keep:
 
 ```bash
 # A TR-098 device (InternetGatewayDevice.*): the ARRIS NVG578LX profile
-bin/cpe-sim --profile=profiles/example-arris/ --acs-url=http://acs:7547/
+./cpe-sim --profile=profiles/example-arris/ --acs-url=http://acs:7547/
 
 # A TR-181 fleet, replayable: set fleet.count in the profile, seed the run
-bin/cpe-sim --profile=profiles/example-sagemcom-fast5598/ --acs-url=http://acs:7547/ --seed=42
+./cpe-sim --profile=profiles/example-sagemcom-fast5598/ --acs-url=http://acs:7547/ --seed=42
 
 # Answer connection requests (note the TR-098 publish path)
-bin/cpe-sim --profile=profiles/example-arris/ --acs-url=http://acs:7547/ \
+./cpe-sim --profile=profiles/example-arris/ --acs-url=http://acs:7547/ \
     --cr-bind-addr=0.0.0.0:7547 \
     --cr-publish-path=InternetGatewayDevice.ManagementServer.ConnectionRequestURL
 ```

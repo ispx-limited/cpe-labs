@@ -2,6 +2,11 @@
 
 Run a fake CPE (or fleet of fake CPEs) that talks real TR-069 to your ACS, locally, in containers, or in CI.
 
+The fastest start is a [release binary](https://github.com/ispx-limited/cpe-labs/releases),
+which ships with the reference profiles; extract it and run `./cpe-sim` from
+the extracted directory. The examples below build from source instead
+(Go 1.25+), where the binary lands at `bin/cpe-sim`.
+
 ## Single CPE, one bootstrap
 
 ```bash
