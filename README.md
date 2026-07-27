@@ -12,12 +12,13 @@ new device is an afternoon, not a code change.
 
 ```bash
 make build
-bin/cpe-sim --profile=profiles/example-arris/ --acs-url=http://your-acs:7547/
+bin/cpe-sim --profile=profiles/example-sagemcom-fast5598/ --acs-url=http://your-acs:7547/
 ```
 
-That runs an ARRIS NVG578LX with a populated WAN, four Ethernet ports, two WiFi
-radios with associated stations, and a LAN host table. Change `fleet.count` to
-5000 and you have a fleet, each CPE with its own serial, MAC, IP and drift.
+That runs a Sagemcom Fast 5598 speaking TR-181: a PPP WAN drawing from declared
+address pools, five Ethernet interfaces, two WiFi radios with associated
+stations, and a LAN host table. Change `fleet.count` to 5000 and you have a
+fleet, each CPE with its own serial, MAC, IP and drift.
 
 ## Why it exists
 
@@ -32,8 +33,8 @@ CPE annoying:
 
 - **Vendor-specific behaviour, declared not coded.** A profile describes the
   parameter tree, which parameters ride each Inform, how values drift, and how
-  the device answers a connection request. Two full reference profiles ship: an
-  ARRIS NVG578LX (TR-098) and a Sagemcom Fast 5598 (TR-181), both modelled on
+  the device answers a connection request. Two full reference profiles ship: a
+  Sagemcom Fast 5598 (TR-181) and an ARRIS NVG578LX (TR-098), both modelled on
   real device exports rather than invented.
 - **Fleets from one template.** `fleet.count: 5000` stamps per-CPE serials,
   MACs, hostnames and addresses from declared pools, so every simulated device
@@ -84,20 +85,23 @@ means a subscription fires on changes a CWMP session caused, and vice versa.
 bin/cpe-sim --profile=profiles/example-tr181-minimal.yaml --acs-url=http://acs:7547/
 
 # The same fleet, replayable: set fleet.count in the profile, seed the run
-bin/cpe-sim --profile=profiles/example-arris/ --acs-url=http://acs:7547/ --seed=42
+bin/cpe-sim --profile=profiles/example-sagemcom-fast5598/ --acs-url=http://acs:7547/ --seed=42
 
 # Answer connection requests
-bin/cpe-sim --profile=profiles/example-arris/ --acs-url=http://acs:7547/ \
+bin/cpe-sim --profile=profiles/example-sagemcom-fast5598/ --acs-url=http://acs:7547/ \
     --cr-bind-addr=0.0.0.0:7547 \
-    --cr-publish-path=InternetGatewayDevice.ManagementServer.ConnectionRequestURL
+    --cr-publish-path=Device.ManagementServer.ConnectionRequestURL
 ```
 
-Docker:
+Docker, no clone required — the image ships with the reference profiles at
+`/profiles/`:
 
 ```bash
-docker build -t cpe-sim:dev .
-docker run --rm cpe-sim:dev --profile=/profiles/example-tr181-minimal.yaml --acs-url=http://acs:7547/
+docker run --rm ispxhq/cpe-sim --profile=/profiles/example-tr181-minimal.yaml --acs-url=http://acs:7547/
 ```
+
+To build the image yourself, or for connection-request ports, compose setups
+and fleet sizing, see the [Docker guide](docs/guides/docker.md).
 
 Full guides, the profile schema reference and the CLI reference are in
 [docs/](docs/guides/quickstart.md). Run `pip install -r requirements.txt && mkdocs serve`

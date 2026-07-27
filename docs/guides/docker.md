@@ -2,6 +2,17 @@
 
 The shipped `Dockerfile` produces a small distroless image (`gcr.io/distroless/static-debian12:nonroot`) with the `cpe-sim` binary at `/usr/local/bin/cpe-sim` and the reference profiles bundled at `/profiles/`. No shell, no package manager, no extras.
 
+## Pull
+
+Published builds are on Docker Hub as [`ispxhq/cpe-sim`](https://hub.docker.com/r/ispxhq/cpe-sim):
+
+```bash
+docker pull ispxhq/cpe-sim          # latest release
+docker pull ispxhq/cpe-sim:v0.1.0   # pinned
+```
+
+`ispxhq/cpe-sim` substitutes for `cpe-sim:dev` in every example below.
+
 ## Build
 
 ```bash
