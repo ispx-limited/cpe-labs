@@ -97,7 +97,7 @@ Docker, no clone required — the image ships with the reference profiles at
 `/profiles/`:
 
 ```bash
-docker run --rm ispxhq/cpe-sim --profile=/profiles/example-tr181-minimal.yaml --acs-url=http://acs:7547/
+docker run --rm ispxhq/cpe-labs --profile=/profiles/example-tr181-minimal.yaml --acs-url=http://acs:7547/
 ```
 
 To build the image yourself, or for connection-request ports, compose setups

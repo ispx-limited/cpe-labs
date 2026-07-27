@@ -4,14 +4,14 @@ The shipped `Dockerfile` produces a small distroless image (`gcr.io/distroless/s
 
 ## Pull
 
-Published builds are on Docker Hub as [`ispxhq/cpe-sim`](https://hub.docker.com/r/ispxhq/cpe-sim):
+Published builds are on Docker Hub as [`ispxhq/cpe-labs`](https://hub.docker.com/r/ispxhq/cpe-labs):
 
 ```bash
-docker pull ispxhq/cpe-sim          # latest release
-docker pull ispxhq/cpe-sim:v0.1.0   # pinned
+docker pull ispxhq/cpe-labs          # latest release
+docker pull ispxhq/cpe-labs:v0.1.0   # pinned
 ```
 
-`ispxhq/cpe-sim` substitutes for `cpe-sim:dev` in every example below.
+`ispxhq/cpe-labs` substitutes for `cpe-sim:dev` in every example below.
 
 ## Build
 
