@@ -83,7 +83,7 @@ func readRequestedPaths(t *testing.T, file string) []string {
 	if err != nil {
 		t.Fatalf("open %s: %v", file, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var out []string
 	sc := bufio.NewScanner(f)
