@@ -1,6 +1,14 @@
 name: docs
 
+# Build check only: deployment is handled by the docs host's git integration
+# watching main, so this repo carries no deploy configuration or secrets.
 on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "requirements.txt"
+      - ".github/workflows/docs.yml"
   push:
     branches: [main]
     paths:
@@ -8,17 +16,9 @@ on:
       - "mkdocs.yml"
       - "requirements.txt"
       - ".github/workflows/docs.yml"
-  workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-# Cancel any in-progress run if a newer push lands.
-concurrency:
-  group: pages
-  cancel-in-progress: true
 
 jobs:
   build:
@@ -39,19 +39,3 @@ jobs:
 
       - name: Build site
         run: mkdocs build --strict
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
