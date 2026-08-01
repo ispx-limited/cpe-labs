@@ -114,11 +114,11 @@
   // jitter) gets attached per-param so the same kind reads with realistic
   // variety across the leaf row.
   const GEN_TYPES = {
-    counter:   { icon: "gen-counter",   color: "#2563EB" },
-    drift:     { icon: "gen-drift",     color: "#10B981" },
+    counter:   { icon: "gen-counter",   color: "#E53935" },
+    drift:     { icon: "gen-drift",     color: "#22C55E" },
     enum:      { icon: "gen-enum",      color: "#F59E0B" },
-    uptime:    { icon: "gen-uptime",    color: "#8B5CF6" },
-    wallclock: { icon: "gen-wallclock", color: "#0EA5E9" },
+    uptime:    { icon: "gen-uptime",    color: "#7C3AED" },
+    wallclock: { icon: "gen-wallclock", color: "#2563EB" },
   };
 
   // PARAMS map each parameter to its semantically-valid generators, so the
