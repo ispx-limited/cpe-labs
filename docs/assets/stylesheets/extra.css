@@ -787,3 +787,63 @@ article .typography h4:hover a.headerlink {
   .arch-node-sub { font-size: 9px; }
   .arch-node-icon { width: 14px; height: 14px; }
 }
+
+
+/* "Powered by ispx" attribution (powered-by.js): in the top left corner of
+   the header when the viewport has one, at the top of the sidebar
+   otherwise. */
+.ispx-powered {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  text-decoration: none;
+}
+.ispx-powered img {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 8px;
+}
+.ispx-powered__text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.ispx-powered__label {
+  font-size: 0.7rem;
+  color: var(--muted-foreground, var(--ispx-neutral-500));
+}
+.ispx-powered__name {
+  font-size: 1.05rem;
+  font-weight: 650;
+  color: var(--foreground, var(--ispx-neutral-900));
+}
+.ispx-powered:hover .ispx-powered__name {
+  color: var(--ispx-primary-500);
+}
+
+.ispx-powered--corner {
+  display: none;
+  position: absolute;
+  left: 1.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.ispx-powered--sidebar {
+  margin: 1.4rem 0.5rem 0.6rem;
+  padding-bottom: 1.1rem;
+  border-bottom: 1px solid var(--border, var(--ispx-neutral-200));
+}
+@media (min-width: 1900px) {
+  .ispx-powered--corner {
+    display: flex;
+  }
+  .ispx-powered--sidebar {
+    display: none;
+  }
+}
+
+/* Larger site title in the header. */
+header a h1 {
+  font-size: 1.1rem;
+  font-weight: 650;
+}
