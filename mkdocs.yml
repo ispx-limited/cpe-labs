@@ -5,6 +5,7 @@ copyright: Copyright &copy; ISPX LIMITED
 
 theme:
   name: shadcn
+  icon: assets/images/ispx-icon.png
   topbar_sections: false
   pygments_style:
     light: shadcn-light
@@ -40,6 +41,7 @@ extra_javascript:
   - assets/js/hero-tree.js
   - assets/js/arch-topology.js
   - assets/js/copy-code.js
+  - assets/js/powered-by.js
 
 nav:
   - Home: index.md
