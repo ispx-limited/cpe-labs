@@ -1,7 +1,7 @@
 site_name: cpe-labs
 site_description: TR-069 / TR-369 CPE simulator. Real wire-format, profile-driven, multi-CPE per process.
-site_url: https://ispx-limited.github.io/cpe-labs/
-copyright: Copyright &copy; ISPX
+site_url: https://docs.cpe-labs.ispx.co/
+copyright: Copyright &copy; ISPX LIMITED
 
 theme:
   name: shadcn
