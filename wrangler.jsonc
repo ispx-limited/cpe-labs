@@ -1,0 +1,10 @@
+{
+  "name": "cpe-labs",
+  "compatibility_date": "2026-08-01",
+  "build": {
+    "command": "pip install -r requirements.txt && mkdocs build --strict"
+  },
+  "assets": {
+    "directory": "./site"
+  }
+}
