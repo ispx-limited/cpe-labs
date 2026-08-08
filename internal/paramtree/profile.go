@@ -355,6 +355,53 @@ type TransferConfig struct {
 	// "1 Firmware Upgrade Image"); a missing entry means
 	// FaultCode=0 (success).
 	Faults map[string]TransferFault
+
+	// Firmware, when non-nil, switches Download RPCs whose FileType is
+	// "1 Firmware Upgrade Image" from the generic settle path onto the
+	// firmware apply sequence: fetch the image, go dark for ApplyDelay,
+	// update VersionPath, then announce the new version in a boot
+	// session carrying the TransferComplete. Nil keeps the generic
+	// behavior (TransferComplete after the delay, no version change).
+	Firmware *FirmwareConfig
+}
+
+// FirmwareConfig configures simulated firmware upgrade behavior for
+// Download RPCs with FileType "1 Firmware Upgrade Image". The sequence
+// it drives reproduces observed real-CPE behavior (an ARRIS NVG578LX
+// on TR-098): DownloadResponse Status=1, a plain HTTP GET of the
+// image, a dark window while the device flashes and reboots, then one
+// session whose Inform carries "1 BOOT" + "M Download" +
+// "7 TRANSFER COMPLETE" together with the TransferComplete RPC and the
+// new software version.
+//
+// The version applied comes from the image itself (see Fetch), never
+// from a lookup table in code: the operator's "image" declares its own
+// version, so any vendor's versioning scheme works without code
+// changes (design principle #3).
+type FirmwareConfig struct {
+	// VersionPath is the tree leaf holding the running firmware
+	// version (SoftwareVersion on the standard models). Required; must
+	// name an existing xsd:string leaf. No TR-181 / TR-098 default in
+	// core, the operator declares the path explicitly (design
+	// principle #3).
+	VersionPath string
+
+	// ApplyDelay is the dark window between the image fetch and the
+	// post-flash boot session. While dark the CPE starts no sessions:
+	// no periodic Informs, and connection requests are answered but
+	// produce no session until the window ends. Real hardware takes
+	// about two minutes; the default is 30s so tests and demo fleets
+	// are not waiting that long.
+	ApplyDelay time.Duration
+
+	// Fetch selects how the version is derived. True (the default)
+	// performs a real HTTP GET of the Download URL and scans the image
+	// for a "cpe-labs-firmware-version: <version>" line, exercising the
+	// ACS's actual delivery path and URL auth at fleet scale. False
+	// skips the GET and derives the version from the URL's last path
+	// segment, stripped of its extension, for tests that do not want an
+	// HTTP round trip.
+	Fetch bool
 }
 
 // TransferFault is one operator-supplied fault to inject into the
@@ -565,6 +612,17 @@ type rawEventSchedule struct {
 type rawTransfer struct {
 	DefaultDelay string                      `yaml:"defaultDelay"`
 	Faults       map[string]rawTransferFault `yaml:"faults"`
+	Firmware     *rawFirmware                `yaml:"firmware"`
+}
+
+// rawFirmware is the transfer.firmware schema. versionPath is required
+// when the block is present; applyDelay parses via time.ParseDuration
+// (absent means the 30s default); fetch is a *bool so YAML absence
+// (default true) is distinguishable from an explicit false.
+type rawFirmware struct {
+	VersionPath string `yaml:"versionPath"`
+	ApplyDelay  string `yaml:"applyDelay"`
+	Fetch       *bool  `yaml:"fetch"`
 }
 
 type rawTransferFault struct {
@@ -943,6 +1001,13 @@ func mergeFiles(tree *Tree, files []*loadedFile) (mergedConfig, error) {
 			for k, v := range tr.Faults {
 				transferCfg.Faults[k] = TransferFault(v)
 			}
+		}
+		if tr.Firmware != nil {
+			fw, ferr := validateFirmware(tree, lf.path, tr.Firmware)
+			if ferr != nil {
+				return mergedConfig{}, cpeerr.Wrap("paramtree.LoadProfile", cpeerr.KindInvalidArgument, ferr)
+			}
+			transferCfg.Firmware = fw
 		}
 		transferSource = lf.path
 	}
@@ -1344,6 +1409,52 @@ func mergeFiles(tree *Tree, files []*loadedFile) (mergedConfig, error) {
 // bbfUint32Max mirrors the xsd:unsignedInt ceiling. Counters whose Max
 // exceeds this would always fail Tree.Set.
 const bbfUint32Max = uint64(4294967295)
+
+// defaultFirmwareApplyDelay is the dark window used when the firmware
+// block omits applyDelay. Real hardware takes about two minutes to
+// flash and reboot; 30s keeps demo fleets and tests responsive while
+// still forcing an ACS to handle a genuinely unreachable device.
+const defaultFirmwareApplyDelay = 30 * time.Second
+
+// validateFirmware runs the load-time checks for the transfer.firmware
+// block: versionPath required and naming an existing xsd:string leaf
+// (SetSystem would reject a non-string version at apply time, hours
+// into a campaign; failing at load is kinder), applyDelay parseable
+// and non-negative, fetch defaulting to true.
+func validateFirmware(tree *Tree, source string, raw *rawFirmware) (*FirmwareConfig, error) {
+	if raw.VersionPath == "" {
+		return nil, fmt.Errorf("%s: transfer.firmware.versionPath is required "+
+			"(no TR-181 / TR-098 default; supply the parameter-tree path explicitly)", source)
+	}
+	v, gerr := tree.Get(raw.VersionPath)
+	if gerr != nil {
+		return nil, fmt.Errorf("%s: transfer.firmware.versionPath references unknown path %q: %w",
+			source, raw.VersionPath, gerr)
+	}
+	if v.Type != TypeString {
+		return nil, fmt.Errorf("%s: transfer.firmware.versionPath path %q must be %s, got %s",
+			source, raw.VersionPath, TypeString, v.Type)
+	}
+	fw := &FirmwareConfig{
+		VersionPath: raw.VersionPath,
+		ApplyDelay:  defaultFirmwareApplyDelay,
+		Fetch:       true,
+	}
+	if raw.ApplyDelay != "" {
+		d, err := time.ParseDuration(raw.ApplyDelay)
+		if err != nil {
+			return nil, fmt.Errorf("%s: transfer.firmware.applyDelay %q: %w", source, raw.ApplyDelay, err)
+		}
+		if d < 0 {
+			return nil, fmt.Errorf("%s: transfer.firmware.applyDelay must be >= 0, got %s", source, d)
+		}
+		fw.ApplyDelay = d
+	}
+	if raw.Fetch != nil {
+		fw.Fetch = *raw.Fetch
+	}
+	return fw, nil
+}
 
 // validateGenerator runs the type / range / target-leaf checks shared
 // by the top-level generators: block and inline parameters[].generator

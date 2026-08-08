@@ -55,6 +55,7 @@ nav:
       - Value Generators: guides/generators.md
       - Periodic Inform Scheduler: guides/scheduler.md
       - Connection Request Listener: guides/connection-request.md
+      - Firmware Upgrades: guides/firmware.md
       - Pointing at an ACS: guides/acs-integration.md
       - USP Agent (TR-369): guides/usp.md
       - Docker: guides/docker.md

@@ -22,7 +22,7 @@ periodicInformPaths:  # leaves the per-CPE periodic Inform timer reads
 generators:           # top-level generators list
 fleet:                # fleet count + pools + serial pattern
 connectionRequest:    # CR listener auth + throttle
-transfer:             # Download / Upload TransferComplete defaults + faults
+transfer:             # Download / Upload TransferComplete defaults + faults + firmware
 eventSchedule:        # Wall-clock latency for Reboot / FactoryReset / boot
 ```
 
@@ -277,6 +277,26 @@ transfer:
 
 When the ACS issues a `Download` whose `FileType` matches a `faults` key, the handler fires `TransferComplete` with the configured fault code and string. Useful for testing how an ACS handles failed firmware pushes.
 
+### `transfer.firmware`
+
+Enables firmware upgrade simulation for `Download` RPCs with FileType `1 Firmware Upgrade Image`: the simulator fetches the image, goes dark while it "flashes", updates the version leaf, and announces the result in a boot session. See [Firmware Upgrades](../guides/firmware.md) for the full sequence.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `versionPath` | string | Required. Tree leaf holding the running firmware version (`SoftwareVersion` on the standard models). Must exist and be `xsd:string`. No TR-181 / TR-098 default. |
+| `applyDelay` | duration | Dark window between the image fetch and the post-flash boot session. The CPE starts no sessions while dark. Default `30s`. |
+| `fetch` | bool | `true` (default): HTTP GET the Download URL and scan the image for a `cpe-labs-firmware-version: <version>` line. `false`: derive the version from the URL's last path segment, stripped of its extension, with no HTTP round trip. |
+
+```yaml
+transfer:
+  defaultDelay: 5s
+  firmware:
+    versionPath: InternetGatewayDevice.DeviceInfo.SoftwareVersion
+    applyDelay: 30s
+```
+
+A `faults` entry for `1 Firmware Upgrade Image` takes precedence over the firmware sequence: the configured fault fires with no fetch, no dark window, and no version change. An image that cannot be fetched or carries no version header settles as fault `9010`.
+
 ## `eventSchedule`
 
 Wall-clock latency between selected CWMP events and the simulated CPE's matching outbound Inform. Models the time a real CPE spends rebooting, factory-resetting, or booting up before the ACS sees the post-event Inform.
@@ -309,6 +329,7 @@ The loader rejects loudly. Every error names the source file and offending key:
 - `periodicInformPaths` leaves with the wrong type or non-writable.
 - `connectionRequest` with `scheme` set but missing `realm` / `usernameParameter` / `passwordParameter`.
 - `eventSchedule` durations that don't parse via Go's `time.ParseDuration`, or that parse to a negative value.
+- `transfer.firmware` with a missing `versionPath`, a `versionPath` that doesn't exist or isn't `xsd:string`, or an `applyDelay` that doesn't parse or is negative.
 - `fleet.pools` with a CIDR that doesn't parse, an IPv6 prefix length lower than the super-prefix length, or capacity smaller than `fleet.count`.
 - Generators on the wrong leaf type (counter on a string, drift on an unsigned int).
 - Two generators targeting the same path (top-level + inline on the same leaf).
