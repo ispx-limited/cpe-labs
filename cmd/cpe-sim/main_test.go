@@ -324,6 +324,432 @@ const transferCompleteResponseEnvelope = `<?xml version="1.0"?>
   </soapenv:Body>
 </soapenv:Envelope>`
 
+// firmwareDownloadEnvelope builds a Download RPC for the firmware
+// FileType pointing at url. commandKey and delaySeconds vary per test.
+func firmwareDownloadEnvelope(commandKey, url string, delaySeconds int) string {
+	return fmt.Sprintf(`<?xml version="1.0"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:cwmp="urn:dslforum-org:cwmp-1-1">
+  <soapenv:Header><cwmp:ID soapenv:mustUnderstand="1">acs-fw</cwmp:ID></soapenv:Header>
+  <soapenv:Body>
+    <cwmp:Download>
+      <CommandKey>%s</CommandKey>
+      <FileType>1 Firmware Upgrade Image</FileType>
+      <URL>%s</URL>
+      <Username/>
+      <Password/>
+      <FileSize>0</FileSize>
+      <TargetFileName/>
+      <DelaySeconds>%d</DelaySeconds>
+      <SuccessURL/>
+      <FailureURL/>
+    </cwmp:Download>
+  </soapenv:Body>
+</soapenv:Envelope>`, commandKey, url, delaySeconds)
+}
+
+// firmwareTestProfile writes a profile with the firmware block enabled
+// (short delays so the tests stay fast) and the boot Inform reporting
+// SoftwareVersion, then returns its path.
+func firmwareTestProfile(t *testing.T) string {
+	t.Helper()
+	tmp := t.TempDir()
+	profile := filepath.Join(tmp, "profile.yaml")
+	if err := os.WriteFile(profile, []byte(`deviceIdPaths:
+  manufacturer: Device.DeviceInfo.Manufacturer
+  oui:          Device.DeviceInfo.ManufacturerOUI
+  productClass: Device.DeviceInfo.ProductClass
+  serialNumber: Device.DeviceInfo.SerialNumber
+
+parameters:
+  - path: Device.DeviceInfo.Manufacturer
+    value: "TestVendor"
+  - path: Device.DeviceInfo.ManufacturerOUI
+    value: "AABBCC"
+  - path: Device.DeviceInfo.ProductClass
+    value: "TestModel"
+  - path: Device.DeviceInfo.SerialNumber
+    value: "TEST-1"
+  - path: Device.DeviceInfo.SoftwareVersion
+    value: "1.0.0"
+  - path: Device.ManagementServer.ConnectionRequestURL
+    value: ""
+    writable: true
+
+informParameters:
+  boot:
+    - Device.DeviceInfo.SoftwareVersion
+
+transfer:
+  defaultDelay: 50ms
+  firmware:
+    versionPath: Device.DeviceInfo.SoftwareVersion
+    applyDelay: 100ms
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return profile
+}
+
+// TestRunDaemonModeFirmwareUpgradeAppliesAndBoots exercises the full
+// firmware sequence end-to-end: the stub ACS issues a Download for an
+// image the stub image server serves with a version header line, and
+// the test asserts the post-apply session arrives with "1 BOOT" +
+// "M Download" + "7 TRANSFER COMPLETE" together, the TransferComplete
+// riding that same session with fault 0 and zero-valued times, and the
+// boot Inform reporting the new SoftwareVersion.
+func TestRunDaemonModeFirmwareUpgradeAppliesAndBoots(t *testing.T) {
+	var (
+		informCount  atomic.Int32
+		fetchCount   atomic.Int32
+		tcCount      atomic.Int32
+		downloadSent atomic.Bool
+		bootInform   atomicString
+		tcBody       atomicString
+	)
+
+	imgSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		fetchCount.Add(1)
+		_, _ = w.Write([]byte("cpe-labs-firmware-version: 2.0.0\n" + strings.Repeat("p", 1024)))
+	}))
+	defer imgSrv.Close()
+
+	downloadEnvelope := firmwareDownloadEnvelope("fw-upgrade-1", imgSrv.URL+"/nvg-2.0.0.bin", 0)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		s := string(body)
+		switch {
+		case strings.Contains(s, "<cwmp:Inform>"):
+			informCount.Add(1)
+			if strings.Contains(s, "<EventCode>M Download</EventCode>") {
+				bootInform.Store(s)
+			}
+			w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+			_, _ = w.Write([]byte(informResponseEnvelope))
+		case strings.Contains(s, "<cwmp:TransferComplete>"):
+			tcCount.Add(1)
+			tcBody.Store(s)
+			w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+			_, _ = w.Write([]byte(transferCompleteResponseEnvelope))
+		case strings.TrimSpace(s) == "":
+			if informCount.Load() >= 1 && !downloadSent.Load() {
+				downloadSent.Store(true)
+				w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+				_, _ = w.Write([]byte(downloadEnvelope))
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			// The CPE's DownloadResponse; drain to 204.
+			w.WriteHeader(http.StatusNoContent)
+		}
+	}))
+	defer srv.Close()
+
+	port := freePort(t)
+	bindAddr := "127.0.0.1:" + strconv.Itoa(port)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	args := []string{
+		"--acs-url=" + srv.URL,
+		"--profile=" + firmwareTestProfile(t),
+		"--cr-bind-addr=" + bindAddr,
+		"--cr-publish-path=Device.ManagementServer.ConnectionRequestURL",
+		"--log-level=error",
+	}
+	done := make(chan error, 1)
+	go func() { done <- run(ctx, args, os.Stdout, os.Stderr) }()
+
+	if err := waitFor(t, 5*time.Second, func() bool {
+		return tcCount.Load() >= 1
+	}); err != nil {
+		t.Fatalf("firmware TransferComplete never arrived: %v", err)
+	}
+
+	if got := fetchCount.Load(); got != 1 {
+		t.Errorf("image fetches = %d, want exactly one plain GET", got)
+	}
+
+	boot := bootInform.Load()
+	for _, want := range []string{
+		"<EventCode>1 BOOT</EventCode>",
+		"<EventCode>M Download</EventCode>",
+		"<EventCode>7 TRANSFER COMPLETE</EventCode>",
+	} {
+		if !strings.Contains(boot, want) {
+			t.Errorf("boot Inform missing %s:\n%s", want, boot)
+		}
+	}
+	if !strings.Contains(boot, "2.0.0") {
+		t.Errorf("boot Inform should report the new SoftwareVersion 2.0.0:\n%s", boot)
+	}
+
+	tc := tcBody.Load()
+	if !strings.Contains(tc, "<CommandKey>fw-upgrade-1</CommandKey>") {
+		t.Errorf("TransferComplete missing echoed CommandKey:\n%s", tc)
+	}
+	if !strings.Contains(tc, "<FaultCode>0</FaultCode>") {
+		t.Errorf("TransferComplete should carry fault 0:\n%s", tc)
+	}
+	// The observed device reports zero-valued StartTime/CompleteTime on
+	// a firmware TransferComplete; both render as the zero time.
+	if got := strings.Count(tc, "0001-01-01T00:00:00Z"); got != 2 {
+		t.Errorf("TransferComplete should carry two zero-valued times, got %d:\n%s", got, tc)
+	}
+
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("run returned error after cancel: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("run did not return within 5s of ctx cancel")
+	}
+}
+
+// TestRunDaemonModeFirmwareInvalidImageFaults serves an image without
+// the version header line and asserts the sequence settles as a
+// TransferComplete fault 9010 with no boot session (no dark window, no
+// version change).
+func TestRunDaemonModeFirmwareInvalidImageFaults(t *testing.T) {
+	var (
+		informCount  atomic.Int32
+		tcCount      atomic.Int32
+		downloadSent atomic.Bool
+		tcInform     atomicString
+		tcBody       atomicString
+	)
+
+	imgSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("binary blob without a version marker"))
+	}))
+	defer imgSrv.Close()
+
+	downloadEnvelope := firmwareDownloadEnvelope("fw-bad-1", imgSrv.URL+"/broken.bin", 0)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		s := string(body)
+		switch {
+		case strings.Contains(s, "<cwmp:Inform>"):
+			informCount.Add(1)
+			if strings.Contains(s, "<EventCode>M Download</EventCode>") {
+				tcInform.Store(s)
+			}
+			w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+			_, _ = w.Write([]byte(informResponseEnvelope))
+		case strings.Contains(s, "<cwmp:TransferComplete>"):
+			tcCount.Add(1)
+			tcBody.Store(s)
+			w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+			_, _ = w.Write([]byte(transferCompleteResponseEnvelope))
+		case strings.TrimSpace(s) == "":
+			if informCount.Load() >= 1 && !downloadSent.Load() {
+				downloadSent.Store(true)
+				w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+				_, _ = w.Write([]byte(downloadEnvelope))
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			w.WriteHeader(http.StatusNoContent)
+		}
+	}))
+	defer srv.Close()
+
+	port := freePort(t)
+	bindAddr := "127.0.0.1:" + strconv.Itoa(port)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	args := []string{
+		"--acs-url=" + srv.URL,
+		"--profile=" + firmwareTestProfile(t),
+		"--cr-bind-addr=" + bindAddr,
+		"--cr-publish-path=Device.ManagementServer.ConnectionRequestURL",
+		"--log-level=error",
+	}
+	done := make(chan error, 1)
+	go func() { done <- run(ctx, args, os.Stdout, os.Stderr) }()
+
+	if err := waitFor(t, 5*time.Second, func() bool {
+		return tcCount.Load() >= 1
+	}); err != nil {
+		t.Fatalf("faulted TransferComplete never arrived: %v", err)
+	}
+
+	tc := tcBody.Load()
+	if !strings.Contains(tc, "<FaultCode>9010</FaultCode>") {
+		t.Errorf("TransferComplete should carry fault 9010:\n%s", tc)
+	}
+	if !strings.Contains(tc, "invalid firmware image") {
+		t.Errorf("TransferComplete should carry the invalid-image fault string:\n%s", tc)
+	}
+	// A rejected image produces no reboot: the delivery session is a
+	// plain TRANSFER COMPLETE session, not a boot session.
+	inf := tcInform.Load()
+	if strings.Contains(inf, "<EventCode>1 BOOT</EventCode>") {
+		t.Errorf("fault delivery Inform should not announce 1 BOOT:\n%s", inf)
+	}
+
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("run returned error after cancel: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("run did not return within 5s of ctx cancel")
+	}
+}
+
+// TestRunDaemonModeFirmwareSupersede issues a firmware Download with a
+// long DelaySeconds, then a second one (via connection request) before
+// the first settles. The second must cancel the first: exactly one
+// TransferComplete arrives, carrying the second CommandKey, and the
+// boot Inform reports the second image's version.
+func TestRunDaemonModeFirmwareSupersede(t *testing.T) {
+	var (
+		informCount atomic.Int32
+		tcCount     atomic.Int32
+		aSent       atomic.Bool
+		bSent       atomic.Bool
+		crSeen      atomic.Bool
+		bootInform  atomicString
+		tcBodies    struct {
+			mu   sync.Mutex
+			list []string
+		}
+	)
+
+	imgSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "a-9.9.9") {
+			_, _ = w.Write([]byte("cpe-labs-firmware-version: 9.9.9\n"))
+			return
+		}
+		_, _ = w.Write([]byte("cpe-labs-firmware-version: 2.0.0\n"))
+	}))
+	defer imgSrv.Close()
+
+	// A settles at 50ms + 2s; B (DelaySeconds 0) supersedes it well
+	// before that.
+	envelopeA := firmwareDownloadEnvelope("fw-a", imgSrv.URL+"/a-9.9.9.bin", 2)
+	envelopeB := firmwareDownloadEnvelope("fw-b", imgSrv.URL+"/b-2.0.0.bin", 0)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		s := string(body)
+		switch {
+		case strings.Contains(s, "<cwmp:Inform>"):
+			informCount.Add(1)
+			if strings.Contains(s, "<EventCode>6 CONNECTION REQUEST</EventCode>") {
+				crSeen.Store(true)
+			}
+			if strings.Contains(s, "<EventCode>M Download</EventCode>") {
+				bootInform.Store(s)
+			}
+			w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+			_, _ = w.Write([]byte(informResponseEnvelope))
+		case strings.Contains(s, "<cwmp:TransferComplete>"):
+			tcCount.Add(1)
+			tcBodies.mu.Lock()
+			tcBodies.list = append(tcBodies.list, s)
+			tcBodies.mu.Unlock()
+			w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+			_, _ = w.Write([]byte(transferCompleteResponseEnvelope))
+		case strings.TrimSpace(s) == "":
+			if informCount.Load() >= 1 && !aSent.Load() {
+				aSent.Store(true)
+				w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+				_, _ = w.Write([]byte(envelopeA))
+				return
+			}
+			if crSeen.Load() && !bSent.Load() {
+				bSent.Store(true)
+				w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+				_, _ = w.Write([]byte(envelopeB))
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			w.WriteHeader(http.StatusNoContent)
+		}
+	}))
+	defer srv.Close()
+
+	port := freePort(t)
+	bindAddr := "127.0.0.1:" + strconv.Itoa(port)
+	crURL := "http://" + bindAddr + "/cr"
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	args := []string{
+		"--acs-url=" + srv.URL,
+		"--profile=" + firmwareTestProfile(t),
+		"--cr-bind-addr=" + bindAddr,
+		"--cr-publish-path=Device.ManagementServer.ConnectionRequestURL",
+		"--log-level=error",
+	}
+	done := make(chan error, 1)
+	go func() { done <- run(ctx, args, os.Stdout, os.Stderr) }()
+
+	// Wait for A to be accepted, then trigger the CR session that
+	// carries the superseding Download B.
+	if err := waitFor(t, 5*time.Second, func() bool { return aSent.Load() }); err != nil {
+		t.Fatalf("Download A never issued: %v", err)
+	}
+	superseded := time.Now()
+	resp, err := http.Get(crURL)
+	if err != nil {
+		t.Fatalf("GET CR URL: %v", err)
+	}
+	_ = resp.Body.Close()
+
+	if err := waitFor(t, 5*time.Second, func() bool {
+		return tcCount.Load() >= 1
+	}); err != nil {
+		t.Fatalf("TransferComplete never arrived: %v", err)
+	}
+
+	// Give A's original settle time (2s after acceptance) a margin to
+	// prove the supersede actually cancelled it.
+	if wait := 2600*time.Millisecond - time.Since(superseded); wait > 0 {
+		time.Sleep(wait)
+	}
+	if got := tcCount.Load(); got != 1 {
+		t.Errorf("TransferComplete count = %d, want exactly 1 (A superseded)", got)
+	}
+	tcBodies.mu.Lock()
+	all := strings.Join(tcBodies.list, "\n")
+	tcBodies.mu.Unlock()
+	if !strings.Contains(all, "<CommandKey>fw-b</CommandKey>") {
+		t.Errorf("TransferComplete should carry fw-b:\n%s", all)
+	}
+	if strings.Contains(all, "<CommandKey>fw-a</CommandKey>") {
+		t.Errorf("superseded fw-a must not deliver a TransferComplete:\n%s", all)
+	}
+
+	boot := bootInform.Load()
+	if !strings.Contains(boot, "2.0.0") || strings.Contains(boot, "9.9.9") {
+		t.Errorf("boot Inform should report the superseding image's version 2.0.0:\n%s", boot)
+	}
+
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("run returned error after cancel: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("run did not return within 5s of ctx cancel")
+	}
+}
+
 // TestRunDaemonModeFiresCR exercises the connection-request flow:
 // start cpe-sim with --cr-bind-addr; observe the initial Inform reach
 // the stub ACS; GET the CR URL; observe a second Inform (this one

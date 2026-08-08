@@ -16,7 +16,7 @@ A profile is **either a single file** (e.g. `profile.yaml`) **or a directory** o
 | `periodicInformPaths` | Names the leaves that drive the per-CPE periodic Inform timer. |
 | `fleet` | Fleet count, serial pattern, named address pools. |
 | `connectionRequest` | CR listener auth scheme + credential paths. |
-| `transfer` | Default Download / Upload TransferComplete delay + per-FileType fault injection. |
+| `transfer` | Default Download / Upload TransferComplete delay + per-FileType fault injection + [firmware upgrade simulation](firmware.md). |
 | `eventSchedule` | Wall-clock latency for `Reboot` / `FactoryReset` / initial bootstrap Inform. Models the time a real CPE spends rebooting / resetting / booting before the ACS sees the post-event Inform. |
 
 Every block is optional except `deviceIdPaths` (required) and either `parameters` or `objects` / `groups` (you need to mount at least the four DeviceID leaves).

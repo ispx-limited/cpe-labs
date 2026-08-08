@@ -612,6 +612,178 @@ transfer:
 	}
 }
 
+func TestProfileTransferFirmwareLoad(t *testing.T) {
+	t.Parallel()
+
+	body := `parameters:
+  - path: Device.DeviceInfo.SoftwareVersion
+    value: "1.0.0"
+transfer:
+  defaultDelay: 2s
+  firmware:
+    versionPath: Device.DeviceInfo.SoftwareVersion
+    applyDelay: 45s
+    fetch: false
+`
+	prof, err := loadProfileFromStringFull(t, body)
+	if err != nil {
+		t.Fatalf("LoadProfile: %v", err)
+	}
+	fw := prof.Transfer.Firmware
+	if fw == nil {
+		t.Fatal("Firmware = nil, want configured block")
+	}
+	if fw.VersionPath != "Device.DeviceInfo.SoftwareVersion" {
+		t.Errorf("VersionPath = %q", fw.VersionPath)
+	}
+	if fw.ApplyDelay != 45*time.Second {
+		t.Errorf("ApplyDelay = %s, want 45s", fw.ApplyDelay)
+	}
+	if fw.Fetch {
+		t.Error("Fetch = true, want explicit false honored")
+	}
+}
+
+func TestProfileTransferFirmwareDefaults(t *testing.T) {
+	t.Parallel()
+
+	// Only versionPath declared: applyDelay defaults to 30s, fetch to
+	// true (YAML absence means true, not false).
+	body := `parameters:
+  - path: Device.DeviceInfo.SoftwareVersion
+    value: "1.0.0"
+transfer:
+  firmware:
+    versionPath: Device.DeviceInfo.SoftwareVersion
+`
+	prof, err := loadProfileFromStringFull(t, body)
+	if err != nil {
+		t.Fatalf("LoadProfile: %v", err)
+	}
+	fw := prof.Transfer.Firmware
+	if fw == nil {
+		t.Fatal("Firmware = nil, want configured block")
+	}
+	if fw.ApplyDelay != 30*time.Second {
+		t.Errorf("default ApplyDelay = %s, want 30s", fw.ApplyDelay)
+	}
+	if !fw.Fetch {
+		t.Error("default Fetch = false, want true")
+	}
+}
+
+func TestProfileTransferFirmwareOmitted(t *testing.T) {
+	t.Parallel()
+
+	body := `parameters:
+  - path: Device.X
+    value: "y"
+transfer:
+  defaultDelay: 1s
+`
+	prof, err := loadProfileFromStringFull(t, body)
+	if err != nil {
+		t.Fatalf("LoadProfile: %v", err)
+	}
+	if prof.Transfer.Firmware != nil {
+		t.Errorf("Firmware = %+v, want nil when block omitted", prof.Transfer.Firmware)
+	}
+}
+
+func TestProfileTransferFirmwareInvalid(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		body    string
+		wantErr string
+	}{
+		{
+			name: "missing versionPath",
+			body: `parameters:
+  - path: Device.X
+    value: "y"
+transfer:
+  firmware:
+    applyDelay: 10s
+`,
+			wantErr: "versionPath",
+		},
+		{
+			name: "unknown versionPath",
+			body: `parameters:
+  - path: Device.X
+    value: "y"
+transfer:
+  firmware:
+    versionPath: Device.DeviceInfo.SoftwareVersion
+`,
+			wantErr: "unknown path",
+		},
+		{
+			name: "non-string versionPath",
+			body: `parameters:
+  - path: Device.DeviceInfo.UpTime
+    type: xsd:unsignedInt
+    value: "1"
+transfer:
+  firmware:
+    versionPath: Device.DeviceInfo.UpTime
+`,
+			wantErr: "must be xsd:string",
+		},
+		{
+			name: "malformed applyDelay",
+			body: `parameters:
+  - path: Device.DeviceInfo.SoftwareVersion
+    value: "1.0.0"
+transfer:
+  firmware:
+    versionPath: Device.DeviceInfo.SoftwareVersion
+    applyDelay: soon
+`,
+			wantErr: "applyDelay",
+		},
+		{
+			name: "negative applyDelay",
+			body: `parameters:
+  - path: Device.DeviceInfo.SoftwareVersion
+    value: "1.0.0"
+transfer:
+  firmware:
+    versionPath: Device.DeviceInfo.SoftwareVersion
+    applyDelay: -5s
+`,
+			wantErr: "applyDelay",
+		},
+		{
+			name: "unknown key",
+			body: `parameters:
+  - path: Device.DeviceInfo.SoftwareVersion
+    value: "1.0.0"
+transfer:
+  firmware:
+    versionPath: Device.DeviceInfo.SoftwareVersion
+    bogusKey: 1
+`,
+			wantErr: "bogusKey",
+		},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := loadProfileFromStringFull(t, tc.body)
+			if err == nil {
+				t.Fatal("expected load error")
+			}
+			if !strings.Contains(err.Error(), tc.wantErr) {
+				t.Errorf("error %q should contain %q", err.Error(), tc.wantErr)
+			}
+		})
+	}
+}
+
 func TestProfileConnectionRequestDefaults(t *testing.T) {
 	t.Parallel()
 

@@ -726,7 +726,13 @@ func buildCPEStack(cfg cpeconfig.Config, in cpeStackInputs) (*cpeStack, error) {
 			logger:  in.logger,
 		}
 
-		scheduleTransfer := buildTransferScheduler(in.sched, in.id, tracker, prof.Transfer, runner, in.logger)
+		// pendingCancels holds the cancel funcs for in-flight scheduled
+		// reboot / factory-reset / firmware deliveries. Accessed from RPC
+		// handlers (running inside a session) and from fired one-shot
+		// goroutines, so it carries its own mutex.
+		pendingCancels := &pendingScheduledCancels{}
+
+		scheduleTransfer := buildTransferScheduler(in.sched, in.id, tracker, prof.Transfer, prof.Tree, runner, pendingCancels, in.logger)
 
 		factoryReset := func() error {
 			fresh, loadErr := paramtree.LoadProfile(cfg.ProfilePath)
@@ -744,12 +750,6 @@ func buildCPEStack(cfg cpeconfig.Config, in cpeStackInputs) (*cpeStack, error) {
 			tracker.ResetBootstrap()
 			return nil
 		}
-
-		// pendingCancels holds the cancel funcs for in-flight scheduled
-		// reboot / factory-reset deliveries. Accessed from RPC handlers
-		// (running inside a session) and from fired one-shot goroutines,
-		// so it carries its own mutex.
-		pendingCancels := &pendingScheduledCancels{}
 
 		var scheduleReboot handlers.RebootSchedule
 		if prof.EventSchedule.RebootDelay > 0 {
@@ -1176,10 +1176,19 @@ func buildCRAuthenticator(cfg paramtree.ConnectionRequestConfig, tree *paramtree
 // far as the ACS can tell; the dedicated TriggerRetry session only
 // fires when no natural trigger got there first.
 //
-// Deadlock freedom: r.mu only guards the busy/deferred/cancelRetry
-// fields and is never held while a session runs or while any other
-// lock is taken. Sessions run on the requesting goroutine; a busy
-// runner latches and returns immediately, so scheduler goroutines
+// Offline gating: setOffline marks the CPE dark (a firmware image is
+// being flashed and the device is rebooting). While offline, every
+// trigger latches into the same one-slot deferred latch instead of
+// running, so a periodic tick or connection request that lands during
+// the dark window produces its session only after the device comes
+// back. The firmware apply path calls setOnline and then fires the
+// boot session itself; the deferred latch drains after that session,
+// exactly as it does for triggers that landed mid-session.
+//
+// Deadlock freedom: r.mu only guards the busy/offline/deferred/
+// cancelRetry fields and is never held while a session runs or while
+// any other lock is taken. Sessions run on the requesting goroutine; a
+// busy runner latches and returns immediately, so scheduler goroutines
 // (ticks, one-shots, retry timers) never block on a session in
 // progress.
 type sessionRunner struct {
@@ -1191,9 +1200,28 @@ type sessionRunner struct {
 
 	mu          sync.Mutex
 	busy        bool
+	offline     bool
 	deferred    cwmp.Trigger
 	hasDeferred bool
 	cancelRetry func()
+}
+
+// setOffline marks the CPE dark: request latches every trigger until
+// setOnline. Used by the firmware apply sequence to model the flash +
+// reboot window during which a real device sends nothing.
+func (r *sessionRunner) setOffline() {
+	r.mu.Lock()
+	r.offline = true
+	r.mu.Unlock()
+}
+
+// setOnline ends the dark window. It does not fire any deferred
+// trigger itself; the caller runs the boot session next, and the
+// deferred latch drains after it.
+func (r *sessionRunner) setOnline() {
+	r.mu.Lock()
+	r.offline = false
+	r.mu.Unlock()
 }
 
 // request runs a session for trigger, or defers it when one is already
@@ -1204,14 +1232,20 @@ type sessionRunner struct {
 // immediately after the running session completes, success or failure.
 func (r *sessionRunner) request(ctx context.Context, trigger cwmp.Trigger) (ran bool, err error) {
 	r.mu.Lock()
-	if r.busy {
+	if r.busy || r.offline {
 		if !r.hasDeferred || triggerPriority(trigger) > triggerPriority(r.deferred) {
 			r.deferred = trigger
 		}
 		r.hasDeferred = true
+		offline := r.offline
 		r.mu.Unlock()
-		r.logger.Debug("session deferred until in-progress session completes",
-			"cpe_id", r.cpeID, "deferred_trigger", int(trigger))
+		if offline {
+			r.logger.Debug("session deferred: device offline for firmware apply",
+				"cpe_id", r.cpeID, "deferred_trigger", int(trigger))
+		} else {
+			r.logger.Debug("session deferred until in-progress session completes",
+				"cpe_id", r.cpeID, "deferred_trigger", int(trigger))
+		}
 		return false, nil
 	}
 	r.busy = true
@@ -1220,7 +1254,9 @@ func (r *sessionRunner) request(ctx context.Context, trigger cwmp.Trigger) (ran 
 	err = r.runOne(ctx, trigger)
 	for {
 		r.mu.Lock()
-		if !r.hasDeferred {
+		// A dark window that opened mid-session keeps the deferred
+		// trigger latched; it drains after the post-apply boot session.
+		if !r.hasDeferred || r.offline {
 			r.busy = false
 			r.mu.Unlock()
 			return true, err
@@ -1321,16 +1357,31 @@ func (r *sessionRunner) cancelPendingRetry() {
 // TransferComplete delivery acquires the same SessionMu as periodic
 // ticks and CR sessions.
 //
+// A Download whose FileType is "1 Firmware Upgrade Image" takes the
+// firmware apply sequence instead when the profile configures
+// transfer.firmware, unless a transfer.faults entry matches the
+// FileType: operator-declared faults take precedence and short-circuit
+// the sequence entirely (no fetch, no dark window, no version change),
+// so the existing fault-injection contract is unchanged.
+//
 // runner holds runOpts by pointer so the scheduler picks up the
 // Session once cmd/cpe-sim's main has finished constructing it.
-func buildTransferScheduler(sched *scheduler.Scheduler, cpeID string, tracker *cwmp.EventTracker, cfg paramtree.TransferConfig, runner *sessionRunner, logger *slog.Logger) handlers.Schedule {
+func buildTransferScheduler(sched *scheduler.Scheduler, cpeID string, tracker *cwmp.EventTracker, cfg paramtree.TransferConfig, tree *paramtree.Tree, runner *sessionRunner, cancels *pendingScheduledCancels, logger *slog.Logger) handlers.Schedule {
 	defaultDelay := cfg.DefaultDelay
 	if defaultDelay <= 0 {
 		defaultDelay = 5 * time.Second
 	}
+	var scheduleFirmware func(p handlers.Pending, settleDelay time.Duration)
+	if cfg.Firmware != nil {
+		scheduleFirmware = buildFirmwareScheduler(sched, cpeID, tracker, cfg.Firmware, tree, runner, cancels, logger)
+	}
 	return func(p handlers.Pending) {
 		delay := defaultDelay + time.Duration(p.DelaySeconds)*time.Second
 		fault := lookupTransferFault(cfg, p.FileType)
+		if scheduleFirmware != nil && p.IsDownload && p.FileType == firmwareFileType && fault.Code == 0 {
+			scheduleFirmware(p, delay)
+			return
+		}
 		logger.Debug("transfer scheduler enqueue",
 			"cpe_id", cpeID,
 			"command_key", p.CommandKey,
@@ -1390,6 +1441,7 @@ type pendingScheduledCancels struct {
 	mu           sync.Mutex
 	reboot       func()
 	factoryReset func()
+	firmware     func()
 }
 
 // cancelReboot cancels any in-flight scheduled reboot and clears the
@@ -1431,6 +1483,29 @@ func (p *pendingScheduledCancels) setFactoryReset(cancel func()) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.factoryReset = cancel
+}
+
+// cancelFirmware mirrors cancelReboot for the firmware apply sequence.
+// The slot holds whichever of the sequence's two one-shots (settle,
+// dark-window apply) is currently in flight, so a superseding Download
+// aborts the sequence at either stage.
+func (p *pendingScheduledCancels) cancelFirmware() bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.firmware == nil {
+		return false
+	}
+	p.firmware()
+	p.firmware = nil
+	return true
+}
+
+// setFirmware stores the cancel func for the firmware sequence's
+// currently in-flight one-shot.
+func (p *pendingScheduledCancels) setFirmware(cancel func()) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.firmware = cancel
 }
 
 // buildRebootScheduler returns a handlers.RebootSchedule that defers

@@ -302,3 +302,38 @@ func TestLoadProfileEventScheduleCrossFileConflict(t *testing.T) {
 		t.Errorf("error should mention eventSchedule: %v", err)
 	}
 }
+
+func TestLoadProfileTransferFirmwareCrossFileConflict(t *testing.T) {
+	t.Parallel()
+
+	// The firmware block nests inside transfer, and transfer is a
+	// singleton across the directory, so two files carrying firmware
+	// blocks reject with the existing transfer conflict error.
+	dir := t.TempDir()
+	leafYAML := `parameters:
+  - path: Device.DeviceInfo.SoftwareVersion
+    value: "1.0.0"
+`
+	if err := os.WriteFile(filepath.Join(dir, "0_leaves.yaml"), []byte(leafYAML), 0o600); err != nil {
+		t.Fatalf("write 0_leaves.yaml: %v", err)
+	}
+
+	block := `transfer:
+  firmware:
+    versionPath: Device.DeviceInfo.SoftwareVersion
+`
+	if err := os.WriteFile(filepath.Join(dir, "1_first.yaml"), []byte(block), 0o600); err != nil {
+		t.Fatalf("write 1_first.yaml: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "2_second.yaml"), []byte(block), 0o600); err != nil {
+		t.Fatalf("write 2_second.yaml: %v", err)
+	}
+
+	_, err := paramtree.LoadProfile(dir)
+	if err == nil {
+		t.Fatal("expected error: two files declare transfer")
+	}
+	if !strings.Contains(err.Error(), "transfer") {
+		t.Errorf("error should mention transfer: %v", err)
+	}
+}
