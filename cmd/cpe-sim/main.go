@@ -175,6 +175,12 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 		return fmt.Errorf("fleet offset %d + count %d: %w", offset, count, poolErr)
 	}
 
+	// Effective boot ramp, same precedence story as the fleet offset.
+	bootRamp := templateProf.EventSchedule.BootRamp
+	if cfg.BootRamp != nil {
+		bootRamp = *cfg.BootRamp
+	}
+
 	// Read the base serial from the template tree so we know what to
 	// substitute when count > 1.
 	baseSerialLeaf, err := templateProf.Tree.Get(templateProf.DeviceIDPaths.SerialNumber)
@@ -283,6 +289,7 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 		"cr_bind_addr", cfg.CRBindAddr,
 		"fleet_count", count,
 		"fleet_offset", offset,
+		"boot_ramp", bootRamp.String(),
 		"scheduler_enabled", hasAnyScheduler,
 		"generators_enabled", hasAnyGenerators,
 		"event_schedule_daemon", eventScheduleRequiresDaemon,
@@ -309,7 +316,7 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 	// session to bootstrap; the agent's announce below is their first
 	// contact.
 	if cfg.ACSURL != "" {
-		if bootstrapErr := bootstrapAll(ctx, stacks, templateProf.EventSchedule.BootDelay, logger); bootstrapErr != nil {
+		if bootstrapErr := bootstrapAll(ctx, stacks, templateProf.EventSchedule.BootDelay, bootRamp, logger); bootstrapErr != nil {
 			return bootstrapErr
 		}
 	}
@@ -1116,16 +1123,28 @@ func buildCPEStack(cfg cpeconfig.Config, template *paramtree.Profile, in cpeStac
 	}, nil
 }
 
-// bootstrapAll fires the startup Inform for every CPE in parallel.
-// Returns nil if every CPE succeeds; the first error otherwise. Failed
-// CPEs are logged with their cpe_id so an operator can identify which
-// one of N misbehaved.
+// bootstrapAll fires the startup Inform for every CPE. Returns nil if
+// every CPE succeeds; the first error otherwise. Failed CPEs are logged
+// with their cpe_id so an operator can identify which one of N
+// misbehaved.
 //
-// bootDelay > 0 delays each per-CPE bootstrap by exactly that wall-
-// clock duration (real time.Sleep), modelling a CPE that takes time
-// to reach the ACS after process start. The fleet still bootstraps in
-// parallel, every CPE waits the same delay independently.
-func bootstrapAll(ctx context.Context, stacks []*cpeStack, bootDelay time.Duration, logger *slog.Logger) error {
+// bootDelay > 0 holds the whole fleet back by that wall-clock duration,
+// modelling a CPE that takes time to reach the ACS after power-on.
+//
+// bootRamp > 0 then spreads the fleet across a window: CPE k of N
+// starts at bootDelay + k*bootRamp/N. Zero keeps the previous
+// behavior, every CPE starting as soon as bootDelay elapses. The ramp
+// matters because a fleet that bootstraps in one instant measures how
+// fast the simulator can open sockets rather than how well the ACS
+// onboards devices, and a real population does not do it either.
+//
+// Releasing is done by this goroutine walking the (already
+// index-ordered) stacks and spawning each session at its due time,
+// rather than spawning every CPE up front to sleep on its own timer:
+// at fleet scale that would hold a goroutine and a timer per CPE for
+// the entire ramp window, which is exactly the kind of simulator-side
+// cost that shrinks how many CPEs a process can carry.
+func bootstrapAll(ctx context.Context, stacks []*cpeStack, bootDelay, bootRamp time.Duration, logger *slog.Logger) error {
 	if len(stacks) == 0 {
 		return nil
 	}
@@ -1136,24 +1155,36 @@ func bootstrapAll(ctx context.Context, stacks []*cpeStack, bootDelay time.Durati
 	results := make(chan result, len(stacks))
 	var wg sync.WaitGroup
 	spawned := 0
-	for _, st := range stacks {
+	startedAt := time.Now()
+	canceled := false
+	for k, st := range stacks {
 		st := st
 		if st.runner == nil {
 			// USP-only stack: no CWMP session to bootstrap.
 			continue
 		}
 		spawned++
+		due := bootDelay
+		if bootRamp > 0 {
+			due += time.Duration(int64(bootRamp) * int64(k) / int64(len(stacks)))
+		}
+		if wait := time.Until(startedAt.Add(due)); wait > 0 {
+			select {
+			case <-time.After(wait):
+			case <-ctx.Done():
+				canceled = true
+			}
+		}
+		if canceled || ctx.Err() != nil {
+			// Shutdown mid-ramp: the CPEs still waiting never get their
+			// turn. Recording them as failures keeps the "every CPE
+			// failed is fatal, some failed is not" rule honest.
+			results <- result{id: st.id, err: ctx.Err()}
+			continue
+		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if bootDelay > 0 {
-				select {
-				case <-time.After(bootDelay):
-				case <-ctx.Done():
-					results <- result{id: st.id, err: ctx.Err()}
-					return
-				}
-			}
 			start := time.Now()
 			if _, err := st.runner.request(ctx, cwmp.TriggerStartup); err != nil {
 				logger.Info("bootstrap session failed",

@@ -2656,3 +2656,122 @@ func TestRunFleetParallelBuildIsDeterministic(t *testing.T) {
 		t.Errorf("same seed produced different fleets:\n first=%v\nsecond=%v", first, second)
 	}
 }
+
+// rampProfileYAML is a four-CPE fleet with no scheduler and no
+// generators, so the only thing the ACS sees is the bootstrap wave.
+const rampProfileYAML = `deviceIdPaths:
+  manufacturer: Device.DeviceInfo.Manufacturer
+  oui:          Device.DeviceInfo.ManufacturerOUI
+  productClass: Device.DeviceInfo.ProductClass
+  serialNumber: Device.DeviceInfo.SerialNumber
+
+fleet:
+  count: 4
+  serialPattern: "{base}-{i}"
+
+parameters:
+  - path: Device.DeviceInfo.Manufacturer
+    value: "TestVendor"
+  - path: Device.DeviceInfo.ManufacturerOUI
+    value: "AABBCC"
+  - path: Device.DeviceInfo.ProductClass
+    value: "TestModel"
+  - path: Device.DeviceInfo.SerialNumber
+    value: "TEST"
+`
+
+// bootstrapArrivals runs a fleet and returns how long after the start
+// of the run each bootstrap Inform reached the ACS, in arrival order.
+func bootstrapArrivals(t *testing.T, profileBody string, extraArgs ...string) []time.Duration {
+	t.Helper()
+
+	var (
+		mu       sync.Mutex
+		arrivals []time.Duration
+		start    time.Time
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if !strings.Contains(string(body), "<cwmp:Inform>") {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		mu.Lock()
+		arrivals = append(arrivals, time.Since(start))
+		mu.Unlock()
+		w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+		_, _ = w.Write([]byte(informResponseEnvelope))
+	}))
+	defer srv.Close()
+
+	profile := filepath.Join(t.TempDir(), "profile.yaml")
+	if err := os.WriteFile(profile, []byte(profileBody), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	args := append([]string{
+		"--acs-url=" + srv.URL,
+		"--profile=" + profile,
+		"--log-level=error",
+	}, extraArgs...)
+	start = time.Now()
+	if err := run(context.Background(), args, os.Stdout, os.Stderr); err != nil {
+		t.Fatalf("run %v: %v", extraArgs, err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	return append([]time.Duration(nil), arrivals...)
+}
+
+// TestRunBootRampSpreadsBootstrap checks the ramp does what it says:
+// four CPEs across an 800ms window start roughly 200ms apart, so the
+// ACS sees a wave rather than a wall.
+func TestRunBootRampSpreadsBootstrap(t *testing.T) {
+	arrivals := bootstrapArrivals(t, rampProfileYAML, "--boot-ramp=800ms")
+	if len(arrivals) != 4 {
+		t.Fatalf("expected 4 bootstrap Informs, got %d", len(arrivals))
+	}
+	// CPE k of 4 is released at k*800ms/4 = k*200ms. Assert each one
+	// landed no earlier than its slot; the upper bound is left loose
+	// because session time is real work on a shared CI machine.
+	for k, at := range arrivals {
+		earliest := time.Duration(k) * 200 * time.Millisecond
+		if at < earliest {
+			t.Errorf("CPE %d informed at %s, before its %s slot", k, at, earliest)
+		}
+	}
+	if last := arrivals[len(arrivals)-1]; last < 600*time.Millisecond {
+		t.Errorf("whole fleet finished in %s; the ramp did not spread it", last)
+	}
+}
+
+// TestRunBootRampZeroKeepsExistingBehaviour is the other half: no ramp
+// means the fleet bootstraps together, exactly as before the flag
+// existed.
+func TestRunBootRampZeroKeepsExistingBehaviour(t *testing.T) {
+	arrivals := bootstrapArrivals(t, rampProfileYAML)
+	if len(arrivals) != 4 {
+		t.Fatalf("expected 4 bootstrap Informs, got %d", len(arrivals))
+	}
+	if last := arrivals[len(arrivals)-1]; last > 500*time.Millisecond {
+		t.Errorf("unramped fleet took %s to bootstrap; it should go together", last)
+	}
+}
+
+// TestRunBootRampFlagOverridesProfile pins the precedence: the flag
+// beats eventSchedule.bootRamp, so one profile shards across processes
+// that ramp differently.
+func TestRunBootRampFlagOverridesProfile(t *testing.T) {
+	body := rampProfileYAML + `
+eventSchedule:
+  bootRamp: 10s
+`
+	arrivals := bootstrapArrivals(t, body, "--boot-ramp=0s")
+	if len(arrivals) != 4 {
+		t.Fatalf("expected 4 bootstrap Informs, got %d", len(arrivals))
+	}
+	if last := arrivals[len(arrivals)-1]; last > 500*time.Millisecond {
+		t.Errorf("--boot-ramp=0s did not override the profile's 10s ramp (took %s)", last)
+	}
+}

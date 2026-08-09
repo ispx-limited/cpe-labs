@@ -680,3 +680,50 @@ func TestLoadFleetOffsetInvalidEnv(t *testing.T) {
 		t.Fatal("unparseable CPE_SIM_FLEET_OFFSET must reject")
 	}
 }
+
+func TestLoadBootRampPrecedence(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := cpeconfig.Load(nil, nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.BootRamp != nil {
+		t.Errorf("BootRamp = %s, want nil", *cfg.BootRamp)
+	}
+
+	path := writeYAML(t, `
+		bootRamp: 1m
+	`)
+	env := map[string]string{
+		"CPE_SIM_CONFIG":    path,
+		"CPE_SIM_BOOT_RAMP": "2m",
+	}
+	cfg, err = cpeconfig.Load(nil, env)
+	if err != nil {
+		t.Fatalf("Load (env over file): %v", err)
+	}
+	if cfg.BootRamp == nil || *cfg.BootRamp != 2*time.Minute {
+		t.Errorf("env should beat file: %v", cfg.BootRamp)
+	}
+
+	cfg, err = cpeconfig.Load([]string{"--boot-ramp=3m"}, env)
+	if err != nil {
+		t.Fatalf("Load (flag over env): %v", err)
+	}
+	if cfg.BootRamp == nil || *cfg.BootRamp != 3*time.Minute {
+		t.Errorf("flag should beat env: %v", cfg.BootRamp)
+	}
+}
+
+func TestLoadBootRampNegativeRejected(t *testing.T) {
+	t.Parallel()
+
+	_, err := cpeconfig.Load([]string{"--boot-ramp=-1s"}, nil)
+	if err == nil {
+		t.Fatal("negative boot-ramp must reject")
+	}
+	if !strings.Contains(err.Error(), "boot-ramp") {
+		t.Errorf("error should name the flag: %v", err)
+	}
+}

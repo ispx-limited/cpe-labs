@@ -52,6 +52,12 @@ type Config struct {
 	// "unset" and "explicitly zero" have to stay distinguishable.
 	FleetOffset *int `yaml:"fleetOffset"`
 
+	// BootRamp spreads the fleet's bootstrap Informs evenly across this
+	// window instead of firing them all at once. Nil means "not set
+	// here", deferring to the profile's eventSchedule.bootRamp; same
+	// pointer rationale as FleetOffset, zero is a meaningful value.
+	BootRamp *time.Duration `yaml:"bootRamp"`
+
 	// USP (TR-369) agent. Empty USPBroker leaves the whole USP path off, so a
 	// CWMP-only run is unchanged. The controller id and secret mirror what a
 	// controller expects: an authority-scheme endpoint id (TR-369 2.2) and the
@@ -104,6 +110,7 @@ var knownEnvKeys = map[string]struct{}{
 	envPrefix + "CR_PATH":           {},
 	envPrefix + "CR_PUBLISH_PATH":   {},
 	envPrefix + "FLEET_OFFSET":      {},
+	envPrefix + "BOOT_RAMP":         {},
 }
 
 // Load parses configuration from CLI args, env vars, and (optionally) a
@@ -278,6 +285,13 @@ func applyEnv(env map[string]string, cfg *Config) error {
 		}
 		cfg.FleetOffset = &n
 	}
+	if v, ok := env[envPrefix+"BOOT_RAMP"]; ok && v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return fmt.Errorf("env %sBOOT_RAMP: %w", envPrefix, err)
+		}
+		cfg.BootRamp = &d
+	}
 	if v, ok := env[envPrefix+"USP_BROKER"]; ok {
 		cfg.USPBroker = v
 	}
@@ -318,6 +332,7 @@ func applyFlags(args []string, cfg *Config) error {
 	crPath := fs.String("cr-path", cfg.CRPath, "URL path the connection-request listener serves")
 	crPublishPath := fs.String("cr-publish-path", cfg.CRPublishPath, "parameter-tree path where the listener URL is published")
 	fleetOffset := fs.Int("fleet-offset", derefInt(cfg.FleetOffset), "shift every instance index by this amount so shards produce disjoint fleets")
+	bootRamp := fs.Duration("boot-ramp", derefDuration(cfg.BootRamp), "spread the fleet's bootstrap Informs evenly across this window (e.g. 10m)")
 	uspBroker := fs.String("usp-broker", cfg.USPBroker, "USP MQTT broker host:port (enables the TR-369 agent)")
 	uspControllerID := fs.String("usp-controller-id", cfg.USPControllerID, "USP controller endpoint id, e.g. self::controller")
 	uspMQTTSecret := fs.String("usp-mqtt-secret", cfg.USPMQTTSecret, "shared secret the MQTT password is derived from")
@@ -367,12 +382,23 @@ func applyFlags(args []string, cfg *Config) error {
 	if _, ok := explicit["fleet-offset"]; ok {
 		cfg.FleetOffset = fleetOffset
 	}
+	if _, ok := explicit["boot-ramp"]; ok {
+		cfg.BootRamp = bootRamp
+	}
 	return nil
 }
 
 // derefInt returns *p, or 0 when p is nil. Used to prime a pointer
 // field's flag default without losing the nil.
 func derefInt(p *int) int {
+	if p == nil {
+		return 0
+	}
+	return *p
+}
+
+// derefDuration is derefInt for durations.
+func derefDuration(p *time.Duration) time.Duration {
 	if p == nil {
 		return 0
 	}
@@ -398,6 +424,9 @@ func validate(cfg *Config) error {
 	}
 	if cfg.FleetOffset != nil && *cfg.FleetOffset < 0 {
 		return fmt.Errorf("fleet-offset must be >= 0, got %d", *cfg.FleetOffset)
+	}
+	if cfg.BootRamp != nil && *cfg.BootRamp < 0 {
+		return fmt.Errorf("boot-ramp must be >= 0, got %s", *cfg.BootRamp)
 	}
 	if cfg.CRBindAddr != "" {
 		if !strings.HasPrefix(cfg.CRPath, "/") {

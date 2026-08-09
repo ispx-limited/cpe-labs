@@ -337,19 +337,34 @@ type EventScheduleConfig struct {
 	//
 	// Zero / unset = bootstrap fires immediately.
 	BootDelay time.Duration
+
+	// BootRamp spreads the fleet's bootstrap Informs evenly across a
+	// window instead of firing them together: CPE k of N starts at
+	// BootDelay + k*BootRamp/N. A whole fleet bootstrapping in the same
+	// instant measures the simulator's ability to open sockets, not the
+	// ACS's ability to onboard devices, and it is not what a real
+	// population does either: gateways come back after a power cut or a
+	// firmware wave over minutes, not milliseconds.
+	//
+	// The ramp is per process. Operators wanting a fleet-wide ramp
+	// across shards stagger the process starts as well.
+	//
+	// Zero / unset = every CPE bootstraps as soon as BootDelay elapses,
+	// which is the behavior before this field existed.
+	BootRamp time.Duration
 }
 
 // IsZero reports whether the block was omitted (every field zero).
 func (e EventScheduleConfig) IsZero() bool {
-	return e.RebootDelay == 0 && e.FactoryResetDelay == 0 && e.BootDelay == 0
+	return e.RebootDelay == 0 && e.FactoryResetDelay == 0 && e.BootDelay == 0 && e.BootRamp == 0
 }
 
 // RequiresDaemon reports whether this configuration forces cmd/cpe-sim
 // into daemon mode regardless of scheduler / listener / generators
 // state. True iff RebootDelay > 0 or FactoryResetDelay > 0 (the
 // deferred Inform needs the process to outlive the delay). BootDelay
-// alone preserves one-shot behavior, the deferred bootstrap fires,
-// then the process exits.
+// and BootRamp alone preserve one-shot behavior, the deferred
+// bootstraps fire, then the process exits.
 func (e EventScheduleConfig) RequiresDaemon() bool {
 	return e.RebootDelay > 0 || e.FactoryResetDelay > 0
 }
@@ -621,6 +636,7 @@ type rawEventSchedule struct {
 	RebootDelay       string `yaml:"rebootDelay"`
 	FactoryResetDelay string `yaml:"factoryResetDelay"`
 	BootDelay         string `yaml:"bootDelay"`
+	BootRamp          string `yaml:"bootRamp"`
 }
 
 // rawTransfer is the transfer schema. defaultDelay is parsed via
@@ -1253,6 +1269,7 @@ func mergeFiles(tree *Tree, files []*loadedFile) (mergedConfig, error) {
 			{"rebootDelay", raw.RebootDelay, &eventScheduleCfg.RebootDelay},
 			{"factoryResetDelay", raw.FactoryResetDelay, &eventScheduleCfg.FactoryResetDelay},
 			{"bootDelay", raw.BootDelay, &eventScheduleCfg.BootDelay},
+			{"bootRamp", raw.BootRamp, &eventScheduleCfg.BootRamp},
 		}
 		for _, e := range entries {
 			if e.raw == "" {
