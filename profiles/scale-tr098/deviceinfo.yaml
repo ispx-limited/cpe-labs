@@ -27,11 +27,6 @@ groups:
         value: ""
       - path: SpecVersion
         value: "1.1"
-      # TR-069 Annex A forced-Inform parameter: the data models and
-      # profiles this device supports, which is how an ACS learns what
-      # it is talking to without asking.
-      - path: DeviceSummary
-        value: "InternetGatewayDevice:1.4[](Baseline:1,EthernetLAN:1,WiFiLAN:1,DeviceAssociation:2)"
       - path: ProvisioningCode
         value: ""
         writable: true
@@ -107,6 +102,15 @@ groups:
 
 # Two on-board sensors (SoC and WLAN module), both xsd:int degrees
 # celsius so they drift like live thermal readings.
+  # TR-069 Annex A forced-Inform parameter. It sits at the data model
+  # root rather than under DeviceInfo: it names the data models and
+  # profiles this device implements, which is how an ACS learns what it
+  # is talking to without asking.
+  - prefix: InternetGatewayDevice
+    parameters:
+      - path: DeviceSummary
+        value: "InternetGatewayDevice:1.4[](Baseline:1,EthernetLAN:1,WiFiLAN:1,DeviceAssociation:2)"
+
 objects:
   - path: InternetGatewayDevice.DeviceInfo.TemperatureStatus.TemperatureSensor
     instances: 2
