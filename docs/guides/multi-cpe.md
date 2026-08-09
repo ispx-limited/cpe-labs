@@ -14,6 +14,25 @@ Each CPE's `Device.DeviceInfo.SerialNumber` (the leaf named in `deviceIdPaths.se
 
 `{i}` is the 1-based instance index. `{i:N}` is the same with zero-padding to N digits. `{base}` substitutes the literal `value:` from the SerialNumber leaf.
 
+After those serial-only forms, the full per-CPE placeholder engine (the table below, plus named pools) runs over the pattern, so anything valid in a leaf value is valid in `serialPattern` too.
+
+## Realistic serials
+
+A visible counter (`TEST-0001`) is fine for smoke tests but real CPE serials mix a vendor prefix, often a YYWW date code, and an alphanumeric tail with no padding runs. `{cpe:alnum:N}` (or `{cpe:ALNUM:N}` for uppercase) produces N pseudo-random base-36 characters `[0-9A-Z]` for exactly that tail:
+
+```yaml
+fleet:
+  count: 200
+  serialPattern: "MH2321{cpe:ALNUM:6}"   # e.g. MH2321K7Q2M4
+```
+
+The tail is drawn from the per-CPE seeded RNG, not from the instance index, so small indexes do not render as zero-padded again. It is deterministic: the same `--seed` and instance index give the same serial on every run, and different indexes give different serials. Collision space is `36^N`: at `N=8` (about 2.8e12) a 200k fleet's birthday collision probability is under 1%, at `N=6` (about 2.2e9) a few-thousand-CPE demo's is negligible. Use `N >= 8` for large fleets, `N >= 6` for demos.
+
+Two things to know:
+
+- Changing `serialPattern` on an existing deployment mints new device identities at the ACS (identity is OUI plus serial). Treat the pattern as fixed once a fleet has registered.
+- `{cpe:alnum:N}` in a leaf value draws from the same restarted per-CPE stream, so the same form reproduces the same token the serial pattern drew. Useful when a vendor leaf must echo the serial tail.
+
 ## Per-CPE differentiation
 
 Real fleets need more than just unique serials. WAN IPs, MAC addresses, hostnames, SSIDs all differ per device. Two mechanisms:
@@ -28,6 +47,8 @@ Recognized in **any leaf value** when `fleet.count > 1`:
 | `{cpe:N}` | Zero-padded decimal to N digits | `007` for `{cpe:3}` |
 | `{cpe:hex:N}` | Zero-padded lowercase hex to N digits | `0007` for `{cpe:hex:4}` |
 | `{cpe:HEX:N}` | Zero-padded uppercase hex | `0007` for `{cpe:HEX:4}` |
+| `{cpe:alnum:N}` | N pseudo-random base-36 chars, lowercase, stable per (seed, CPE) | `k7q2m4` for `{cpe:alnum:6}` |
+| `{cpe:ALNUM:N}` | Same as `alnum` but uppercase | `K7Q2M4` for `{cpe:ALNUM:6}` |
 | `{cpe:mac:N}` | N bytes of MAC NIC portion (1..3) | `00:00:07` for `{cpe:mac:3}` |
 | `{cpe:MAC:N}` | Same as `mac` but uppercase hex | `00:00:07` for `{cpe:MAC:3}` |
 | `{cpe:ipv4:CIDR}` | Nth host in the IPv4 CIDR | `203.0.113.7` for `{cpe:ipv4:203.0.113.0/24}` |
@@ -140,7 +161,7 @@ When `fleet.count == 1`, the path is `--cr-path` verbatim. Single-CPE deployment
 
 ## Determinism
 
-Per-CPE jitter, session retry backoff, and generator state derive from per-CPE `*rand.Rand` streams seeded by FNV-64a hash of `(rootSeed, cpeID)` (with per-concern suffixes such as `:generators` and `:retry`). The root seed comes from `--seed` (or `CPE_SIM_SEED`); when `0`, it's derived from `time.Now().UnixNano()` and logged at startup as `root_seed=<N>`. Pass that value back via `--seed=<N>` next run and every CPE's stream replays byte-for-byte.
+Per-CPE jitter, session retry backoff, generator state, and `{cpe:alnum:N}` serial material derive from per-CPE `*rand.Rand` streams seeded by FNV-64a hash of `(rootSeed, cpeID)` (with per-concern suffixes such as `:generators`, `:retry`, and `:serial`). The root seed comes from `--seed` (or `CPE_SIM_SEED`); when `0`, it's derived from `time.Now().UnixNano()` and logged at startup as `root_seed=<N>`. Pass that value back via `--seed=<N>` next run and every CPE's stream replays byte-for-byte.
 
 ## Reserved pool names
 

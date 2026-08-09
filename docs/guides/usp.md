@@ -47,8 +47,8 @@ Endpoint ids follow TR-369 2.2: an authority scheme, `::`, then a
 scheme-specific id. The Agent uses the `os` scheme, so the id is
 `os::<OUI><SerialNumber>` with no separator inside it.
 
-For `(OUI=ECFC2F, Serial=N000000A0000001)` the Agent registers as
-`os::ECFC2FN000000A0000001`.
+For `(OUI=ECFC2F, Serial=XU2033K7Q2M4RB)` the Agent registers as
+`os::ECFC2FXU2033K7Q2M4RB`.
 
 Both values are read from the same `deviceIdPaths` the profile already declares
 for CWMP's Inform DeviceId. An operator who has said what their device's OUI and

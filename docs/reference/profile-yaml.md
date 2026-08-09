@@ -203,7 +203,7 @@ Fleet metadata, named address pools, serial pattern.
 | Field | Type | Default | Notes |
 | --- | --- | --- | --- |
 | `count` | int | `1` | Number of CPEs to spawn. `0` and `1` both mean single-CPE. |
-| `serialPattern` | string | `{base}-{i}` | Template applied to each CPE's SerialNumber leaf. Recognized: `{base}` (the `value:` of the SerialNumber leaf), `{i}` (1-based instance), `{i:N}` (zero-padded). |
+| `serialPattern` | string | `{base}-{i}` | Template applied to each CPE's SerialNumber leaf. Recognized: `{base}` (the `value:` of the SerialNumber leaf), `{i}` (1-based instance), `{i:N}` (zero-padded), then the full fleet placeholder engine (`{cpe:*}` forms including `{cpe:alnum:N}`, named pools). Expansion beyond 64 characters (the TR-069 SerialNumber limit) is rejected at startup. |
 | `pools` | map | `{}` | Named per-CPE allocators referenced from any leaf via `{name}`. |
 
 Pool entry:
