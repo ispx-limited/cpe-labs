@@ -68,35 +68,30 @@ func NewOnBoardRequest(msgID string, id Identity) *usp.Msg {
 
 // NewBootNotify builds the Boot! Event Notify.
 //
-// The event's arguments are payload keyed on argument name, not data-model
-// paths, which is why they are a plain map here. ParameterMap is the exception:
-// TR-369 defines it as the agent's declared boot parameters, path to value, and
-// it is the USP analogue of CWMP's Inform ParameterList. Controllers read real
-// parameter state out of it, so a simulator that omits it looks like a device
-// that reported nothing.
-func NewBootNotify(msgID, subscriptionID, objPath, cause string, bootParams map[string]string) *usp.Msg {
+// ParameterMap is TR-369's declared boot parameters, path to value, the USP
+// analogue of CWMP's Inform ParameterList. Controllers read real parameter
+// state out of it, so a simulator that omits it looks like a device that
+// reported nothing.
+//
+// commandKey and firmwareUpdated are "" and false for an ordinary boot. A
+// boot caused by a USP operation echoes that operation's command_key (TR-181:
+// the Boot! CommandKey is the key of the request that caused the reboot), and
+// a boot that changed the running image reports FirmwareUpdated true; the
+// firmware activation path is what exercises both.
+func NewBootNotify(msgID, subscriptionID, objPath, cause, commandKey string, firmwareUpdated bool, bootParams map[string]string) *usp.Msg {
+	updated := "false"
+	if firmwareUpdated {
+		updated = "true"
+	}
 	params := map[string]string{
-		"CommandKey":      "",
+		"CommandKey":      commandKey,
 		"Cause":           cause,
-		"FirmwareUpdated": "false",
+		"FirmwareUpdated": updated,
 	}
 	if len(bootParams) > 0 {
 		params["ParameterMap"] = encodeParameterMap(bootParams)
 	}
-	return &usp.Msg{
-		Header: &usp.Header{MsgId: msgID, MsgType: usp.Header_NOTIFY},
-		Body: &usp.Body{MsgBody: &usp.Body_Request{Request: &usp.Request{
-			ReqType: &usp.Request_Notify{Notify: &usp.Notify{
-				SubscriptionId: subscriptionID,
-				SendResp:       false,
-				Notification: &usp.Notify_Event_{Event: &usp.Notify_Event{
-					ObjPath:   objPath,
-					EventName: BootEventName,
-					Params:    params,
-				}},
-			}},
-		}}},
-	}
+	return NewEventNotify(msgID, subscriptionID, objPath, BootEventName, params)
 }
 
 // encodeParameterMap renders a path-to-value map as the JSON object TR-369

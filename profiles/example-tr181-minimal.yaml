@@ -35,6 +35,16 @@ generators:
     step: 1500
     jitter: 0.1
 
+# transfer.firmware enables firmware upgrade simulation on both protocols:
+# the CWMP Download RPC (FileType "1 Firmware Upgrade Image") and the USP
+# Device.DeviceInfo.FirmwareImage.{i}.Download() / Activate() commands.
+# versionPath is the leaf holding the running version; applyDelay is the
+# dark window while the device "flashes and reboots".
+transfer:
+  firmware:
+    versionPath: Device.DeviceInfo.SoftwareVersion
+    applyDelay: 30s
+
 # informParameters tells the inform builder which parameter paths
 # ride along in each event code's Inform ParameterList. The CPE side
 # of TR-069 is "vendor-chosen", operators decide which fields are
@@ -80,6 +90,25 @@ parameters:
   - path: Device.DeviceInfo.UpTime
     type: xsd:unsignedInt
     value: "3600"
+
+  # ---- FirmwareImage (TR-181 Device.DeviceInfo.FirmwareImage.{i}.) ----
+  # The instance the USP firmware commands address. The agent walks Status
+  # through Downloading / Validating / Available / Active and updates
+  # Version and Available itself, so all four leaves stay read-only to the
+  # controller.
+  - path: Device.DeviceInfo.FirmwareImage.{i}.Name
+    instances: 1
+    value: "bank-{i}"
+  - path: Device.DeviceInfo.FirmwareImage.{i}.Version
+    instances: 1
+    value: "1.0.0"
+  - path: Device.DeviceInfo.FirmwareImage.{i}.Available
+    type: xsd:boolean
+    instances: 1
+    value: "true"
+  - path: Device.DeviceInfo.FirmwareImage.{i}.Status
+    instances: 1
+    value: "Active"
 
   # ---- ManagementServer (writable so the ACS can update its own URL) ----
   - path: Device.ManagementServer.URL

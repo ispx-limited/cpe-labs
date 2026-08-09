@@ -1,6 +1,6 @@
 # Firmware Upgrades
 
-This page is **TR-069 only**. The USP agent does not yet implement async `Operate` or `OperationComplete` notifications; see [USP Agent](usp.md) for that gap.
+Both protocols simulate firmware upgrades off the same `transfer.firmware` profile block and the same image conventions. The TR-069 sequence is described first; the [USP sequence](#usp-tr-369) follows it.
 
 An ACS firmware campaign at fleet scale needs testing against devices that behave like real ones. When the profile enables `transfer.firmware`, a `Download` RPC with FileType `1 Firmware Upgrade Image` stops being a generic simulated transfer and drives the full upgrade sequence a real device produces: accept, fetch, go dark, come back reporting the new version.
 
@@ -132,11 +132,55 @@ A second firmware `Download` accepted while an earlier one is pending cancels th
 
 The existing `transfer.faults` map takes precedence over the firmware sequence. A `faults` entry keyed `1 Firmware Upgrade Image` fires the configured fault with no fetch, no dark window, and no version change, exactly as it did before the firmware block existed. That makes it easy to run a canary cohort where some profiles fail the push and the rest upgrade cleanly.
 
+## USP (TR-369)
+
+The USP agent implements the same upgrade off the same profile block, but where the CWMP sequence reproduces captured real-CPE behavior, the USP sequence follows the standards text (the TR-369 messages spec and TR-181 2.21 `Device.DeviceInfo.FirmwareImage`), because no real USP CPE was available to capture.
+
+A Controller upgrades firmware by invoking the async data-model command `Device.DeviceInfo.FirmwareImage.{i}.Download()` via an `Operate` message. The command is matched by suffix under the `FirmwareImage` table, so whichever instances the profile declares are all addressable; the shipped `profiles/example-tr181-minimal.yaml` declares instance 1 with the `Name` / `Version` / `Available` / `Status` leaves. Input arguments:
+
+| Argument | Notes |
+| --- | --- |
+| `URL` | Required. The image URL, fetched with one plain HTTP GET. |
+| `AutoActivate` | `true` activates (reboots into) the image immediately after the download completes. Anything else, including absent, leaves the image staged for a later `Activate()`. |
+| `CheckSum` | Hex digest of the whole image. When present the agent verifies it against the fetched bytes and fails validation on mismatch, per TR-181. When empty, no checksum validation. |
+| `CheckSumAlgorithm` | `SHA-1`, `SHA-224`, `SHA-256`, `SHA-384` or `SHA-512`. Defaults to `SHA-256` when a `CheckSum` is given without it. |
+| `Username`, `Password`, `FileSize` | Accepted and ignored. The fetch is a plain unauthenticated GET, the same convention as the CWMP sequence. |
+
+### The sequence
+
+1. The `Operate` is asynchronous. The agent creates a `Device.LocalAgent.Request.{i}.` row (`Originator`, `Command`, `CommandKey`, `Status`) and answers `OperateResp` with `req_obj_path` naming that row (TR-369 R-OPR.0). With `send_resp` false the row is still created; only the reply is suppressed.
+2. `FirmwareImage.{i}.Status` walks `Downloading`, then `Validating`, then `Available`. The image is fetched and scanned for the same `cpe-labs-firmware-version:` header the CWMP path uses; the checksum, when supplied, is verified over the entire body.
+3. On failure, `Status` settles as `DownloadFailed` (the fetch failed) or `ValidationFailed` (no version header, or checksum mismatch). The Request row transitions `Error` and is removed, the `OperationComplete` notify carries `cmd_failure` with err_code `7800` (the TR-369 vendor range; the specifics are in the message), and a `Device.LocalAgent.TransferComplete!` event goes out with a nonzero `FaultCode`. No reboot, no version change.
+4. On success, everything lands **before** any activation reboot, because TR-369 says async operations do not persist across a reboot and an in-process command at reboot is considered failed: `FirmwareImage.{i}.Version` and `Available` are updated, `Status` becomes `Available`, the Request row transitions `Success` and is removed, the `OperationComplete` notify goes out (empty output args), and the `TransferComplete!` event follows it.
+5. If `AutoActivate` was true, activation runs after the success notifies: the MQTT session disconnects (this is the USP dark window; the CWMP equivalent is silence between sessions), `applyDelay` elapses, the `versionPath` leaf flips to the new version, `FirmwareImage.{i}.Status` becomes `Active`, the MQTT session reconnects, and `Boot!` goes out with `Cause` `RemoteReboot`, `CommandKey` echoing the Download's command key, and `FirmwareUpdated` `"true"`. If `AutoActivate` was false the image sits `Available` until the Controller invokes `Activate()`, which runs the same activation with no download step.
+
+`OperationComplete` notifies are delivered to every subscription with `NotifType` `OperationComplete` whose `ReferenceList` matches the command path. `TransferComplete!` is delivered to `Event` subscriptions matching `Device.LocalAgent.TransferComplete!` (a reference of `Device.LocalAgent.` covers it). Its arguments carry the full results, per TR-181: `Command`, `CommandKey`, `Requestor`, `TransferType` `Download`, `Affected` (the FirmwareImage instance path), `TransferURL`, real `StartTime` / `CompleteTime` (the agent sends this event before the reboot, so unlike the CWMP `TransferComplete` it never lost track of them), `FaultCode`, `FaultString`.
+
+### Concurrency
+
+A second firmware `Operate` while one is in flight is refused with error `7005` (Resources Exceeded), and the in-flight operation is not cancelled, per TR-369 R-OPR.3. This deliberately differs from the CWMP behavior above, where a repeat `Download` supersedes the in-flight sequence: CWMP has no Request semantics, so superseding is the only way an ACS can correct a push there, while a USP Controller can see the active Request row and wait for its `OperationComplete`.
+
+### No idempotence, same as CWMP
+
+TR-181 says the agent must perform each download as requested and must not assume same-URL content is unchanged. Told to download the version it is already running, the agent downloads and applies it again.
+
+### USP smoke test
+
+With the shipped TR-181 profile, a broker, and the stub image server from the [smoke test below](#smoke-test), invoke from your Controller:
+
+```
+Operate  command: Device.DeviceInfo.FirmwareImage.1.Download()
+         command_key: upgrade-2.0.0
+         input_args:  URL=http://<host>:8000/fw-2.0.0.bin  AutoActivate=true
+```
+
+The log shows `usp firmware: image accepted`, then `device dark for apply`, then `activation complete`. On the Controller side: the `OperateResp` names the Request row, `OperationComplete` and `TransferComplete!` arrive (subscribe with `NotifType` `OperationComplete` on `Device.DeviceInfo.FirmwareImage.` and `Event` on `Device.LocalAgent.`), the MQTT session drops and returns, and the `Boot!` that follows reports `FirmwareUpdated` `"true"`. A `Get` on `Device.DeviceInfo.SoftwareVersion` returns `2.0.0`.
+
 ## Out of scope
 
-- **USP.** No async `Operate`, no `OperationComplete` notify. The USP agent is untouched by this feature.
 - **Persistence.** The simulator models the management plane, not the operating system. A process restart forgets an in-flight upgrade, and the applied version survives only as long as the process. Reloading the profile starts back at the profile's declared version.
 - **`AUTONOMOUS TRANSFER COMPLETE` and `RequestDownload`** are unchanged.
+- **USP specifics.** `transfer.faults` injection applies to the CWMP `Download` RPC only. With `fetch: false` nothing is downloaded, so a supplied `CheckSum` cannot be verified and is skipped. Multi-bank image management beyond the declared `FirmwareImage` instances is not modeled, and there is no way to cancel an in-flight operation.
 
 ## Smoke test
 

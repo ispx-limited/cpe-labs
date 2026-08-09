@@ -100,7 +100,7 @@ later is transport work rather than a change to the Agent.
 | Add / Delete | Instance creation and removal in multi-instance tables, reporting the instantiated path and its unique keys |
 | GetInstances | Instance enumeration, optionally first-level-only |
 | GetSupportedDM | The supported object and parameter model, with per-parameter access (read-only or read-write). `return_commands`, `return_events` and `return_unique_key_sets` are accepted but return nothing yet |
-| Operate | `Device.Reboot()` and `Device.FactoryReset()` |
+| Operate | `Device.Reboot()` and `Device.FactoryReset()` synchronously. `Device.DeviceInfo.FirmwareImage.{i}.Download()` and `Activate()` asynchronously: the agent creates a `Device.LocalAgent.Request.{i}.` row, answers `OperateResp` with its path, and reports the outcome in an `OperationComplete` notify. See [Firmware Upgrades](firmware.md) |
 
 Errors are reported per path inside the response rather than failing the whole
 message, so a Get for ten paths where one is unknown still answers the other
@@ -113,17 +113,28 @@ afterwards and a factory reset re-arms BOOTSTRAP so the device comes back as a
 stranger. Both protocols route through the same event tracker, so a Controller
 that reboots over USP still sees the CWMP side report it.
 
+A firmware activation is the exception with a visible lifecycle: the agent
+drops its MQTT session for the profile's `applyDelay` (the dark window a
+flashing, rebooting device produces), reconnects, and sends `Boot!` with the
+operation's command key and `FirmwareUpdated` `"true"`. The full sequence,
+including checksum validation and the `TransferComplete!` event, is in
+[Firmware Upgrades](firmware.md).
+
 ## Subscriptions and notifications
 
 The Agent pushes. It sends `Boot!` and `OnBoardRequest` unprompted on first
 contact, and once a Controller installs subscriptions it sends `ValueChange`,
-`ObjectCreation` and `ObjectDeletion` as the tree moves.
+`ObjectCreation` and `ObjectDeletion` as the tree moves, `OperationComplete`
+as async commands finish, and `Event` notifies for the events it emits
+(`TransferComplete!` today).
 
 Subscriptions live in `Device.LocalAgent.Subscription.{i}.`, alongside
-`Device.LocalAgent.EndpointID` and the `Device.LocalAgent.Controller.{i}.`
-table. All three exist at first contact rather than being created on demand,
-because a Controller typically resolves its own `Recipient` by searching
-`Device.LocalAgent.Controller.*.` *before* it writes a subscription.
+`Device.LocalAgent.EndpointID`, the `Device.LocalAgent.Controller.{i}.`
+table, and the `Device.LocalAgent.Request.{i}.` table the agent fills with
+its in-flight async operations. All of it exists at first contact rather than
+being created on demand, because a Controller typically resolves its own
+`Recipient` by searching `Device.LocalAgent.Controller.*.` *before* it writes
+a subscription.
 
 The Subscription object carries its full TR-181 parameter set, not just the
 parameters this simulator acts on. A Controller sends what the data model says
@@ -154,9 +165,14 @@ important as verifying the notifications arrive: an Agent that reports everythin
 is as wrong as one that reports nothing, and it is the failure mode that quietly
 floods a Controller.
 
-`Periodic` and `OperationComplete` notify types are not implemented yet. A
-Controller that installs them gets a subscription it can read back, but the Agent
-will not fire on them.
+`OperationComplete` subscriptions fire when an async command's `ReferenceList`
+matches the command path (`Device.DeviceInfo.FirmwareImage.1.Download()`, or a
+partial path covering it). `Event` subscriptions fire for events matched
+against `objPath` plus the event name, so a reference of `Device.LocalAgent.`
+covers `TransferComplete!`.
+
+The `Periodic` notify type is not implemented yet. A Controller that installs
+it gets a subscription it can read back, but the Agent will not fire on it.
 
 ## No Connection Request
 

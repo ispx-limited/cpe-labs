@@ -180,7 +180,7 @@ func splitReferenceList(raw string) []string {
 // EnsureLocalAgent mounts the Device.LocalAgent subtree a USP agent is expected
 // to expose, when the profile has not declared it.
 //
-// Three things live here and a controller needs all of them:
+// Four things live here and a controller needs all of them:
 //
 //   - EndpointID, so the agent can state its own identity in-band.
 //   - The Controller table, which is how the agent records the controllers it
@@ -189,12 +189,18 @@ func splitReferenceList(raw string) []string {
 //     these rows. Without a matching row the controller cannot express who the
 //     notify should go to, and subscription setup fails before it starts.
 //   - The Subscription table, which the controller populates with Add.
+//   - The Request table, whose rows the agent creates itself for asynchronous
+//     commands (an OperateResp names the row, TR-369 R-OPR.0) and which a
+//     controller reads to see what is in flight.
 //
 // A profile should not have to declare any of it. This is what being a USP
 // agent means, not what makes a vendor's device distinctive, and requiring it
 // by hand would be a trap for anyone converting a CWMP profile.
 func EnsureLocalAgent(tree *paramtree.Tree, agentEndpointID, controllerEndpointID string) error {
 	if err := ensureSubscriptionTable(tree); err != nil {
+		return err
+	}
+	if err := ensureRequestTable(tree); err != nil {
 		return err
 	}
 	if err := ensureControllerTable(tree, controllerEndpointID); err != nil {
@@ -422,6 +428,61 @@ func NewObjectCreationNotify(msgID, subscriptionID, objPath string, uniqueKeys m
 				Notification: &usp.Notify_ObjCreation{ObjCreation: &usp.Notify_ObjectCreation{
 					ObjPath:    objPath,
 					UniqueKeys: uniqueKeys,
+				}},
+			}},
+		}}},
+	}
+}
+
+// NewOperationCompleteNotify builds the Notify that reports an asynchronous
+// command's outcome (TR-369 7.5.6). obj_path and command_name are carried
+// split, which is why AsyncOperation carries them split. Exactly one of
+// outputArgs (success, empty map allowed) or failure must be provided; a nil
+// failure means success.
+func NewOperationCompleteNotify(msgID, subscriptionID, objPath, commandName, commandKey string,
+	outputArgs map[string]string, failure *usp.Notify_OperationComplete_CommandFailure) *usp.Msg {
+	oc := &usp.Notify_OperationComplete{
+		ObjPath:     objPath,
+		CommandName: commandName,
+		CommandKey:  commandKey,
+	}
+	if failure != nil {
+		oc.OperationResp = &usp.Notify_OperationComplete_CmdFailure{CmdFailure: failure}
+	} else {
+		if outputArgs == nil {
+			outputArgs = map[string]string{}
+		}
+		oc.OperationResp = &usp.Notify_OperationComplete_ReqOutputArgs{
+			ReqOutputArgs: &usp.Notify_OperationComplete_OutputArgs{OutputArgs: outputArgs},
+		}
+	}
+	return &usp.Msg{
+		Header: &usp.Header{MsgId: msgID, MsgType: usp.Header_NOTIFY},
+		Body: &usp.Body{MsgBody: &usp.Body_Request{Request: &usp.Request{
+			ReqType: &usp.Request_Notify{Notify: &usp.Notify{
+				SubscriptionId: subscriptionID,
+				SendResp:       false,
+				Notification:   &usp.Notify_OperComplete{OperComplete: oc},
+			}},
+		}}},
+	}
+}
+
+// NewEventNotify builds an Event Notify for an Object-defined Event
+// (Boot!, TransferComplete!, vendor events). The event's arguments are
+// payload keyed on argument name, not data-model paths, which is why they
+// are a plain map here.
+func NewEventNotify(msgID, subscriptionID, objPath, eventName string, params map[string]string) *usp.Msg {
+	return &usp.Msg{
+		Header: &usp.Header{MsgId: msgID, MsgType: usp.Header_NOTIFY},
+		Body: &usp.Body{MsgBody: &usp.Body_Request{Request: &usp.Request{
+			ReqType: &usp.Request_Notify{Notify: &usp.Notify{
+				SubscriptionId: subscriptionID,
+				SendResp:       false,
+				Notification: &usp.Notify_Event_{Event: &usp.Notify_Event{
+					ObjPath:   objPath,
+					EventName: eventName,
+					Params:    params,
 				}},
 			}},
 		}}},

@@ -35,10 +35,12 @@ type Config struct {
 	// satisfy. Real agents send the id the controller created; a simulator with
 	// no subscription table yet sends a stable local one.
 	BootSubscriptionID string
-	// Operate runs a USP command (Device.Reboot(), Device.FactoryReset() and
-	// any vendor command). Nil makes every Operate fail with 7021, which is the
-	// honest answer: a controller that thinks it rebooted a device that did not
-	// is worse off than one told the command failed.
+	// Operate runs a USP command (Device.Reboot(), Device.FactoryReset(),
+	// the firmware commands and any vendor command), deciding per command
+	// whether it is synchronous or asynchronous; see OperateFunc. Nil makes
+	// every Operate fail with 7021, which is the honest answer: a controller
+	// that thinks it rebooted a device that did not is worse off than one
+	// told the command failed.
 	Operate OperateFunc
 	Logger  *slog.Logger
 }
@@ -145,11 +147,27 @@ func (r *Runner) Announce(cause string) error {
 // "RemoteFactoryReset"). Exported so a simulated reboot mid-run can re-fire
 // the event a restarted CPE would send, without re-onboarding.
 func (r *Runner) Boot(cause string) error {
+	return r.boot(cause, "", false)
+}
+
+// FirmwareBoot sends the Boot! a CPE emits when it comes back from a
+// firmware activation: Cause RemoteReboot (the reboot was requested via a
+// USP operation), CommandKey echoing the operation's command_key so the
+// controller correlates the boot with the Download()/Activate() that caused
+// it, and FirmwareUpdated true. Called by the firmware activation sequence
+// after ConnectTransport ends the dark window.
+func (r *Runner) FirmwareBoot(commandKey string) error {
+	return r.boot("RemoteReboot", commandKey, true)
+}
+
+func (r *Runner) boot(cause, commandKey string, firmwareUpdated bool) error {
 	boot := NewBootNotify(
 		r.nextMsgID("boot"),
 		r.cfg.BootSubscriptionID,
 		r.rootObjectPath(),
 		cause,
+		commandKey,
+		firmwareUpdated,
 		r.collectBootParameters(),
 	)
 	if err := r.send(boot); err != nil {
@@ -158,6 +176,7 @@ func (r *Runner) Boot(cause string) error {
 	r.log.Info("usp/agent: sent Boot!",
 		"endpoint_id", r.cfg.Identity.EndpointID,
 		"cause", cause,
+		"firmware_updated", firmwareUpdated,
 		"boot_parameters", len(r.cfg.BootParameters))
 	return nil
 }
@@ -305,9 +324,10 @@ func (r *Runner) handleRecord(payload []byte) {
 			"endpoint_id", r.cfg.Identity.EndpointID,
 			"msg_id", msgID,
 			"command", body.Operate.GetCommand())
-		resp := HandleOperate(msgID, body.Operate, r.cfg.Operate)
+		resp := r.handleOperate(msgID, body.Operate)
 		// send_resp=false means the controller wants the command run without a
-		// response, per TR-369 7.5.6.
+		// response, per TR-369 7.5.6. An async command's Request row is
+		// created either way; only the reply is suppressed.
 		if body.Operate.GetSendResp() {
 			r.reply(resp)
 		}

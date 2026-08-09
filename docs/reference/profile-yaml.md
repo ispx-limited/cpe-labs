@@ -279,7 +279,7 @@ When the ACS issues a `Download` whose `FileType` matches a `faults` key, the ha
 
 ### `transfer.firmware`
 
-Enables firmware upgrade simulation for `Download` RPCs with FileType `1 Firmware Upgrade Image`: the simulator fetches the image, goes dark while it "flashes", updates the version leaf, and announces the result in a boot session. See [Firmware Upgrades](../guides/firmware.md) for the full sequence.
+Enables firmware upgrade simulation on both protocols: CWMP `Download` RPCs with FileType `1 Firmware Upgrade Image`, and the USP `Device.DeviceInfo.FirmwareImage.{i}.Download()` / `Activate()` commands. The simulator fetches the image, goes dark while it "flashes", updates the version leaf, and announces the result (a boot session on CWMP; `OperationComplete`, `TransferComplete!` and `Boot!` notifies on USP). See [Firmware Upgrades](../guides/firmware.md) for both sequences.
 
 | Field | Type | Notes |
 | --- | --- | --- |
@@ -295,7 +295,26 @@ transfer:
     applyDelay: 30s
 ```
 
-A `faults` entry for `1 Firmware Upgrade Image` takes precedence over the firmware sequence: the configured fault fires with no fetch, no dark window, and no version change. An image that cannot be fetched or carries no version header settles as fault `9010`.
+A `faults` entry for `1 Firmware Upgrade Image` takes precedence over the firmware sequence: the configured fault fires with no fetch, no dark window, and no version change. An image that cannot be fetched or carries no version header settles as fault `9010`. `faults` applies to the CWMP `Download` RPC only; the USP path reports its failures through `OperationComplete` and a faulted `TransferComplete!` instead.
+
+For the USP commands the tree must also declare the `Device.DeviceInfo.FirmwareImage.{i}.` instance(s) being addressed, with the `Name`, `Version`, `Available` (`xsd:boolean`) and `Status` leaves; the agent updates them itself, so they stay non-writable. `profiles/example-tr181-minimal.yaml` ships one instance:
+
+```yaml
+parameters:
+  - path: Device.DeviceInfo.FirmwareImage.{i}.Name
+    instances: 1
+    value: "bank-{i}"
+  - path: Device.DeviceInfo.FirmwareImage.{i}.Version
+    instances: 1
+    value: "1.0.0"
+  - path: Device.DeviceInfo.FirmwareImage.{i}.Available
+    type: xsd:boolean
+    instances: 1
+    value: "true"
+  - path: Device.DeviceInfo.FirmwareImage.{i}.Status
+    instances: 1
+    value: "Active"
+```
 
 ## `eventSchedule`
 

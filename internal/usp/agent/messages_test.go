@@ -69,7 +69,7 @@ func TestNewOnBoardRequestCarriesIdentityTriple(t *testing.T) {
 }
 
 func TestNewBootNotifyEncodesParameterMap(t *testing.T) {
-	msg := NewBootNotify("m2", "boot", "Device.", "LocalReboot", map[string]string{
+	msg := NewBootNotify("m2", "boot", "Device.", "LocalReboot", "", false, map[string]string{
 		"Device.DeviceInfo.SoftwareVersion": "1.0.0",
 		"Device.DeviceInfo.SerialNumber":    "SN-1",
 	})
@@ -97,7 +97,7 @@ func TestNewBootNotifyEncodesParameterMap(t *testing.T) {
 }
 
 func TestNewBootNotifyOmitsEmptyParameterMap(t *testing.T) {
-	msg := NewBootNotify("m3", "boot", "Device.", "LocalReboot", nil)
+	msg := NewBootNotify("m3", "boot", "Device.", "LocalReboot", "", false, nil)
 	params := msg.GetBody().GetRequest().GetNotify().GetEvent().GetParams()
 	if _, present := params["ParameterMap"]; present {
 		t.Error("ParameterMap should be absent when there are no boot parameters, not an empty object")
