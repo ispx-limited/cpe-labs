@@ -42,6 +42,14 @@ type Config struct {
 	CRPath        string        `yaml:"crPath"`
 	CRPublishPath string        `yaml:"crPublishPath"`
 
+	// CRAdvertiseHost replaces the host in the ConnectionRequestURL the
+	// CPE publishes to the ACS. Empty keeps the bound address, which is
+	// right on one host and wrong everywhere else: a container or a
+	// remote load generator binds 0.0.0.0, publishes 127.0.0.1, and the
+	// ACS silently cannot reach a single CPE. Port is unchanged; set
+	// this to the address the ACS should dial.
+	CRAdvertiseHost string `yaml:"crAdvertiseHost"`
+
 	// FleetOffset shifts every instance index this process produces, so
 	// N processes running ONE profile carve disjoint fleets out of the
 	// same [1, total] index space. Nil means "not set here", which lets
@@ -109,6 +117,7 @@ var knownEnvKeys = map[string]struct{}{
 	envPrefix + "CR_BIND_ADDR":      {},
 	envPrefix + "CR_PATH":           {},
 	envPrefix + "CR_PUBLISH_PATH":   {},
+	envPrefix + "CR_ADVERTISE_HOST": {},
 	envPrefix + "FLEET_OFFSET":      {},
 	envPrefix + "BOOT_RAMP":         {},
 }
@@ -278,6 +287,9 @@ func applyEnv(env map[string]string, cfg *Config) error {
 	if v, ok := env[envPrefix+"CR_PUBLISH_PATH"]; ok && v != "" {
 		cfg.CRPublishPath = v
 	}
+	if v, ok := env[envPrefix+"CR_ADVERTISE_HOST"]; ok && v != "" {
+		cfg.CRAdvertiseHost = v
+	}
 	if v, ok := env[envPrefix+"FLEET_OFFSET"]; ok && v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil {
@@ -331,6 +343,7 @@ func applyFlags(args []string, cfg *Config) error {
 	crBindAddr := fs.String("cr-bind-addr", cfg.CRBindAddr, "TCP address to bind the connection-request listener (empty disables daemon mode)")
 	crPath := fs.String("cr-path", cfg.CRPath, "URL path the connection-request listener serves")
 	crPublishPath := fs.String("cr-publish-path", cfg.CRPublishPath, "parameter-tree path where the listener URL is published")
+	crAdvertiseHost := fs.String("cr-advertise-host", cfg.CRAdvertiseHost, "host to publish in the ConnectionRequestURL instead of the bound address")
 	fleetOffset := fs.Int("fleet-offset", derefInt(cfg.FleetOffset), "shift every instance index by this amount so shards produce disjoint fleets")
 	bootRamp := fs.Duration("boot-ramp", derefDuration(cfg.BootRamp), "spread the fleet's bootstrap Informs evenly across this window (e.g. 10m)")
 	uspBroker := fs.String("usp-broker", cfg.USPBroker, "USP MQTT broker host:port (enables the TR-369 agent)")
@@ -374,6 +387,7 @@ func applyFlags(args []string, cfg *Config) error {
 	cfg.CRBindAddr = *crBindAddr
 	cfg.CRPath = *crPath
 	cfg.CRPublishPath = *crPublishPath
+	cfg.CRAdvertiseHost = *crAdvertiseHost
 	cfg.USPBroker = *uspBroker
 	cfg.USPControllerID = *uspControllerID
 	cfg.USPMQTTSecret = *uspMQTTSecret
@@ -427,6 +441,14 @@ func validate(cfg *Config) error {
 	}
 	if cfg.BootRamp != nil && *cfg.BootRamp < 0 {
 		return fmt.Errorf("boot-ramp must be >= 0, got %s", *cfg.BootRamp)
+	}
+	if cfg.CRAdvertiseHost != "" {
+		// A host, not a URL. Catching the mistake here beats publishing
+		// something like "http://http://host/cr" to the ACS and losing
+		// an afternoon to it.
+		if strings.ContainsAny(cfg.CRAdvertiseHost, "/ ") {
+			return fmt.Errorf("cr-advertise-host must be a host or host:port, got %q", cfg.CRAdvertiseHost)
+		}
 	}
 	if cfg.CRBindAddr != "" {
 		if !strings.HasPrefix(cfg.CRPath, "/") {

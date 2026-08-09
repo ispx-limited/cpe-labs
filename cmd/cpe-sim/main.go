@@ -236,8 +236,9 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 	var listener *cr.Listener
 	if cfg.CRBindAddr != "" {
 		listener, err = cr.NewListener(cr.ListenerOptions{
-			BindAddr: cfg.CRBindAddr,
-			Logger:   logger,
+			BindAddr:      cfg.CRBindAddr,
+			AdvertiseHost: cfg.CRAdvertiseHost,
+			Logger:        logger,
 		})
 		if err != nil {
 			return fmt.Errorf("connection-request listener: %w", err)

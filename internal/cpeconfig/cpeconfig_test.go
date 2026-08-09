@@ -727,3 +727,32 @@ func TestLoadBootRampNegativeRejected(t *testing.T) {
 		t.Errorf("error should name the flag: %v", err)
 	}
 }
+
+func TestLoadCRAdvertiseHost(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := cpeconfig.Load([]string{"--cr-advertise-host=sim-1.example"}, nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.CRAdvertiseHost != "sim-1.example" {
+		t.Errorf("CRAdvertiseHost = %q", cfg.CRAdvertiseHost)
+	}
+
+	cfg, err = cpeconfig.Load(nil, map[string]string{"CPE_SIM_CR_ADVERTISE_HOST": "sim-2.example:7547"})
+	if err != nil {
+		t.Fatalf("Load (env): %v", err)
+	}
+	if cfg.CRAdvertiseHost != "sim-2.example:7547" {
+		t.Errorf("CRAdvertiseHost = %q", cfg.CRAdvertiseHost)
+	}
+}
+
+func TestLoadCRAdvertiseHostRejectsURL(t *testing.T) {
+	t.Parallel()
+
+	_, err := cpeconfig.Load([]string{"--cr-advertise-host=http://sim-1.example/"}, nil)
+	if err == nil {
+		t.Fatal("a URL must reject; it would be pasted straight into the published ConnectionRequestURL")
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -350,5 +351,69 @@ func TestNewListenerRejectsNilLogger(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error on nil Logger")
+	}
+}
+
+// TestListenerAdvertiseHost covers the reason the option exists: a
+// listener bound to a wildcard address publishes 127.0.0.1, which no
+// ACS on another host or in another container can reach.
+func TestListenerAdvertiseHost(t *testing.T) {
+	cases := []struct {
+		name      string
+		advertise string
+		want      string // "" means "expect the bound port appended"
+	}{
+		{name: "bare host", advertise: "sim-1.example", want: ""},
+		{name: "host and port", advertise: "sim-1.example:9999", want: "http://sim-1.example:9999/cr"},
+		{name: "bare ipv6", advertise: "2001:db8::1", want: ""},
+		{name: "bracketed ipv6 and port", advertise: "[2001:db8::1]:9999", want: "http://[2001:db8::1]:9999/cr"},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			ln, err := cr.NewListener(cr.ListenerOptions{
+				BindAddr:      "127.0.0.1:0",
+				AdvertiseHost: tc.advertise,
+				Logger:        testLogger(),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if regErr := ln.Register(cr.Endpoint{Path: "/cr", OnRequest: func(context.Context) {}}); regErr != nil {
+				t.Fatal(regErr)
+			}
+			if startErr := ln.Start(); startErr != nil {
+				t.Fatal(startErr)
+			}
+			t.Cleanup(func() {
+				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				defer cancel()
+				_ = ln.Shutdown(ctx)
+			})
+
+			got := ln.URL("/cr")
+			if tc.want != "" {
+				if got != tc.want {
+					t.Errorf("URL = %q, want %q", got, tc.want)
+				}
+				return
+			}
+			// Bare host: the bound port is kept, so assert the shape
+			// rather than a port the OS chose.
+			if !strings.HasPrefix(got, "http://") || !strings.HasSuffix(got, "/cr") {
+				t.Fatalf("URL = %q", got)
+			}
+			authority := strings.TrimSuffix(strings.TrimPrefix(got, "http://"), "/cr")
+			host, port, err := net.SplitHostPort(authority)
+			if err != nil {
+				t.Fatalf("authority %q: %v", authority, err)
+			}
+			if host != strings.Trim(tc.advertise, "[]") {
+				t.Errorf("host = %q, want %q", host, tc.advertise)
+			}
+			if port == "" || port == "0" {
+				t.Errorf("port = %q, want the bound port", port)
+			}
+		})
 	}
 }
