@@ -2775,3 +2775,202 @@ eventSchedule:
 		t.Errorf("--boot-ramp=0s did not override the profile's 10s ramp (took %s)", last)
 	}
 }
+
+// scaleProfileDir is the large-fleet profile. The tests below are its
+// contract: the things that make it a realistic gateway rather than a
+// convenient one are easy to erode by accident, and eroding them turns
+// a scale run into a measurement of nothing.
+const scaleProfileDir = "../../profiles/scale-tr098"
+
+func TestScaleProfileContract(t *testing.T) {
+	t.Parallel()
+
+	prof, err := paramtree.LoadProfile(scaleProfileDir)
+	if err != nil {
+		t.Fatalf("LoadProfile: %v", err)
+	}
+
+	leaves, err := prof.Tree.Names("InternetGatewayDevice", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(leaves) < 300 || len(leaves) > 450 {
+		t.Errorf("%d leaves; a real gateway reports a few hundred and the ACS has to store all of them", len(leaves))
+	}
+	if len(prof.Generators) < 40 {
+		t.Errorf("%d generators; a real gateway has tens of moving values", len(prof.Generators))
+	}
+
+	// Phase anchoring: declaring periodicInformPaths.time switches the
+	// scheduler to phase-anchored mode and suppresses jitter, so the
+	// whole fleet fires on one boundary. See _top.yaml.
+	if prof.PeriodicInformPaths.Time != "" {
+		t.Error("periodicInformPaths.time must stay undeclared; declaring it synchronizes the whole fleet onto one boundary")
+	}
+	pit, err := prof.Tree.Get("InternetGatewayDevice.ManagementServer.PeriodicInformTime")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pit.Raw != "0001-01-01T00:00:00Z" {
+		t.Errorf("PeriodicInformTime = %q, want the TR-069 Unknown Time sentinel", pit.Raw)
+	}
+
+	interval, err := prof.Tree.Get("InternetGatewayDevice.ManagementServer.PeriodicInformInterval")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if interval.Raw != "300" {
+		t.Errorf("PeriodicInformInterval = %q, want 300 (the common real-world default)", interval.Raw)
+	}
+
+	// An ACS that never sees a reported firmware version cannot verify
+	// a campaign landed or skip devices already on the target build.
+	const swVersion = "InternetGatewayDevice.DeviceInfo.SoftwareVersion"
+	for _, event := range []string{"0 BOOTSTRAP", "1 BOOT", "2 PERIODIC"} {
+		if !slices.Contains(prof.InformParameters[event], swVersion) {
+			t.Errorf("%s inform list does not carry SoftwareVersion", event)
+		}
+	}
+
+	if prof.Transfer.Firmware == nil {
+		t.Fatal("no transfer.firmware block; a scale run has to exercise the ACS's delivery path")
+	}
+	if !prof.Transfer.Firmware.Fetch {
+		t.Error("firmware fetch must default to true so a campaign actually moves the bytes")
+	}
+	if prof.Transfer.Firmware.ApplyDelay != 60*time.Second {
+		t.Errorf("firmware applyDelay = %s, want 60s", prof.Transfer.Firmware.ApplyDelay)
+	}
+
+	// 36^8 keeps birthday collisions under one percent at 200k; a
+	// shorter tail does not.
+	if !strings.Contains(prof.Fleet.SerialPattern, "{cpe:ALNUM:8}") {
+		t.Errorf("serialPattern %q needs an 8-character alphanumeric tail at fleet scale", prof.Fleet.SerialPattern)
+	}
+	if len(prof.Fleet.Pools) != 0 {
+		t.Errorf("pools must stay out: sized for documentation ranges they cap at 255 CPEs and fail the first shard (got %v)", prof.Fleet.Pools)
+	}
+	if prof.Fleet.Count < 100 || prof.Fleet.Count > 5000 {
+		t.Errorf("fleet.count = %d; the default should be modest enough to run casually and obviously raisable", prof.Fleet.Count)
+	}
+}
+
+// TestRunScaleProfileFleetBootstraps boots a small fleet from the
+// scale profile against a stub ACS and checks the Informs carry what
+// the profile promises. The fleet count is trimmed to keep the test
+// quick; nothing else about the profile is touched.
+func TestRunScaleProfileFleetBootstraps(t *testing.T) {
+	var (
+		mu     sync.Mutex
+		bodies []string
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if !strings.Contains(string(body), "<cwmp:Inform>") {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		mu.Lock()
+		bodies = append(bodies, string(body))
+		mu.Unlock()
+		w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+		_, _ = w.Write([]byte(informResponseEnvelope))
+	}))
+	defer srv.Close()
+
+	dir := copyProfileWithSmallFleet(t, scaleProfileDir, 3)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- run(ctx, []string{
+			"--acs-url=" + srv.URL,
+			"--profile=" + dir,
+			"--log-level=error",
+			"--seed=11",
+		}, os.Stdout, os.Stderr)
+	}()
+
+	if err := waitFor(t, 5*time.Second, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(bodies) >= 3
+	}); err != nil {
+		t.Fatalf("three bootstrap Informs never arrived: %v", err)
+	}
+
+	mu.Lock()
+	got := append([]string(nil), bodies...)
+	mu.Unlock()
+
+	serialRE := regexp.MustCompile(`<SerialNumber>([^<]+)</SerialNumber>`)
+	serials := map[string]bool{}
+	for _, b := range got {
+		m := serialRE.FindStringSubmatch(b)
+		if len(m) != 2 {
+			t.Fatal("Inform without a serial")
+		}
+		serials[m[1]] = true
+		if !strings.HasPrefix(m[1], "RG24") || len(m[1]) != 12 {
+			t.Errorf("serial %q does not match the profile's RG24 + 8-character tail", m[1])
+		}
+		// A first-contact session emits [1 BOOT, 0 BOOTSTRAP] and the
+		// inform builder takes the first matching list, so this is the
+		// boot list. SoftwareVersion riding it is the point: without a
+		// reported version an ACS cannot tell a firmware campaign
+		// landed. The bootstrap and periodic lists are asserted in
+		// TestScaleProfileContract.
+		for _, want := range []string{
+			"InternetGatewayDevice.DeviceInfo.SoftwareVersion",
+			"InternetGatewayDevice.DeviceInfo.UpTime",
+		} {
+			if !strings.Contains(b, want) {
+				t.Errorf("first Inform does not report %s", want)
+			}
+		}
+		if !strings.Contains(b, "<Manufacturer>Example Networks</Manufacturer>") {
+			t.Error("Inform DeviceId does not carry the profile's manufacturer")
+		}
+	}
+	if len(serials) != 3 {
+		t.Errorf("expected 3 distinct serials, got %v", serials)
+	}
+
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("run returned %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("run did not return after cancel")
+	}
+}
+
+// copyProfileWithSmallFleet copies a profile directory into the test's
+// temp dir with fleet.count rewritten, so a test can boot the real
+// profile without standing up its default fleet.
+func copyProfileWithSmallFleet(t *testing.T, src string, count int) string {
+	t.Helper()
+	dst := t.TempDir()
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	countRE := regexp.MustCompile(`(?m)^(\s*count:\s*)\d+$`)
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".yaml") {
+			continue
+		}
+		body, readErr := os.ReadFile(filepath.Join(src, e.Name()))
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		body = countRE.ReplaceAll(body, []byte("${1}"+strconv.Itoa(count)))
+		if writeErr := os.WriteFile(filepath.Join(dst, e.Name()), body, 0o600); writeErr != nil {
+			t.Fatal(writeErr)
+		}
+	}
+	return dst
+}

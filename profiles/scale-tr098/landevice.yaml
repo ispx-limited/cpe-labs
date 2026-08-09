@@ -1,0 +1,121 @@
+# InternetGatewayDevice.LANDevice.{i}.*, LAN configuration.
+# One LANDevice with a DHCP server and a 4-port switch.
+
+parameters:
+  - path: InternetGatewayDevice.LANDeviceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+
+groups:
+  - prefix: InternetGatewayDevice.LANDevice.1
+    parameters:
+      - path: LANEthernetInterfaceNumberOfEntries
+        type: xsd:unsignedInt
+        value: "4"
+      - path: LANUSBInterfaceNumberOfEntries
+        type: xsd:unsignedInt
+        value: "0"
+      - path: LANWLANConfigurationNumberOfEntries
+        type: xsd:unsignedInt
+        value: "2"
+
+  - prefix: InternetGatewayDevice.LANDevice.1.LANHostConfigManagement
+    parameters:
+      - path: DHCPServerEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: DHCPServerConfigurable
+        type: xsd:boolean
+        value: "true"
+      - path: MinAddress
+        value: "192.168.1.64"
+        writable: true
+      - path: MaxAddress
+        value: "192.168.1.253"
+        writable: true
+      - path: SubnetMask
+        value: "255.255.255.0"
+        writable: true
+      - path: IPRouters
+        value: "192.168.1.254"
+        writable: true
+      - path: DNSServers
+        value: "192.168.1.254"
+        writable: true
+      - path: DomainName
+        value: "lan.example"
+        writable: true
+      - path: DHCPLeaseTime
+        type: xsd:int
+        value: "86400"
+        writable: true
+
+# 4-port switch. Byte counters per port, plus the link-layer
+# extensions an ACS's Ethernet telemetry usually asks for.
+objects:
+  - path: InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig
+    instances: 4
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: MACAddress
+        value: "00:00:5E:01:00:0{i}"
+      - path: MaxBitRate
+        value: "Auto"
+        writable: true
+      - path: DuplexMode
+        value: "Auto"
+        writable: true
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 2000000
+          jitter: 0.3
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 4000000
+          jitter: 0.3
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 60s
+          min: 0
+          max: 4294967295
+          step: 3000
+          jitter: 0.3
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 60s
+          min: 0
+          max: 4294967295
+          step: 5000
+          jitter: 0.3
+      - path: X_00005E_CurrentBitRate
+        value: "1000"
+      - path: X_00005E_CurrentDuplexMode
+        value: "Full"

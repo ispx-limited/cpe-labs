@@ -1,0 +1,261 @@
+# LANDevice.1.WLANConfiguration.{i}.*, WiFi.
+#
+# Two radios (1 = 2.4 GHz, 2 = 5 GHz), each with a full security
+# posture and four associated stations carrying live signal readings.
+# Path templates use {i} (table-instance index), which is unrelated to
+# {cpe} (fleet instance).
+#
+# The associated-device tables are the expensive half of a WiFi
+# telemetry run: an ACS storing per-client signal history writes eight
+# rows per CPE per sample, and at 200k CPEs that is the write path
+# under test.
+
+objects:
+  - path: InternetGatewayDevice.LANDevice.1.WLANConfiguration
+    instances: 2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      # SSID carries the global fleet index so two shards of the same
+      # profile do not name their networks identically.
+      - path: SSID
+        value: "EXN-{cpe:hex:6}-{i}"
+        writable: true
+      - path: BSSID
+        value: "00:00:5E:{cpe:mac:3}"
+      - path: MACAddress
+        value: "00:00:5E:{cpe:mac:3}"
+      - path: BeaconType
+        value: "11i"
+        writable: true
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "6"
+        writable: true
+      - path: AutoChannelEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Standard
+        value: "n"
+        writable: true
+      - path: SSIDAdvertisementEnabled
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      # WPA2-PSK posture: BeaconType=11i makes the IEEE11i* pair
+      # authoritative, and BasicAuthenticationMode=None says no legacy
+      # basic auth is in use. All four are what a security audit reads.
+      - path: BasicAuthenticationMode
+        value: "None"
+        writable: true
+      - path: BasicEncryptionModes
+        value: "None"
+        writable: true
+      - path: WPAEncryptionModes
+        value: "AESEncryption"
+        writable: true
+      - path: WPAAuthenticationMode
+        value: "PSKAuthentication"
+        writable: true
+      - path: IEEE11iEncryptionModes
+        value: "AESEncryption"
+        writable: true
+      - path: IEEE11iAuthenticationMode
+        value: "PSKAuthentication"
+        writable: true
+      - path: TransmitPower
+        type: xsd:unsignedInt
+        value: "100"
+        writable: true
+      - path: TotalAssociations
+        type: xsd:unsignedInt
+        value: "4"
+        writable: true
+        generator:
+          type: counter
+          interval: 120s
+          min: 2
+          max: 7
+          step: 1
+          jitter: 0.9
+      - path: AssociatedDeviceNumberOfEntries
+        type: xsd:unsignedInt
+        value: "4"
+      - path: MaxBitRate
+        value: "Auto"
+        writable: true
+      - path: RegulatoryDomain
+        value: "US"
+        writable: true
+      - path: RadioEnabled
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: WMMEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: TotalBytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 6000000
+          jitter: 0.3
+      - path: TotalBytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 9000000
+          jitter: 0.3
+      - path: TotalPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 5000
+          jitter: 0.3
+      - path: TotalPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 7000
+          jitter: 0.3
+      # TR-098 defines only error and packet-kind counters under
+      # WLANConfiguration.{i}.Stats (byte totals live on the object
+      # itself), but plenty of field firmware ships byte counters here
+      # too and ACS telemetry profiles ask for them, so both spellings
+      # are present.
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 6000000
+          jitter: 0.3
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 9000000
+          jitter: 0.3
+      - path: Stats.ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  # ---- 2.4 GHz radio: 4 associated stations ----
+  # X_00005E_RSSI is dBm (xsd:int, drifts like a live reading);
+  # X_00005E_SignalStrength is the percent-style companion plenty of
+  # firmware reports alongside it.
+  - path: InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.AssociatedDevice
+    instances: 4
+    parameters:
+      - path: AssociatedDeviceMACAddress
+        value: "0A:1B:2C:00:00:0{i}"
+      - path: AssociatedDeviceIPAddress
+        value: "192.168.1.{i}0"
+      - path: LastDataTransmitRate
+        value: "144"
+      - path: AssociatedDeviceAuthenticationState
+        type: xsd:boolean
+        value: "true"
+      - path: X_00005E_RSSI
+        type: xsd:int
+        value: "-52"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -78
+          max: -38
+          stepMax: 4
+      - path: X_00005E_SignalStrength
+        type: xsd:unsignedInt
+        value: "68"
+      - path: X_00005E_OperatingStandard
+        value: "n"
+
+  # ---- 5 GHz radio: 4 associated stations ----
+  - path: InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.AssociatedDevice
+    instances: 4
+    parameters:
+      - path: AssociatedDeviceMACAddress
+        value: "0A:1B:2D:00:00:0{i}"
+      - path: AssociatedDeviceIPAddress
+        value: "192.168.1.{i}5"
+      - path: LastDataTransmitRate
+        value: "433"
+      - path: AssociatedDeviceAuthenticationState
+        type: xsd:boolean
+        value: "true"
+      - path: X_00005E_RSSI
+        type: xsd:int
+        value: "-47"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -72
+          max: -35
+          stepMax: 4
+      - path: X_00005E_SignalStrength
+        type: xsd:unsignedInt
+        value: "76"
+      - path: X_00005E_OperatingStandard
+        value: "ac"
+
+  # ---- Neighbouring networks seen by the 2.4 GHz radio ----
+  # Channel-planning telemetry: static per CPE, but four more rows per
+  # device for the ACS to store and query.
+  - path: InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.X_00005E_NeighboringWiFi
+    instances: 4
+    parameters:
+      - path: SSID
+        value: "neighbor-{i}"
+      - path: BSSID
+        value: "DE:AD:BE:EF:00:0{i}"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "{i}"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-65"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+      - path: SecurityModeEnabled
+        value: "WPA2-Personal"
