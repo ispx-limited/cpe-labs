@@ -27,6 +27,11 @@ groups:
         value: ""
       - path: SpecVersion
         value: "1.1"
+      # TR-069 Annex A forced-Inform parameter: the data models and
+      # profiles this device supports, which is how an ACS learns what
+      # it is talking to without asking.
+      - path: DeviceSummary
+        value: "InternetGatewayDevice:1.4[](Baseline:1,EthernetLAN:1,WiFiLAN:1,DeviceAssociation:2)"
       - path: ProvisioningCode
         value: ""
         writable: true
