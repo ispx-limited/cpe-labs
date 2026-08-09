@@ -92,12 +92,19 @@ transfer:
     fetch: true
 
 informParameters:
+  # TR-069 Annex A names a forced-Inform set every CPE reports on every
+  # Inform, and ConnectionRequestURL is the load-bearing one: an ACS
+  # that never receives it has no address to wake the device on, so
+  # every task it queues waits for the next periodic Inform and expires
+  # first. Leaving it out made a fleet look like it was ignoring tasks
+  # when the ACS simply could not reach it.
   # First contact: vendor identity, running firmware, and the WAN
   # addressing shape, so the ACS can make provisioning and firmware
   # decisions without a round of GetParameterValues per device. At
   # 200k devices those round trips are the difference between an
   # onboarding wave the ACS absorbs and one it does not.
   bootstrap:
+    - InternetGatewayDevice.DeviceSummary
     - InternetGatewayDevice.DeviceInfo.Manufacturer
     - InternetGatewayDevice.DeviceInfo.ManufacturerOUI
     - InternetGatewayDevice.DeviceInfo.ModelName
@@ -105,8 +112,10 @@ informParameters:
     - InternetGatewayDevice.DeviceInfo.SerialNumber
     - InternetGatewayDevice.DeviceInfo.HardwareVersion
     - InternetGatewayDevice.DeviceInfo.SoftwareVersion
+    - InternetGatewayDevice.DeviceInfo.ProvisioningCode
     - InternetGatewayDevice.ManagementServer.URL
     - InternetGatewayDevice.ManagementServer.ParameterKey
+    - InternetGatewayDevice.ManagementServer.ConnectionRequestURL
     - InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.AddressingType
     - InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ExternalIPAddress
   # SoftwareVersion rides every event class, not just bootstrap. An ACS
@@ -117,9 +126,12 @@ informParameters:
   boot:
     - InternetGatewayDevice.DeviceInfo.SoftwareVersion
     - InternetGatewayDevice.DeviceInfo.UpTime
+    - InternetGatewayDevice.ManagementServer.ConnectionRequestURL
+    - InternetGatewayDevice.ManagementServer.ParameterKey
   periodic:
     - InternetGatewayDevice.DeviceInfo.SoftwareVersion
     - InternetGatewayDevice.DeviceInfo.UpTime
+    - InternetGatewayDevice.ManagementServer.ConnectionRequestURL
     - InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.TotalBytesSent
     - InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.TotalBytesReceived
     - InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalBytesSent
