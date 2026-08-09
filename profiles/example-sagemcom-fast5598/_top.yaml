@@ -9,7 +9,13 @@ deviceIdPaths:
 
 fleet:
   count: 1
-  serialPattern: "N000000A0000{i:03}"
+  # Sagemcom-style shape: 2-letter factory prefix + YYWW date code +
+  # 8-char alphanumeric tail. {cpe:ALNUM:8} draws the tail from the
+  # per-CPE seeded RNG, so serials look real instead of a zero-padded
+  # counter, stay stable for a given --seed, and stay unique across
+  # the fleet. Changing the pattern on an existing deployment mints
+  # new device identities at the ACS (identity is OUI plus serial).
+  serialPattern: "XU2033{cpe:ALNUM:8}"
   pools:
     wan_ipv4:
       type: ipv4

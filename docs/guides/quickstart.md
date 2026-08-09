@@ -77,9 +77,9 @@ Recognized placeholders (substituted at fleet expansion time, before any tree mu
 | `{base}` | The literal `value:` of the SerialNumber leaf (only valid in `fleet.serialPattern`) | `TEST` |
 | `{i}` | 1-based instance index (only valid in `fleet.serialPattern`) | `7` |
 | `{i:N}` | Instance index zero-padded to N digits (only valid in `fleet.serialPattern`) | `0007` |
-| `{cpe}` | 1-based instance index (valid in any leaf value) | `7` |
-| `{cpe:N}` | Instance index zero-padded to N digits (valid in any leaf value) | `0007` |
-| `{cpe_id}` | The assigned CPE ID (valid in any leaf value) | `cpe-7` |
+| `{cpe}` | 1-based instance index (valid in any leaf value and in `fleet.serialPattern`) | `7` |
+| `{cpe:N}` | Instance index zero-padded to N digits (valid in any leaf value and in `fleet.serialPattern`) | `0007` |
+| `{cpe_id}` | The assigned CPE ID (valid in any leaf value and in `fleet.serialPattern`) | `cpe-7` |
 
 Existing `{i}` in path templates (table-instance materialization) is unrelated and is fully resolved at profile-load time before fleet substitution runs, so the two systems don't collide.
 

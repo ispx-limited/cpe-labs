@@ -212,7 +212,10 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 	stacks := make([]*cpeStack, 0, count)
 	for i := 1; i <= count; i++ {
 		id := fmt.Sprintf(cpeIDFmt, i)
-		serial := stampSerial(pattern, baseSerial, i)
+		serial, serialErr := stampSerial(pattern, baseSerial, i, id, templateProf.Fleet.Pools, rngSource)
+		if serialErr != nil {
+			return fmt.Errorf("serial pattern %q (cpe %s): %w", pattern, id, serialErr)
+		}
 		stack, buildErr := buildCPEStack(cfg, cpeStackInputs{
 			id:         id,
 			serial:     serial,
@@ -360,6 +363,7 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 //	{cpe}, 1-based fleet instance index
 //	{cpe:N}, instance, zero-padded to N digits
 //	{cpe:hex:N} / {cpe:HEX:N}, instance, zero-padded to N hex digits
+//	{cpe:alnum:N} / {cpe:ALNUM:N}, N pseudo-random base-36 characters
 //	{cpe:ipv4:CIDR}, Nth host in the IPv4 CIDR (inline form)
 //	{cpe:ipv6:CIDR}, Nth host in the IPv6 CIDR (inline form)
 //	{cpe:ipv6prefix:SUPER,SUBLEN}, Nth /SUBLEN prefix from SUPER (DHCPv6-PD style)
@@ -368,25 +372,19 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 //
 // Existing path-template {i} (table-instance index) is unrelated and
 // is fully resolved at profile-load time before this runs.
-func applyFleetPlaceholders(tree *paramtree.Tree, instance int, cpeID string, pools map[string]paramtree.FleetPool) error {
-	// Resolve named pools once per CPE so {pool_name} substitutions
-	// share one allocation per pool.
-	resolved := make(map[string]string, len(pools))
-	for name, pool := range pools {
-		v, err := paramtree.ResolvePool(pool, instance)
-		if err != nil {
-			return fmt.Errorf("fleet.pools[%q]: %w", name, err)
-		}
-		resolved[name] = v
+func applyFleetPlaceholders(tree *paramtree.Tree, instance int, cpeID string, pools map[string]paramtree.FleetPool, rng *cperng.Source) error {
+	resolved, err := resolveFleetPools(pools, instance)
+	if err != nil {
+		return err
 	}
 
 	type pending struct{ path, raw string }
 	var updates []pending
-	if err := tree.Walk("", -1, func(path string, v paramtree.Value) error {
+	if walkErr := tree.Walk("", -1, func(path string, v paramtree.Value) error {
 		if !hasFleetPlaceholder(v.Raw, resolved) {
 			return nil
 		}
-		next, sErr := substituteFleetPlaceholders(v.Raw, instance, cpeID, resolved)
+		next, sErr := substituteFleetPlaceholders(v.Raw, instance, cpeID, resolved, rng)
 		if sErr != nil {
 			return fmt.Errorf("substitute %q: %w", path, sErr)
 		}
@@ -394,15 +392,29 @@ func applyFleetPlaceholders(tree *paramtree.Tree, instance int, cpeID string, po
 			updates = append(updates, pending{path: path, raw: next})
 		}
 		return nil
-	}); err != nil {
-		return err
+	}); walkErr != nil {
+		return walkErr
 	}
 	for _, u := range updates {
-		if err := tree.SetSystem(u.path, u.raw); err != nil {
-			return fmt.Errorf("apply fleet placeholder at %q: %w", u.path, err)
+		if setErr := tree.SetSystem(u.path, u.raw); setErr != nil {
+			return fmt.Errorf("apply fleet placeholder at %q: %w", u.path, setErr)
 		}
 	}
 	return nil
+}
+
+// resolveFleetPools resolves every named pool for one CPE instance so
+// {pool_name} substitutions share one allocation per pool.
+func resolveFleetPools(pools map[string]paramtree.FleetPool, instance int) (map[string]string, error) {
+	resolved := make(map[string]string, len(pools))
+	for name, pool := range pools {
+		v, err := paramtree.ResolvePool(pool, instance)
+		if err != nil {
+			return nil, fmt.Errorf("fleet.pools[%q]: %w", name, err)
+		}
+		resolved[name] = v
+	}
+	return resolved, nil
 }
 
 // hasFleetPlaceholder is a cheap pre-filter so the substitution
@@ -419,14 +431,20 @@ func hasFleetPlaceholder(s string, resolved map[string]string) bool {
 	return false
 }
 
-// substituteFleetPlaceholders rewrites every placeholder in s.
-func substituteFleetPlaceholders(s string, instance int, cpeID string, resolved map[string]string) (string, error) {
+// substituteFleetPlaceholders rewrites every placeholder in s. The
+// ":serial" stream suffix feeds {cpe:alnum:N}: those tokens are
+// serial-material identity bytes, and stampSerial routes through this
+// same function, so the same form in a leaf value reproduces the same
+// token the serial pattern drew.
+func substituteFleetPlaceholders(s string, instance int, cpeID string, resolved map[string]string, rng *cperng.Source) (string, error) {
 	out := strings.ReplaceAll(s, "{cpe_id}", cpeID)
 	out = strings.ReplaceAll(out, "{cpe}", strconv.Itoa(instance))
 	for name, v := range resolved {
 		out = strings.ReplaceAll(out, "{"+name+"}", v)
 	}
-	return expandCPEFormPlaceholders(out, instance)
+	return expandCPEFormPlaceholders(out, instance, func() *rand.Rand {
+		return rng.ForCPE(cpeID + ":serial")
+	})
 }
 
 // expandCPEFormPlaceholders walks the string finding {cpe:...} forms
@@ -434,6 +452,7 @@ func substituteFleetPlaceholders(s string, instance int, cpeID string, resolved 
 //
 //	{cpe:N}, zero-padded decimal
 //	{cpe:hex:N} / {cpe:HEX:N}, zero-padded hex
+//	{cpe:alnum:N} / {cpe:ALNUM:N}, N pseudo-random base-36 characters
 //	{cpe:ipv4:CIDR}, Nth host in the IPv4 CIDR
 //	{cpe:ipv6:CIDR}, Nth host in the IPv6 CIDR
 //	{cpe:ipv6prefix:SUPER,SUBLEN}, Nth /SUBLEN prefix from SUPER
@@ -441,7 +460,22 @@ func substituteFleetPlaceholders(s string, instance int, cpeID string, resolved 
 // Anything between {cpe: and } that doesn't match a known form is
 // left literal so misconfiguration is visible at the ACS rather than
 // silently dropped.
-func expandCPEFormPlaceholders(s string, instance int) (string, error) {
+//
+// newAlnumRNG must return a freshly derived per-CPE stream. It is
+// consumed lazily and at most once per call: several {cpe:alnum:N} in
+// one string draw sequentially (so their blocks differ), while each
+// new string restarts the stream. Restarting per string keeps tokens
+// independent of tree-walk order and means the same form at the same
+// position reproduces the same token for a given CPE wherever it
+// appears.
+func expandCPEFormPlaceholders(s string, instance int, newAlnumRNG func() *rand.Rand) (string, error) {
+	var stream *rand.Rand
+	alnumRNG := func() *rand.Rand {
+		if stream == nil {
+			stream = newAlnumRNG()
+		}
+		return stream
+	}
 	const marker = "{cpe:"
 	var b strings.Builder
 	for {
@@ -457,7 +491,7 @@ func expandCPEFormPlaceholders(s string, instance int) (string, error) {
 		}
 		j += i
 		spec := s[i+len(marker) : j]
-		expanded, ok, err := evalCPEForm(spec, instance)
+		expanded, ok, err := evalCPEForm(spec, instance, alnumRNG)
 		if err != nil {
 			return "", fmt.Errorf("{cpe:%s}: %w", spec, err)
 		}
@@ -476,7 +510,7 @@ func expandCPEFormPlaceholders(s string, instance int) (string, error) {
 // recognized=false means the spec didn't match any known form so the
 // caller leaves it literal; err is non-nil only when a recognized form
 // has invalid arguments (bad CIDR, sublen out of range, etc.).
-func evalCPEForm(spec string, instance int) (string, bool, error) {
+func evalCPEForm(spec string, instance int, alnumRNG func() *rand.Rand) (string, bool, error) {
 	// Plain decimal width: {cpe:N}.
 	if w, err := strconv.Atoi(spec); err == nil && w >= 0 {
 		return fmt.Sprintf("%0*d", w, instance), true, nil
@@ -500,6 +534,29 @@ func evalCPEForm(spec string, instance int) (string, bool, error) {
 			return "", true, fmt.Errorf("HEX width %q: invalid", arg)
 		}
 		return fmt.Sprintf("%0*X", w, instance), true, nil
+	case "alnum", "ALNUM":
+		// N pseudo-random base-36 characters ([0-9A-Z], lowercased for
+		// the "alnum" form) drawn from the per-CPE stream, for
+		// realistic serial tails instead of a visible zero-padded
+		// counter. The space is 36^N: at N=8 (about 2.8e12) a 200k
+		// fleet's birthday collision probability is under 1%, at N=6
+		// (about 2.2e9) a few-thousand-CPE demo's is negligible. Use
+		// N >= 8 for large fleets, N >= 6 for demos.
+		w, err := strconv.Atoi(arg)
+		if err != nil || w < 1 {
+			return "", true, fmt.Errorf("alnum width %q: invalid (want >= 1)", arg)
+		}
+		const base36 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+		stream := alnumRNG()
+		chars := make([]byte, w)
+		for i := range chars {
+			chars[i] = base36[stream.Intn(len(base36))]
+		}
+		token := string(chars)
+		if kind == "alnum" {
+			token = strings.ToLower(token)
+		}
+		return token, true, nil
 	case "mac", "MAC":
 		// NIC portion of a MAC: arg is the byte count (1..3). Produces
 		// colon-separated zero-padded hex. {cpe:mac:3} for instance 1
@@ -556,21 +613,43 @@ func evalCPEForm(spec string, instance int) (string, bool, error) {
 }
 
 // stampSerial applies pattern to baseSerial / instance, returning the
-// per-CPE serial. Recognized placeholders:
+// per-CPE serial. Two passes: first the serial-only placeholders
 //
 //	{base}, the SerialNumber the profile declared (template default)
 //	{i}, the 1-based instance index, no padding
 //	{i:N}, the 1-based instance index, zero-padded to N digits
 //	            (e.g. {i:04} -> 0001 for instance 1, 0042 for instance 42)
 //
+// then the full fleet placeholder engine ({cpe:alnum:N}, {cpe:hex:N},
+// named pools, ...) so realistic serial shapes like
+// "MH2321{cpe:ALNUM:6}" need no serial-specific mini-language.
 // Unknown placeholder forms are left literal so misconfiguration is
 // visible at the ACS rather than silently dropped.
-func stampSerial(pattern, baseSerial string, instance int) string {
+//
+// TR-069 models SerialNumber as string(64); a pattern that expands
+// past that is rejected here, at startup, instead of surfacing as an
+// ACS-side validation failure per CPE.
+func stampSerial(pattern, baseSerial string, instance int, cpeID string, pools map[string]paramtree.FleetPool, rng *cperng.Source) (string, error) {
 	out := strings.ReplaceAll(pattern, "{base}", baseSerial)
 	out = strings.ReplaceAll(out, "{i}", strconv.Itoa(instance))
 	// Substitute {i:N} -> zero-padded instance to N digits.
 	out = padIPlaceholder(out, instance)
-	return out
+	if strings.Contains(out, "{") {
+		// Pool resolution only when a placeholder remains, so patterns
+		// that reference no pool cannot fail on pool capacity.
+		resolved, err := resolveFleetPools(pools, instance)
+		if err != nil {
+			return "", err
+		}
+		out, err = substituteFleetPlaceholders(out, instance, cpeID, resolved, rng)
+		if err != nil {
+			return "", err
+		}
+	}
+	if len(out) > 64 {
+		return "", fmt.Errorf("serial %q is %d characters, exceeds the TR-069 SerialNumber limit of 64", out, len(out))
+	}
+	return out, nil
 }
 
 // padIPlaceholder finds {i:N} placeholders and substitutes the
@@ -642,7 +721,7 @@ func buildCPEStack(cfg cpeconfig.Config, in cpeStackInputs) (*cpeStack, error) {
 	// across the fleet either via inline forms ({cpe}, {cpe:hex:N},
 	// {cpe:ipv4:CIDR}, ...) or named pools ({wan_ipv4}) declared in
 	// fleet.pools.
-	if subErr := applyFleetPlaceholders(prof.Tree, in.instance, in.id, prof.Fleet.Pools); subErr != nil {
+	if subErr := applyFleetPlaceholders(prof.Tree, in.instance, in.id, prof.Fleet.Pools, in.rngSource); subErr != nil {
 		return nil, fmt.Errorf("fleet placeholder substitution: %w", subErr)
 	}
 

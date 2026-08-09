@@ -16,7 +16,14 @@ deviceIdPaths:
 # prefixes, safe to use anywhere without colliding with real traffic.
 fleet:
   count: 1
-  serialPattern: "MH00000{i:04}"
+  # Real NVG578LX shape: MH vendor prefix + YYWW date code + 6-char
+  # alphanumeric tail (e.g. MH2321K7Q2M4). {cpe:ALNUM:6} draws the
+  # tail from the per-CPE seeded RNG, so serials look real instead of
+  # a zero-padded counter, stay stable for a given --seed, and stay
+  # unique across the fleet. Changing the pattern on an existing
+  # deployment mints new device identities at the ACS (identity is
+  # OUI plus serial).
+  serialPattern: "MH2321{cpe:ALNUM:6}"
   pools:
     wan_ipv4:
       type: ipv4

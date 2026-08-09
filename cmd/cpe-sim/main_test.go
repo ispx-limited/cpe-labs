@@ -19,7 +19,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ispx-limited/cpe-labs/internal/cperng"
 	"github.com/ispx-limited/cpe-labs/internal/cwmp"
+	"github.com/ispx-limited/cpe-labs/internal/paramtree"
 )
 
 const informResponseEnvelope = `<?xml version="1.0"?>
@@ -1005,9 +1007,12 @@ func TestSubstituteFleetPlaceholders(t *testing.T) {
 		{"prefix:{wan_ipv6}", 1, "cpe-1", "prefix:2001:db8:1::5"},
 		// Unknown format spec stays literal.
 		{"{cpe:notanumber}", 1, "cpe-1", "{cpe:notanumber}"},
+		// alnum without a width has no colon inside the spec, so it is
+		// unrecognized and stays literal too.
+		{"{cpe:alnum}", 1, "cpe-1", "{cpe:alnum}"},
 	}
 	for _, tc := range cases {
-		got, err := substituteFleetPlaceholders(tc.in, tc.instance, tc.cpeID, pools)
+		got, err := substituteFleetPlaceholders(tc.in, tc.instance, tc.cpeID, pools, cperng.New(1))
 		if err != nil {
 			t.Errorf("substituteFleetPlaceholders(%q): %v", tc.in, err)
 			continue
@@ -1016,6 +1021,111 @@ func TestSubstituteFleetPlaceholders(t *testing.T) {
 			t.Errorf("substituteFleetPlaceholders(%q, %d, %q) = %q, want %q",
 				tc.in, tc.instance, tc.cpeID, got, tc.want)
 		}
+	}
+}
+
+// TestAlnumPlaceholder covers the {cpe:alnum:N} / {cpe:ALNUM:N} form:
+// deterministic per (seed, cpe), correct width and charset, distinct
+// across CPEs and seeds, distinct blocks within one string.
+func TestAlnumPlaceholder(t *testing.T) {
+	t.Parallel()
+	expand := func(seed int64, cpeID, in string) string {
+		t.Helper()
+		got, err := substituteFleetPlaceholders(in, 1, cpeID, nil, cperng.New(seed))
+		if err != nil {
+			t.Fatalf("substituteFleetPlaceholders(%q): %v", in, err)
+		}
+		return got
+	}
+
+	upper := expand(1, "cpe-1", "{cpe:ALNUM:8}")
+	if !regexp.MustCompile(`^[0-9A-Z]{8}$`).MatchString(upper) {
+		t.Errorf("ALNUM token %q: want 8 chars of [0-9A-Z]", upper)
+	}
+	if again := expand(1, "cpe-1", "{cpe:ALNUM:8}"); again != upper {
+		t.Errorf("same seed and cpe gave %q then %q", upper, again)
+	}
+	lower := expand(1, "cpe-1", "{cpe:alnum:8}")
+	if lower != strings.ToLower(upper) {
+		t.Errorf("alnum %q is not the lowercased ALNUM %q", lower, upper)
+	}
+	if other := expand(1, "cpe-2", "{cpe:ALNUM:8}"); other == upper {
+		t.Errorf("cpe-1 and cpe-2 drew the same token %q", upper)
+	}
+	if other := expand(2, "cpe-1", "{cpe:ALNUM:8}"); other == upper {
+		t.Errorf("seed 1 and seed 2 drew the same token %q", upper)
+	}
+
+	// Two blocks in one string draw sequentially from the stream.
+	pair := expand(1, "cpe-1", "{cpe:ALNUM:4}-{cpe:ALNUM:4}")
+	halves := strings.SplitN(pair, "-", 2)
+	if len(halves) != 2 || halves[0] == halves[1] {
+		t.Errorf("expected two distinct blocks, got %q", pair)
+	}
+	// The stream restarts per string: the first block matches a
+	// standalone expansion of the same width.
+	if solo := expand(1, "cpe-1", "{cpe:ALNUM:4}"); solo != halves[0] {
+		t.Errorf("standalone block %q != first block of %q", solo, pair)
+	}
+
+	// Invalid width is an error, not silence.
+	if _, err := substituteFleetPlaceholders("{cpe:alnum:x}", 1, "cpe-1", nil, cperng.New(1)); err == nil {
+		t.Error("alnum with non-numeric width: want error")
+	}
+	if _, err := substituteFleetPlaceholders("{cpe:alnum:0}", 1, "cpe-1", nil, cperng.New(1)); err == nil {
+		t.Error("alnum with width 0: want error")
+	}
+}
+
+func TestStampSerial(t *testing.T) {
+	t.Parallel()
+	stamp := func(seed int64, pattern string, instance int) string {
+		t.Helper()
+		got, err := stampSerial(pattern, "BASE", instance, fmt.Sprintf("cpe-%d", instance), nil, cperng.New(seed))
+		if err != nil {
+			t.Fatalf("stampSerial(%q, %d): %v", pattern, instance, err)
+		}
+		return got
+	}
+
+	// Literal + counter + alnum tail combine; deterministic per seed.
+	got := stamp(1, "MH2321-{i:03}-{cpe:ALNUM:6}", 7)
+	if !regexp.MustCompile(`^MH2321-007-[0-9A-Z]{6}$`).MatchString(got) {
+		t.Errorf("stamped serial %q does not match expected shape", got)
+	}
+	if again := stamp(1, "MH2321-{i:03}-{cpe:ALNUM:6}", 7); again != got {
+		t.Errorf("same seed and instance gave %q then %q", got, again)
+	}
+	if other := stamp(1, "MH2321-{i:03}-{cpe:ALNUM:6}", 8); strings.HasSuffix(other, got[len(got)-6:]) {
+		t.Errorf("instances 7 and 8 drew the same tail: %q vs %q", got, other)
+	}
+
+	// Serial-only placeholders still work without the engine.
+	if plain := stamp(1, "{base}-{i}", 3); plain != "BASE-3" {
+		t.Errorf("stampSerial({base}-{i}, 3) = %q, want BASE-3", plain)
+	}
+
+	// Unknown forms stay literal so misconfig is visible at the ACS.
+	if lit := stamp(1, "X{nope}Y", 1); lit != "X{nope}Y" {
+		t.Errorf("unknown placeholder rewritten: %q", lit)
+	}
+
+	// TR-069 SerialNumber is string(64); longer expansions are
+	// rejected at startup.
+	if _, err := stampSerial("{cpe:ALNUM:70}", "BASE", 1, "cpe-1", nil, cperng.New(1)); err == nil {
+		t.Error("65+ character serial: want error")
+	}
+
+	// Pool references resolve inside serial patterns.
+	pools := map[string]paramtree.FleetPool{
+		"wan_ipv4": {Type: "ipv4", CIDR: "203.0.113.0/24"},
+	}
+	got, err := stampSerial("SN-{wan_ipv4}", "BASE", 2, "cpe-2", pools, cperng.New(1))
+	if err != nil {
+		t.Fatalf("stampSerial with pool: %v", err)
+	}
+	if got != "SN-203.0.113.2" {
+		t.Errorf("pool reference in serial = %q, want SN-203.0.113.2", got)
 	}
 }
 

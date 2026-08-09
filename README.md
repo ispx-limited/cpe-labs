@@ -229,9 +229,10 @@ per-device values when `fleet.count > 1` spawns the fleet.
 | Placeholder | Where | Resolves to |
 |------|------|------|
 | `{i}` | `path` / `value` of a leaf with `instances: N` | Instance index at load: `Radio.{i}` becomes `Radio.1` .. `Radio.N` |
-| `{base}`, `{i}`, `{i:N}` | `fleet.serialPattern` | The declared SerialNumber, the CPE index, and the index zero-padded to N digits |
+| `{base}`, `{i}`, `{i:N}` | `fleet.serialPattern` | The declared SerialNumber, the CPE index, and the index zero-padded to N digits. The whole `{cpe:*}` family below works in `serialPattern` too |
 | `{cpe}`, `{cpe:N}` | Any leaf value in a fleet | 1-based CPE index, plain or zero-padded |
 | `{cpe:hex:N}`, `{cpe:HEX:N}` | Any leaf value in a fleet | CPE index as zero-padded lower/upper hex |
+| `{cpe:alnum:N}`, `{cpe:ALNUM:N}` | Any leaf value in a fleet | N pseudo-random base-36 chars, stable per (seed, CPE): realistic serial tails like `MH2321{cpe:ALNUM:6}` |
 | `{cpe:mac:N}`, `{cpe:MAC:N}` | Any leaf value in a fleet | N bytes (1..3) of MAC NIC portion: `00:00:07` |
 | `{cpe:ipv4:CIDR}`, `{cpe:ipv6:CIDR}` | Any leaf value in a fleet | Nth host in the CIDR: `203.0.113.7` |
 | `{cpe:ipv6prefix:SUPER,SUBLEN}` | Any leaf value in a fleet | Nth /SUBLEN prefix carved from SUPER |
