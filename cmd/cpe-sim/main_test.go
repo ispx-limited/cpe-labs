@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -2585,5 +2587,72 @@ func TestRunFleetOffsetPoolOverrunRejected(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "wan_ipv4") {
 		t.Errorf("error should name the exhausted pool: %v", err)
+	}
+}
+
+// loadTemplate parses a profile for tests that call buildCPEStack
+// directly. It stands in for the single startup parse run() does and
+// whose tree every CPE then clones.
+func loadTemplate(t *testing.T, path string) *paramtree.Profile {
+	t.Helper()
+	prof, err := paramtree.LoadProfile(path)
+	if err != nil {
+		t.Fatalf("LoadProfile(%s): %v", path, err)
+	}
+	return prof
+}
+
+// TestRunFleetParallelBuildIsDeterministic locks the property that lets
+// fleet construction run on a worker pool at all: every CPE's derived
+// values come from its own index and its own RNG stream, so the order
+// workers happen to finish in cannot change what the ACS sees. Same
+// seed, same profile, same fleet, twice.
+func TestRunFleetParallelBuildIsDeterministic(t *testing.T) {
+	var (
+		mu      sync.Mutex
+		serials []string
+	)
+	serialRE := regexp.MustCompile(`<SerialNumber>([^<]+)</SerialNumber>`)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if m := serialRE.FindStringSubmatch(string(body)); len(m) == 2 {
+			mu.Lock()
+			serials = append(serials, m[1])
+			mu.Unlock()
+			w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+			_, _ = w.Write([]byte(informResponseEnvelope))
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	tmp := t.TempDir()
+	profile := filepath.Join(tmp, "profile.yaml")
+	body := strings.Replace(shardProfileYAML, "count: 3", "count: 25", 1)
+	if err := os.WriteFile(profile, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	collect := func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		out := append([]string(nil), serials...)
+		serials = nil
+		sort.Strings(out)
+		return out
+	}
+
+	runShard(t, srv.URL, profile)
+	first := collect()
+	runShard(t, srv.URL, profile)
+	second := collect()
+
+	if len(first) != 25 {
+		t.Fatalf("expected 25 serials, got %d", len(first))
+	}
+	if !slices.Equal(first, second) {
+		t.Errorf("same seed produced different fleets:\n first=%v\nsecond=%v", first, second)
 	}
 }

@@ -19,6 +19,7 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -229,30 +230,23 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 	// Build per-CPE stacks. The loop variable is the local index; every
 	// observable value derives from the GLOBAL index (offset + local),
 	// so two shards of the same profile never mint the same device.
-	stacks := make([]*cpeStack, 0, count)
-	for i := 1; i <= count; i++ {
-		instance := offset + i
-		id := fmt.Sprintf(cpeIDFmt, instance)
-		serial, serialErr := stampSerial(pattern, baseSerial, instance, id, templateProf.Fleet.Pools, rngSource)
-		if serialErr != nil {
-			return fmt.Errorf("serial pattern %q (cpe %s): %w", pattern, id, serialErr)
-		}
-		stack, buildErr := buildCPEStack(cfg, cpeStackInputs{
-			id:           id,
-			serial:       serial,
-			instance:     instance,
-			perCPECRPath: count > 1 || offset > 0,
-			pool:         pool,
-			rngSource:    rngSource,
-			sched:        sched,
-			listener:     listener,
-			logger:       logger,
-		})
-		if buildErr != nil {
-			return fmt.Errorf("build CPE %s (serial=%s): %w", id, serial, buildErr)
-		}
-		stacks = append(stacks, stack)
+	buildStart := time.Now()
+	stacks, err := buildFleet(cfg, templateProf, fleetInputs{
+		count:        count,
+		offset:       offset,
+		pattern:      pattern,
+		baseSerial:   baseSerial,
+		perCPECRPath: count > 1 || offset > 0,
+		pool:         pool,
+		rngSource:    rngSource,
+		sched:        sched,
+		listener:     listener,
+		logger:       logger,
+	})
+	if err != nil {
+		return err
 	}
+	logger.Info("fleet built", "count", count, "duration", time.Since(buildStart).String())
 
 	// Defer generator-runner shutdowns.
 	for _, st := range stacks {
@@ -707,6 +701,103 @@ func padIPlaceholder(s string, instance int) string {
 	return b.String()
 }
 
+// fleetInputs is the process-wide half of fleet construction: the
+// things every CPE in this process shares.
+type fleetInputs struct {
+	count        int
+	offset       int
+	pattern      string
+	baseSerial   string
+	perCPECRPath bool
+	pool         *transport.Pool
+	rngSource    *cperng.Source
+	sched        *scheduler.Scheduler
+	listener     *cr.Listener // may be nil
+	logger       *slog.Logger
+}
+
+// buildFleet constructs every CPE stack for this process, in parallel
+// across a bounded worker pool, and returns them in instance order.
+//
+// Parallel is safe because construction is a pure function of the CPE's
+// own global index: the serial, the placeholder expansions, the pool
+// allocations and the RNG streams all derive from that index and from
+// the immutable template, never from what the previous CPE did. Results
+// land in a pre-sized slice by index rather than by append, so the
+// returned order does not depend on which worker finished first.
+//
+// The pool is bounded at GOMAXPROCS because the work is CPU-bound tree
+// cloning and validation; more goroutines than cores would add
+// scheduling overhead and peak memory without adding throughput.
+func buildFleet(cfg cpeconfig.Config, template *paramtree.Profile, in fleetInputs) ([]*cpeStack, error) {
+	stacks := make([]*cpeStack, in.count)
+	workers := runtime.GOMAXPROCS(0)
+	if workers > in.count {
+		workers = in.count
+	}
+
+	var (
+		next     atomic.Int64
+		wg       sync.WaitGroup
+		errMu    sync.Mutex
+		firstErr error
+	)
+	fail := func(err error) {
+		errMu.Lock()
+		if firstErr == nil {
+			firstErr = err
+		}
+		errMu.Unlock()
+	}
+	failed := func() bool {
+		errMu.Lock()
+		defer errMu.Unlock()
+		return firstErr != nil
+	}
+
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				i := int(next.Add(1))
+				if i > in.count || failed() {
+					return
+				}
+				instance := in.offset + i
+				id := fmt.Sprintf(cpeIDFmt, instance)
+				serial, serialErr := stampSerial(in.pattern, in.baseSerial, instance, id, template.Fleet.Pools, in.rngSource)
+				if serialErr != nil {
+					fail(fmt.Errorf("serial pattern %q (cpe %s): %w", in.pattern, id, serialErr))
+					return
+				}
+				stack, buildErr := buildCPEStack(cfg, template, cpeStackInputs{
+					id:           id,
+					serial:       serial,
+					instance:     instance,
+					perCPECRPath: in.perCPECRPath,
+					pool:         in.pool,
+					rngSource:    in.rngSource,
+					sched:        in.sched,
+					listener:     in.listener,
+					logger:       in.logger,
+				})
+				if buildErr != nil {
+					fail(fmt.Errorf("build CPE %s (serial=%s): %w", id, serial, buildErr))
+					return
+				}
+				stacks[i-1] = stack
+			}
+		}()
+	}
+	wg.Wait()
+
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	return stacks, nil
+}
+
 // cpeStackInputs is the bundle buildCPEStack needs to assemble one CPE.
 type cpeStackInputs struct {
 	id       string
@@ -728,17 +819,24 @@ type cpeStackInputs struct {
 	logger    *slog.Logger
 }
 
-// buildCPEStack constructs one CPE: fresh tree (re-loaded from disk),
-// stamped serial, generator runner, and, when an ACS URL is configured,
-// the CWMP stack (transport, tracker, session, scheduler registration,
-// CR listener registration). A USP-only run (no --acs-url) gets just the
-// tree and generators; tracker / session / runner stay nil. The returned
-// stack's genRunner is non-nil iff the profile declares generators.
-func buildCPEStack(cfg cpeconfig.Config, in cpeStackInputs) (*cpeStack, error) {
-	prof, err := paramtree.LoadProfile(cfg.ProfilePath)
-	if err != nil {
-		return nil, fmt.Errorf("reload profile: %w", err)
-	}
+// buildCPEStack constructs one CPE: its own tree cloned from the
+// parsed template, stamped serial, generator runner, and, when an ACS
+// URL is configured, the CWMP stack (transport, tracker, session,
+// scheduler registration, CR listener registration). A USP-only run
+// (no --acs-url) gets just the tree and generators; tracker / session /
+// runner stay nil. The returned stack's genRunner is non-nil iff the
+// profile declares generators.
+//
+// Everything except the tree is shared with the template by value: the
+// inform parameter map, generator declarations, pools and path
+// declarations are read-only after load, and copying them per CPE would
+// cost memory for nothing. The tree is the only mutable per-CPE state,
+// so it is the only thing cloned.
+func buildCPEStack(cfg cpeconfig.Config, template *paramtree.Profile, in cpeStackInputs) (*cpeStack, error) {
+	profCopy := *template
+	prof := &profCopy
+	prof.Tree = template.Tree.Clone()
+	var err error
 
 	// Stamp the per-CPE serial. SetSystem bypasses Writable so a
 	// read-only SerialNumber leaf still gets the per-CPE value.
@@ -856,11 +954,13 @@ func buildCPEStack(cfg cpeconfig.Config, in cpeStackInputs) (*cpeStack, error) {
 		scheduleTransfer := buildTransferScheduler(in.sched, in.id, tracker, prof.Transfer, prof.Tree, runner, pendingCancels, in.logger)
 
 		factoryReset := func() error {
-			fresh, loadErr := paramtree.LoadProfile(cfg.ProfilePath)
-			if loadErr != nil {
-				return fmt.Errorf("reload profile: %w", loadErr)
-			}
-			if resetErr := prof.Tree.Reset(fresh.Tree); resetErr != nil {
+			// Factory defaults come from the template parsed at startup,
+			// not from a fresh read of the profile file. Two reasons: a
+			// fleet-wide FactoryReset would otherwise be one YAML parse
+			// per CPE, and "factory defaults" should mean the image the
+			// process booted with rather than whatever the operator has
+			// since edited on disk.
+			if resetErr := prof.Tree.Reset(template.Tree.Clone()); resetErr != nil {
 				return fmt.Errorf("tree reset: %w", resetErr)
 			}
 			// Re-stamp serial post-reset so factory reset doesn't collapse

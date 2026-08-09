@@ -152,7 +152,8 @@ func newFWHarness(t *testing.T) *fwHarness {
 	if err := os.WriteFile(profilePath, []byte(uspFirmwareTestProfile), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	st, err := buildCPEStack(cpeconfig.Config{ProfilePath: profilePath}, cpeStackInputs{
+	cfg := cpeconfig.Config{ProfilePath: profilePath}
+	st, err := buildCPEStack(cfg, loadTemplate(t, profilePath), cpeStackInputs{
 		id:           "cpe-1",
 		serial:       "TEST0001",
 		instance:     1,

@@ -111,7 +111,13 @@ func NewListener(opts ListenerOptions) (*Listener, error) {
 }
 
 // Register adds an Endpoint. Must be called before Start.
+//
+// Goroutine-safe: a fleet is built on a worker pool, so several CPEs
+// register their endpoints at once. The lock covers the endpoint and
+// state maps; http.ServeMux does its own locking.
 func (l *Listener) Register(ep Endpoint) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	if l.started {
 		return cpeerr.Wrap("cr.Register", cpeerr.KindInvalidArgument,
 			fmt.Errorf("Register after Start is not supported"))
