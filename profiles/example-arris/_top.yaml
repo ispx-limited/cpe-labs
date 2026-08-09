@@ -17,7 +17,7 @@ deviceIdPaths:
 fleet:
   count: 1
   # Real NVG578LX shape: MH vendor prefix + YYWW date code + 6-char
-  # alphanumeric tail (e.g. MH2321KL2685). {cpe:ALNUM:6} draws the
+  # alphanumeric tail (e.g. MH2321K7Q2M4). {cpe:ALNUM:6} draws the
   # tail from the per-CPE seeded RNG, so serials look real instead of
   # a zero-padded counter, stay stable for a given --seed, and stay
   # unique across the fleet. Changing the pattern on an existing
