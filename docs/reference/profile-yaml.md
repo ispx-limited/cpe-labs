@@ -9,6 +9,7 @@ This page is the exhaustive field reference. For introductions and worked exampl
 - [Profile Schema](../guides/profiles.md): overview and minimum viable profile.
 - [Multi-CPE Fleets](../guides/multi-cpe.md): `fleet:`, pools, placeholders.
 - [Value Generators](../guides/generators.md): counter / drift / enum / uptime / wallclock.
+- [Running a large fleet](../guides/large-fleets.md): sharding, boot ramps, and what one CPE costs a process. The `scale-tr098` profile shipped in `profiles/` is written for that case.
 
 ## Top-level blocks
 
@@ -20,10 +21,10 @@ groups:               # single-instance prefix groupings
 informParameters:     # per-event-code parameter lists for Inform builder
 periodicInformPaths:  # leaves the per-CPE periodic Inform timer reads
 generators:           # top-level generators list
-fleet:                # fleet count + pools + serial pattern
+fleet:                # fleet count + offset + pools + serial pattern
 connectionRequest:    # CR listener auth + throttle
 transfer:             # Download / Upload TransferComplete defaults + faults + firmware
-eventSchedule:        # Wall-clock latency for Reboot / FactoryReset / boot
+eventSchedule:        # Wall-clock latency for Reboot / FactoryReset / boot, and the boot ramp
 ```
 
 Every block is optional except `deviceIdPaths` and at least one of `parameters` / `objects` / `groups` (you need to mount the four DeviceID leaves).
@@ -202,7 +203,8 @@ Fleet metadata, named address pools, serial pattern.
 
 | Field | Type | Default | Notes |
 | --- | --- | --- | --- |
-| `count` | int | `1` | Number of CPEs to spawn. `0` and `1` both mean single-CPE. |
+| `count` | int | `1` | Number of CPEs to spawn in this process. `0` and `1` both mean single-CPE. |
+| `offset` | int | `0` | Shifts every instance index this process produces: the process builds instances `offset+1 .. offset+count`. Lets N processes run one profile and produce disjoint fleets. Overridden by `--fleet-offset` / `CPE_SIM_FLEET_OFFSET` / `fleetOffset` in the config file. Must be `>= 0`. |
 | `serialPattern` | string | `{base}-{i}` | Template applied to each CPE's SerialNumber leaf. Recognized: `{base}` (the `value:` of the SerialNumber leaf), `{i}` (1-based instance), `{i:N}` (zero-padded), then the full fleet placeholder engine (`{cpe:*}` forms including `{cpe:alnum:N}`, named pools). Expansion beyond 64 characters (the TR-069 SerialNumber limit) is rejected at startup. |
 | `pools` | map | `{}` | Named per-CPE allocators referenced from any leaf via `{name}`. |
 
@@ -232,7 +234,7 @@ fleet:
       sublen: 56
 ```
 
-Pool capacity is checked at load. `fleet.count: 1001` against a `/24` (capacity 254) rejects with a precise error. See [Multi-CPE Fleets](../guides/multi-cpe.md) for the full placeholder list.
+Pool capacity is checked at load, against the highest index the run will reach, which is `offset + count` rather than `count`. `fleet.count: 1001` against a `/24` rejects with a precise error, and so does `offset: 200` with `count: 100` against the same `/24`: pools are sized for the whole fleet, not for one shard. The check runs again once flags and environment have settled the effective offset, so a CLI override cannot push a shard past the end of a pool unnoticed. See [Multi-CPE Fleets](../guides/multi-cpe.md) for the full placeholder list and [Running a large fleet](../guides/large-fleets.md) for the sharding contract.
 
 ## `connectionRequest`
 
@@ -324,18 +326,20 @@ Wall-clock latency between selected CWMP events and the simulated CPE's matching
 | --- | --- | --- |
 | `rebootDelay` | duration | Time between a `Reboot` RPC ack and the post-reboot Inform. The deferred Inform carries `[1 BOOT, M Reboot]` (the wire shape a real CPE produces after rebooting). Repeat `Reboot` RPCs supersede the in-flight schedule. |
 | `factoryResetDelay` | duration | Time between a `FactoryReset` RPC ack and the post-reset Inform. The deferred Inform carries `[1 BOOT, 0 BOOTSTRAP]` (BOOTSTRAP is re-armed by `ResetBootstrap` inside `onReset`). Errors from the deferred `onReset` are logged only, since they cannot surface to the ACS because the `FactoryResetResponse` has already been sent. |
-| `bootDelay` | duration | Time between process start and the per-CPE bootstrap Inform. The fleet still bootstraps in parallel; every CPE waits the same delay independently. |
+| `bootDelay` | duration | Time between process start and the per-CPE bootstrap Inform. Every CPE waits the same delay. |
+| `bootRamp` | duration | Spreads the fleet's bootstrap Informs evenly across a window instead of firing them together: CPE k of N starts at `bootDelay + k*bootRamp/N`. Zero keeps the all-at-once behavior. The ramp is per process, so a fleet-wide ramp across shards also wants the process starts staggered. Overridden by `--boot-ramp` / `CPE_SIM_BOOT_RAMP` / `bootRamp` in the config file. |
 
 ```yaml
 eventSchedule:
   rebootDelay: 30s
   factoryResetDelay: 60s
   bootDelay: 5s
+  bootRamp: 10m
 ```
 
-All three fields are optional. Zero / unset preserves the simulator's existing immediate behavior (RPC handlers run their effect synchronously; the bootstrap Inform fires the moment the process starts). Negative values reject at load time.
+All four fields are optional. Zero / unset preserves the simulator's existing immediate behavior (RPC handlers run their effect synchronously; the bootstrap Inform fires the moment the process starts). Negative values reject at load time.
 
-`rebootDelay > 0` or `factoryResetDelay > 0` keeps the process alive long enough for the deferred Inform to fire (daemon mode). `bootDelay` alone preserves one-shot mode (the deferred bootstrap fires, then the process exits).
+`rebootDelay > 0` or `factoryResetDelay > 0` keeps the process alive long enough for the deferred Inform to fire (daemon mode). `bootDelay` and `bootRamp` alone preserve one-shot mode (the deferred bootstraps fire, then the process exits).
 
 ## Strict load-time validation
 

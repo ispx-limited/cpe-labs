@@ -1,6 +1,8 @@
 # Multi-CPE Fleets
 
-A profile with `fleet.count: N` spawns **N independent simulated CPEs in one process**. Each gets its own parameter tree, transport (cookie jar / Digest auth cache), event tracker, session, generator runner, and stamped per-instance values. Bootstrap Informs fire in parallel.
+A profile with `fleet.count: N` spawns **N independent simulated CPEs in one process**. Each gets its own parameter tree, transport (cookie jar / Digest auth cache), event tracker, session, generator runner, and stamped per-instance values.
+
+The profile is parsed once at startup and each CPE's tree is cloned from it, so fleet size costs memory rather than YAML parsing, and the fleet is built across a worker pool. Construction is a pure function of each CPE's index and its own RNG stream, so a given `--seed` produces the same fleet whatever order the workers finish in.
 
 ## Minimal fleet
 
@@ -103,11 +105,44 @@ Pool types:
 If `fleet.count: 1001` references a pool that holds 1000, profile load rejects with:
 
 ```
-fleet.count=1001 but pool "wan_ipv4" can't satisfy that many CPEs:
-instance 1001 exceeds capacity 254 for cidr 203.0.113.0/24
+pool "wan_ipv4" cannot reach instance 1001 (pools are sized for the whole fleet,
+not one shard): instance 1001 exceeds capacity 255 for cidr 203.0.113.0/24
 ```
 
-Fail-fast at startup beats per-CPE failure mid-bootstrap.
+Fail-fast at startup beats per-CPE failure mid-bootstrap. The index checked is `fleet.offset + fleet.count`, not `count`, so a shard high in the range cannot quietly run off the end of a pool. The same check runs again once flags and environment have settled the effective offset.
+
+## Splitting a fleet across processes
+
+One process can only carry so many CPEs, so a large fleet is several processes. `fleet.offset` shifts every instance index a process produces, so all of them can run the same profile:
+
+```bash
+bin/cpe-sim --profile=fleet.yaml --acs-url=http://acs/cwmp --fleet-offset=0
+bin/cpe-sim --profile=fleet.yaml --acs-url=http://acs/cwmp --fleet-offset=20000
+bin/cpe-sim --profile=fleet.yaml --acs-url=http://acs/cwmp --fleet-offset=40000
+```
+
+With `fleet.count: 20000`, those three processes build instances 1..20000, 20001..40000 and 40001..60000. Everything the ACS can see moves with the index: the stamped serial, every `{cpe...}` placeholder, every named-pool allocation, the `cpe-N` id in the logs, and the per-CPE RNG streams derived from that id. Shard 2's first CPE is a genuinely different device from shard 1's first CPE, not a duplicate wearing a different serial.
+
+The offset is also available as `CPE_SIM_FLEET_OFFSET`, as `fleetOffset` in a `--config` file, and as `fleet.offset` in the profile itself. The first three all outrank the profile, which is what lets one profile serve every shard.
+
+Two rules the operator owns:
+
+- **Shards take disjoint `[offset, offset+count)` windows.** Overlapping windows mint duplicate identities at the ACS, and the simulator cannot detect that: each process only knows its own window.
+- **Pools are sized for the whole fleet, not per shard.** A `/24` holds 255 CPEs however many processes draw from it. The 200k case usually wants no pools at all; see [Running a large fleet](large-fleets.md).
+
+## Ramping the bootstrap
+
+By default every CPE in a process bootstraps at once. That is fine for a hundred and misleading for a hundred thousand: the ACS sees a wall of first contacts that no real population produces, and what gets measured is how fast the simulator opens sockets.
+
+`--boot-ramp` (or `CPE_SIM_BOOT_RAMP`, or `eventSchedule.bootRamp` in the profile) spreads them: CPE k of N starts at `bootDelay + k*ramp/N`.
+
+```bash
+bin/cpe-sim --profile=fleet.yaml --acs-url=http://acs/cwmp --boot-ramp=10m
+```
+
+A 20000-CPE process with a 10 minute ramp starts roughly 33 CPEs a second. Zero, the default, keeps the all-at-once behavior.
+
+The ramp is per process. Running four shards each with `--boot-ramp=10m` gives four overlapping 10 minute ramps, not a 40 minute one, so a fleet-wide ramp wants the process starts staggered as well.
 
 ## Worked example: one container, 100 CPEs
 
@@ -155,9 +190,11 @@ bin/cpe-sim --profile=this.yaml --acs-url=http://acs/cwmp
 
 ## CR routing per CPE
 
-When `fleet.count > 1` and `--cr-bind-addr` is set, the connection-request listener routes incoming requests by URL path: `<cr-path>/<cpe-id>` (e.g. `/cr/cpe-3`). Each CPE writes its full URL into the leaf named by `--cr-publish-path` so the next Inform reports the right `ConnectionRequestURL`.
+When a process runs more than one CPE (or a single CPE at a non-zero fleet offset) and `--cr-bind-addr` is set, the connection-request listener routes incoming requests by URL path: `<cr-path>/<cpe-id>` (e.g. `/cr/cpe-3`). The id is the global index, so a sharded fleet's paths do not collide conceptually. Each CPE writes its full URL into the leaf named by `--cr-publish-path` so the next Inform reports the right `ConnectionRequestURL`.
 
-When `fleet.count == 1`, the path is `--cr-path` verbatim. Single-CPE deployments unchanged.
+A lone CPE at offset 0 gets `--cr-path` verbatim, unchanged.
+
+The published host comes from the bound socket, and a wildcard bind address publishes `127.0.0.1`. In a container, behind a NAT, or on a separate load-generator host that is an address the ACS cannot dial, and the symptom is a fleet that looks unreachable while nothing in the simulator's logs looks wrong. Set `--cr-advertise-host` to the address the ACS should use.
 
 ## Determinism
 
