@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -2392,4 +2394,583 @@ func TestWithForcedInformParams(t *testing.T) {
 	if out := withForcedInformParams(base, ""); len(out["0 BOOTSTRAP"]) != 1 {
 		t.Errorf("empty publish path should be a no-op, got %v", out["0 BOOTSTRAP"])
 	}
+}
+
+// shardProfileYAML is a fleet profile whose every identity-bearing leaf
+// derives from the instance index, so a sharded run can be checked for
+// the one property that matters: two shards of the same profile must
+// produce two disjoint sets of devices, not the same devices twice.
+const shardProfileYAML = `deviceIdPaths:
+  manufacturer: Device.DeviceInfo.Manufacturer
+  oui:          Device.DeviceInfo.ManufacturerOUI
+  productClass: Device.DeviceInfo.ProductClass
+  serialNumber: Device.DeviceInfo.SerialNumber
+
+fleet:
+  count: 3
+  serialPattern: "SH{cpe:ALNUM:8}"
+  pools:
+    wan_ipv4:
+      type: ipv4
+      cidr: "203.0.113.0/24"
+
+parameters:
+  - path: Device.DeviceInfo.Manufacturer
+    value: "TestVendor"
+  - path: Device.DeviceInfo.ManufacturerOUI
+    value: "AABBCC"
+  - path: Device.DeviceInfo.ProductClass
+    value: "TestModel"
+  - path: Device.DeviceInfo.SerialNumber
+    value: "TEST"
+  - path: Device.DeviceInfo.HardwareVersion
+    value: "rev-{cpe}"
+  - path: Device.Ethernet.Link.1.MACAddress
+    value: "00:00:5E:{cpe:mac:3}"
+  - path: Device.IP.Interface.1.IPv4Address
+    value: "{wan_ipv4}"
+    writable: true
+
+informParameters:
+  bootstrap:
+    - Device.DeviceInfo.HardwareVersion
+    - Device.Ethernet.Link.1.MACAddress
+    - Device.IP.Interface.1.IPv4Address
+`
+
+// runShard runs one shard to completion against srvURL. The seed is
+// fixed so the alphanumeric serial tails are reproducible and a
+// collision between shards would be a real collision rather than luck.
+func runShard(t *testing.T, srvURL, profile string, extraArgs ...string) {
+	t.Helper()
+	args := append([]string{
+		"--acs-url=" + srvURL,
+		"--profile=" + profile,
+		"--log-level=error",
+		"--seed=7",
+	}, extraArgs...)
+	if err := run(context.Background(), args, os.Stdout, os.Stderr); err != nil {
+		t.Fatalf("run %v: %v", extraArgs, err)
+	}
+}
+
+// TestRunFleetOffsetProducesDisjointShards runs the same profile twice,
+// once unshifted and once at --fleet-offset=3, and asserts that every
+// index-derived value moved: serials, inline {cpe} placeholders, MAC
+// tails and pool allocations. Identical serials across shards would
+// mean the second process was minting the first process's devices
+// again, which at the ACS is one fleet of three, not two of three.
+func TestRunFleetOffsetProducesDisjointShards(t *testing.T) {
+	var (
+		mu     sync.Mutex
+		bodies []string
+	)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if !strings.Contains(string(body), "<cwmp:Inform>") {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		mu.Lock()
+		bodies = append(bodies, string(body))
+		mu.Unlock()
+		w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+		_, _ = w.Write([]byte(informResponseEnvelope))
+	}))
+	defer srv.Close()
+
+	tmp := t.TempDir()
+	profile := filepath.Join(tmp, "profile.yaml")
+	if err := os.WriteFile(profile, []byte(shardProfileYAML), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	collect := func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		out := append([]string(nil), bodies...)
+		bodies = nil
+		return out
+	}
+
+	runShard(t, srv.URL, profile)
+	shardA := collect()
+	runShard(t, srv.URL, profile, "--fleet-offset=3")
+	shardB := collect()
+
+	if len(shardA) != 3 || len(shardB) != 3 {
+		t.Fatalf("expected 3 Informs per shard; got %d and %d", len(shardA), len(shardB))
+	}
+
+	serialRE := regexp.MustCompile(`<SerialNumber>([^<]+)</SerialNumber>`)
+	serialsOf := func(bs []string) map[string]bool {
+		out := make(map[string]bool, len(bs))
+		for _, b := range bs {
+			m := serialRE.FindStringSubmatch(b)
+			if len(m) != 2 {
+				t.Fatalf("no serial in Inform body")
+			}
+			out[m[1]] = true
+		}
+		return out
+	}
+	a, b := serialsOf(shardA), serialsOf(shardB)
+	if len(a) != 3 || len(b) != 3 {
+		t.Fatalf("serials collided within a shard: %v / %v", a, b)
+	}
+	for s := range a {
+		if b[s] {
+			t.Errorf("serial %q appears in both shards; shards are not disjoint", s)
+		}
+	}
+
+	// Placeholders, MAC tails and pool allocations all follow the global
+	// index: shard B is instances 4..6.
+	joinedB := strings.Join(shardB, "\n")
+	for instance := 4; instance <= 6; instance++ {
+		for _, want := range []string{
+			fmt.Sprintf(">rev-%d<", instance),
+			fmt.Sprintf(">00:00:5E:00:00:%02x<", instance),
+			fmt.Sprintf(">203.0.113.%d<", instance),
+		} {
+			if !strings.Contains(joinedB, want) {
+				t.Errorf("shard at offset 3 never reported %s", want)
+			}
+		}
+	}
+	joinedA := strings.Join(shardA, "\n")
+	if strings.Contains(joinedA, ">rev-4<") {
+		t.Error("unshifted shard reported an instance from the shifted range")
+	}
+}
+
+// TestRunFleetOffsetRNGStreamShifts is the identity half of sharding:
+// the per-CPE RNG stream is keyed on the global cpe id, so shard 2's
+// first CPE draws different random material from shard 1's first CPE
+// rather than being a duplicate device wearing a different serial.
+func TestRunFleetOffsetRNGStreamShifts(t *testing.T) {
+	t.Parallel()
+
+	src := cperng.New(99)
+	first := src.ForCPE("cpe-1:serial").Int63()
+	shifted := src.ForCPE("cpe-4:serial").Int63()
+	if first == shifted {
+		t.Error("cpe-1 and cpe-4 must not share an RNG stream")
+	}
+	again := cperng.New(99).ForCPE("cpe-4:serial").Int63()
+	if again != shifted {
+		t.Error("the same global id under the same seed must replay identically")
+	}
+}
+
+// TestRunFleetOffsetPoolOverrunRejected checks the operator contract
+// that pools are sized for the whole fleet: a shard pushed past the end
+// of its pool by a CLI offset fails at startup with the pool named,
+// rather than allocating wrong addresses one CPE at a time.
+func TestRunFleetOffsetPoolOverrunRejected(t *testing.T) {
+	t.Parallel()
+
+	tmp := t.TempDir()
+	profile := filepath.Join(tmp, "profile.yaml")
+	if err := os.WriteFile(profile, []byte(shardProfileYAML), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := run(context.Background(), []string{
+		"--acs-url=http://127.0.0.1:1",
+		"--profile=" + profile,
+		"--log-level=error",
+		"--fleet-offset=1000",
+	}, os.Stdout, os.Stderr)
+	if err == nil {
+		t.Fatal("offset past the end of the pool must reject at startup")
+	}
+	if !strings.Contains(err.Error(), "wan_ipv4") {
+		t.Errorf("error should name the exhausted pool: %v", err)
+	}
+}
+
+// loadTemplate parses a profile for tests that call buildCPEStack
+// directly. It stands in for the single startup parse run() does and
+// whose tree every CPE then clones.
+func loadTemplate(t *testing.T, path string) *paramtree.Profile {
+	t.Helper()
+	prof, err := paramtree.LoadProfile(path)
+	if err != nil {
+		t.Fatalf("LoadProfile(%s): %v", path, err)
+	}
+	return prof
+}
+
+// TestRunFleetParallelBuildIsDeterministic locks the property that lets
+// fleet construction run on a worker pool at all: every CPE's derived
+// values come from its own index and its own RNG stream, so the order
+// workers happen to finish in cannot change what the ACS sees. Same
+// seed, same profile, same fleet, twice.
+func TestRunFleetParallelBuildIsDeterministic(t *testing.T) {
+	var (
+		mu      sync.Mutex
+		serials []string
+	)
+	serialRE := regexp.MustCompile(`<SerialNumber>([^<]+)</SerialNumber>`)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if m := serialRE.FindStringSubmatch(string(body)); len(m) == 2 {
+			mu.Lock()
+			serials = append(serials, m[1])
+			mu.Unlock()
+			w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+			_, _ = w.Write([]byte(informResponseEnvelope))
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	tmp := t.TempDir()
+	profile := filepath.Join(tmp, "profile.yaml")
+	body := strings.Replace(shardProfileYAML, "count: 3", "count: 25", 1)
+	if err := os.WriteFile(profile, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	collect := func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		out := append([]string(nil), serials...)
+		serials = nil
+		sort.Strings(out)
+		return out
+	}
+
+	runShard(t, srv.URL, profile)
+	first := collect()
+	runShard(t, srv.URL, profile)
+	second := collect()
+
+	if len(first) != 25 {
+		t.Fatalf("expected 25 serials, got %d", len(first))
+	}
+	if !slices.Equal(first, second) {
+		t.Errorf("same seed produced different fleets:\n first=%v\nsecond=%v", first, second)
+	}
+}
+
+// rampProfileYAML is a four-CPE fleet with no scheduler and no
+// generators, so the only thing the ACS sees is the bootstrap wave.
+const rampProfileYAML = `deviceIdPaths:
+  manufacturer: Device.DeviceInfo.Manufacturer
+  oui:          Device.DeviceInfo.ManufacturerOUI
+  productClass: Device.DeviceInfo.ProductClass
+  serialNumber: Device.DeviceInfo.SerialNumber
+
+fleet:
+  count: 4
+  serialPattern: "{base}-{i}"
+
+parameters:
+  - path: Device.DeviceInfo.Manufacturer
+    value: "TestVendor"
+  - path: Device.DeviceInfo.ManufacturerOUI
+    value: "AABBCC"
+  - path: Device.DeviceInfo.ProductClass
+    value: "TestModel"
+  - path: Device.DeviceInfo.SerialNumber
+    value: "TEST"
+`
+
+// bootstrapArrivals runs a fleet and returns how long after the start
+// of the run each bootstrap Inform reached the ACS, in arrival order.
+func bootstrapArrivals(t *testing.T, profileBody string, extraArgs ...string) []time.Duration {
+	t.Helper()
+
+	var (
+		mu       sync.Mutex
+		arrivals []time.Duration
+		start    time.Time
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if !strings.Contains(string(body), "<cwmp:Inform>") {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		mu.Lock()
+		arrivals = append(arrivals, time.Since(start))
+		mu.Unlock()
+		w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+		_, _ = w.Write([]byte(informResponseEnvelope))
+	}))
+	defer srv.Close()
+
+	profile := filepath.Join(t.TempDir(), "profile.yaml")
+	if err := os.WriteFile(profile, []byte(profileBody), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	args := append([]string{
+		"--acs-url=" + srv.URL,
+		"--profile=" + profile,
+		"--log-level=error",
+	}, extraArgs...)
+	start = time.Now()
+	if err := run(context.Background(), args, os.Stdout, os.Stderr); err != nil {
+		t.Fatalf("run %v: %v", extraArgs, err)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	return append([]time.Duration(nil), arrivals...)
+}
+
+// TestRunBootRampSpreadsBootstrap checks the ramp does what it says:
+// four CPEs across an 800ms window start roughly 200ms apart, so the
+// ACS sees a wave rather than a wall.
+func TestRunBootRampSpreadsBootstrap(t *testing.T) {
+	arrivals := bootstrapArrivals(t, rampProfileYAML, "--boot-ramp=800ms")
+	if len(arrivals) != 4 {
+		t.Fatalf("expected 4 bootstrap Informs, got %d", len(arrivals))
+	}
+	// CPE k of 4 is released at k*800ms/4 = k*200ms. Assert each one
+	// landed no earlier than its slot; the upper bound is left loose
+	// because session time is real work on a shared CI machine.
+	for k, at := range arrivals {
+		earliest := time.Duration(k) * 200 * time.Millisecond
+		if at < earliest {
+			t.Errorf("CPE %d informed at %s, before its %s slot", k, at, earliest)
+		}
+	}
+	if last := arrivals[len(arrivals)-1]; last < 600*time.Millisecond {
+		t.Errorf("whole fleet finished in %s; the ramp did not spread it", last)
+	}
+}
+
+// TestRunBootRampZeroKeepsExistingBehaviour is the other half: no ramp
+// means the fleet bootstraps together, exactly as before the flag
+// existed.
+func TestRunBootRampZeroKeepsExistingBehaviour(t *testing.T) {
+	arrivals := bootstrapArrivals(t, rampProfileYAML)
+	if len(arrivals) != 4 {
+		t.Fatalf("expected 4 bootstrap Informs, got %d", len(arrivals))
+	}
+	if last := arrivals[len(arrivals)-1]; last > 500*time.Millisecond {
+		t.Errorf("unramped fleet took %s to bootstrap; it should go together", last)
+	}
+}
+
+// TestRunBootRampFlagOverridesProfile pins the precedence: the flag
+// beats eventSchedule.bootRamp, so one profile shards across processes
+// that ramp differently.
+func TestRunBootRampFlagOverridesProfile(t *testing.T) {
+	body := rampProfileYAML + `
+eventSchedule:
+  bootRamp: 10s
+`
+	arrivals := bootstrapArrivals(t, body, "--boot-ramp=0s")
+	if len(arrivals) != 4 {
+		t.Fatalf("expected 4 bootstrap Informs, got %d", len(arrivals))
+	}
+	if last := arrivals[len(arrivals)-1]; last > 500*time.Millisecond {
+		t.Errorf("--boot-ramp=0s did not override the profile's 10s ramp (took %s)", last)
+	}
+}
+
+// scaleProfileDir is the large-fleet profile. The tests below are its
+// contract: the things that make it a realistic gateway rather than a
+// convenient one are easy to erode by accident, and eroding them turns
+// a scale run into a measurement of nothing.
+const scaleProfileDir = "../../profiles/scale-tr098"
+
+func TestScaleProfileContract(t *testing.T) {
+	t.Parallel()
+
+	prof, err := paramtree.LoadProfile(scaleProfileDir)
+	if err != nil {
+		t.Fatalf("LoadProfile: %v", err)
+	}
+
+	leaves, err := prof.Tree.Names("InternetGatewayDevice", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(leaves) < 300 || len(leaves) > 450 {
+		t.Errorf("%d leaves; a real gateway reports a few hundred and the ACS has to store all of them", len(leaves))
+	}
+	if len(prof.Generators) < 40 {
+		t.Errorf("%d generators; a real gateway has tens of moving values", len(prof.Generators))
+	}
+
+	// Phase anchoring: declaring periodicInformPaths.time switches the
+	// scheduler to phase-anchored mode and suppresses jitter, so the
+	// whole fleet fires on one boundary. See _top.yaml.
+	if prof.PeriodicInformPaths.Time != "" {
+		t.Error("periodicInformPaths.time must stay undeclared; declaring it synchronizes the whole fleet onto one boundary")
+	}
+	pit, err := prof.Tree.Get("InternetGatewayDevice.ManagementServer.PeriodicInformTime")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pit.Raw != "0001-01-01T00:00:00Z" {
+		t.Errorf("PeriodicInformTime = %q, want the TR-069 Unknown Time sentinel", pit.Raw)
+	}
+
+	interval, err := prof.Tree.Get("InternetGatewayDevice.ManagementServer.PeriodicInformInterval")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if interval.Raw != "300" {
+		t.Errorf("PeriodicInformInterval = %q, want 300 (the common real-world default)", interval.Raw)
+	}
+
+	// An ACS that never sees a reported firmware version cannot verify
+	// a campaign landed or skip devices already on the target build.
+	const swVersion = "InternetGatewayDevice.DeviceInfo.SoftwareVersion"
+	for _, event := range []string{"0 BOOTSTRAP", "1 BOOT", "2 PERIODIC"} {
+		if !slices.Contains(prof.InformParameters[event], swVersion) {
+			t.Errorf("%s inform list does not carry SoftwareVersion", event)
+		}
+	}
+
+	if prof.Transfer.Firmware == nil {
+		t.Fatal("no transfer.firmware block; a scale run has to exercise the ACS's delivery path")
+	}
+	if !prof.Transfer.Firmware.Fetch {
+		t.Error("firmware fetch must default to true so a campaign actually moves the bytes")
+	}
+	if prof.Transfer.Firmware.ApplyDelay != 60*time.Second {
+		t.Errorf("firmware applyDelay = %s, want 60s", prof.Transfer.Firmware.ApplyDelay)
+	}
+
+	// 36^8 keeps birthday collisions under one percent at 200k; a
+	// shorter tail does not.
+	if !strings.Contains(prof.Fleet.SerialPattern, "{cpe:ALNUM:8}") {
+		t.Errorf("serialPattern %q needs an 8-character alphanumeric tail at fleet scale", prof.Fleet.SerialPattern)
+	}
+	if len(prof.Fleet.Pools) != 0 {
+		t.Errorf("pools must stay out: sized for documentation ranges they cap at 255 CPEs and fail the first shard (got %v)", prof.Fleet.Pools)
+	}
+	if prof.Fleet.Count < 100 || prof.Fleet.Count > 5000 {
+		t.Errorf("fleet.count = %d; the default should be modest enough to run casually and obviously raisable", prof.Fleet.Count)
+	}
+}
+
+// TestRunScaleProfileFleetBootstraps boots a small fleet from the
+// scale profile against a stub ACS and checks the Informs carry what
+// the profile promises. The fleet count is trimmed to keep the test
+// quick; nothing else about the profile is touched.
+func TestRunScaleProfileFleetBootstraps(t *testing.T) {
+	var (
+		mu     sync.Mutex
+		bodies []string
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if !strings.Contains(string(body), "<cwmp:Inform>") {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		mu.Lock()
+		bodies = append(bodies, string(body))
+		mu.Unlock()
+		w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+		_, _ = w.Write([]byte(informResponseEnvelope))
+	}))
+	defer srv.Close()
+
+	dir := copyProfileWithSmallFleet(t, scaleProfileDir, 3)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() {
+		done <- run(ctx, []string{
+			"--acs-url=" + srv.URL,
+			"--profile=" + dir,
+			"--log-level=error",
+			"--seed=11",
+		}, os.Stdout, os.Stderr)
+	}()
+
+	if err := waitFor(t, 5*time.Second, func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(bodies) >= 3
+	}); err != nil {
+		t.Fatalf("three bootstrap Informs never arrived: %v", err)
+	}
+
+	mu.Lock()
+	got := append([]string(nil), bodies...)
+	mu.Unlock()
+
+	serialRE := regexp.MustCompile(`<SerialNumber>([^<]+)</SerialNumber>`)
+	serials := map[string]bool{}
+	for _, b := range got {
+		m := serialRE.FindStringSubmatch(b)
+		if len(m) != 2 {
+			t.Fatal("Inform without a serial")
+		}
+		serials[m[1]] = true
+		if !strings.HasPrefix(m[1], "RG24") || len(m[1]) != 12 {
+			t.Errorf("serial %q does not match the profile's RG24 + 8-character tail", m[1])
+		}
+		// A first-contact session emits [1 BOOT, 0 BOOTSTRAP] and the
+		// inform builder takes the first matching list, so this is the
+		// boot list. SoftwareVersion riding it is the point: without a
+		// reported version an ACS cannot tell a firmware campaign
+		// landed. The bootstrap and periodic lists are asserted in
+		// TestScaleProfileContract.
+		for _, want := range []string{
+			"InternetGatewayDevice.DeviceInfo.SoftwareVersion",
+			"InternetGatewayDevice.DeviceInfo.UpTime",
+		} {
+			if !strings.Contains(b, want) {
+				t.Errorf("first Inform does not report %s", want)
+			}
+		}
+		if !strings.Contains(b, "<Manufacturer>Example Networks</Manufacturer>") {
+			t.Error("Inform DeviceId does not carry the profile's manufacturer")
+		}
+	}
+	if len(serials) != 3 {
+		t.Errorf("expected 3 distinct serials, got %v", serials)
+	}
+
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("run returned %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("run did not return after cancel")
+	}
+}
+
+// copyProfileWithSmallFleet copies a profile directory into the test's
+// temp dir with fleet.count rewritten, so a test can boot the real
+// profile without standing up its default fleet.
+func copyProfileWithSmallFleet(t *testing.T, src string, count int) string {
+	t.Helper()
+	dst := t.TempDir()
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	countRE := regexp.MustCompile(`(?m)^(\s*count:\s*)\d+$`)
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".yaml") {
+			continue
+		}
+		body, readErr := os.ReadFile(filepath.Join(src, e.Name()))
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		body = countRE.ReplaceAll(body, []byte("${1}"+strconv.Itoa(count)))
+		if writeErr := os.WriteFile(filepath.Join(dst, e.Name()), body, 0o600); writeErr != nil {
+			t.Fatal(writeErr)
+		}
+	}
+	return dst
 }

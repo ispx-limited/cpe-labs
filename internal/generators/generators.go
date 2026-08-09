@@ -1,16 +1,22 @@
 // Package generators runs profile-driven value generators that mutate
 // parameter-tree leaves on their own timers. Each generator advances a
-// single leaf (counters today, drift / enum / timestamp in future
-// stories) at its configured interval; the next periodic Inform reads
-// the new value via the existing Tree.Get path and reports it to the
-// ACS.
+// single leaf (counters, drift, enum, timestamps) at its configured
+// interval; the next periodic Inform reads the new value via the
+// existing Tree.Get path and reports it to the ACS.
 //
 // Generators are intentionally separate from internal/cwmp/scheduler:
-// the scheduler runs one tree-driven entry per CPE for the periodic
-// Inform; generators run N independent timers per CPE at
+// that scheduler runs one tree-driven entry per CPE for the periodic
+// Inform; generators run N independent cadences per CPE at
 // profile-fixed intervals. Generators write through the Tree's
-// existing RWMutex, so SPV / Inform builder / generators
-// serialize correctly without additional synchronization.
+// existing RWMutex, so SPV / Inform builder / generators serialize
+// correctly without additional synchronization.
+//
+// A Runner is the per-CPE handle: it owns that CPE's tree, its RNG
+// stream and its set of generators. Timing belongs to the process-wide
+// Scheduler (see scheduler.go), which every Runner shares, so the cost
+// of a generator is a queue entry rather than a goroutine and a timer.
+// A Runner constructed without a Scheduler builds a private one, which
+// keeps single-CPE use and tests self-contained.
 package generators
 
 import (
@@ -48,6 +54,8 @@ type RunnerOptions struct {
 	Logger *slog.Logger
 
 	// Clock is the time source. nil -> realClock; tests inject a fake.
+	// Ignored when Scheduler is supplied, since timing then belongs to
+	// the scheduler and its own clock.
 	Clock Clock
 
 	// Tree is the per-CPE parameter tree the generators write to.
@@ -60,25 +68,38 @@ type RunnerOptions struct {
 	// non-nil source so a future Add of a jittered generator does not
 	// panic).
 	RNG *rand.Rand
+
+	// Scheduler is the process-wide timing source. nil gives this
+	// Runner a private Scheduler, which is what a single-CPE run or a
+	// test wants; a fleet passes one shared Scheduler to every Runner
+	// so the process holds one queue instead of a goroutine per
+	// generator.
+	Scheduler *Scheduler
 }
 
-// Runner schedules Generators on independent timers. One Runner per
-// process holds N generators; each generator runs on its own goroutine.
+// Runner holds one CPE's generators and executes their ticks. Ticks
+// for a single Runner are serialized, so a CPE's generators never
+// write its tree, or draw from its RNG stream, at the same time as
+// each other.
 type Runner struct {
 	logger *slog.Logger
-	clock  Clock
 	tree   *paramtree.Tree
 	rng    *rand.Rand
 
-	mu      sync.Mutex
-	items   []*scheduledGen
-	byPath  map[string]struct{}
-	started bool
-	stopped bool
+	sched     *Scheduler
+	ownsSched bool
 
-	ctx    context.Context
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
+	mu       sync.Mutex
+	items    []scheduledGen
+	byPath   map[string]struct{}
+	started  bool
+	stopped  bool
+	inflight sync.WaitGroup
+
+	// tickMu serializes this CPE's ticks. It is separate from mu so
+	// Stop can mark the Runner stopped without waiting behind a tick
+	// that is already running.
+	tickMu sync.Mutex
 }
 
 type scheduledGen struct {
@@ -86,8 +107,8 @@ type scheduledGen struct {
 	interval time.Duration
 }
 
-// NewRunner returns a Runner. opts.Logger and opts.Tree and opts.RNG
-// are required.
+// NewRunner returns a Runner. opts.Logger, opts.Tree and opts.RNG are
+// required.
 func NewRunner(opts RunnerOptions) (*Runner, error) {
 	if opts.Logger == nil {
 		return nil, errors.New("generators.NewRunner: Logger is required")
@@ -98,20 +119,29 @@ func NewRunner(opts RunnerOptions) (*Runner, error) {
 	if opts.RNG == nil {
 		return nil, errors.New("generators.NewRunner: RNG is required")
 	}
-	clock := opts.Clock
-	if clock == nil {
-		clock = realClock{}
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	return &Runner{
+
+	r := &Runner{
 		logger: opts.Logger,
-		clock:  clock,
 		tree:   opts.Tree,
 		rng:    opts.RNG,
 		byPath: make(map[string]struct{}),
-		ctx:    ctx,
-		cancel: cancel,
-	}, nil
+		sched:  opts.Scheduler,
+	}
+	if r.sched == nil {
+		sched, err := NewScheduler(SchedulerOptions{
+			Logger: opts.Logger,
+			Clock:  opts.Clock,
+			// One CPE's generators are serialized anyway, so a private
+			// scheduler needs exactly one worker.
+			Workers: 1,
+		})
+		if err != nil {
+			return nil, err
+		}
+		r.sched = sched
+		r.ownsSched = true
+	}
+	return r, nil
 }
 
 // Add registers a generator with the Runner. interval must be > 0.
@@ -130,26 +160,29 @@ func (r *Runner) Add(g Generator, interval time.Duration) error {
 	}
 
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	if r.stopped {
+		r.mu.Unlock()
 		return errors.New("generators.Runner.Add: runner is stopped")
 	}
 	if _, dup := r.byPath[path]; dup {
+		r.mu.Unlock()
 		return fmt.Errorf("generators.Runner.Add: duplicate generator path %q", path)
 	}
 	r.byPath[path] = struct{}{}
-	r.items = append(r.items, &scheduledGen{gen: g, interval: interval})
+	r.items = append(r.items, scheduledGen{gen: g, interval: interval})
+	started := r.started
+	r.mu.Unlock()
 
-	if r.started {
-		r.armOne(r.items[len(r.items)-1])
+	if started {
+		r.sched.add(r, g, interval)
 	}
 	return nil
 }
 
-// Start arms timers for every registered generator. Idempotent
+// Start registers every generator with the scheduler. Idempotent
 // (subsequent calls are no-ops). Returns an error if the runner has
 // been stopped.
-func (r *Runner) Start(_ context.Context) error {
+func (r *Runner) Start(ctx context.Context) error {
 	r.mu.Lock()
 	if r.stopped {
 		r.mu.Unlock()
@@ -160,18 +193,29 @@ func (r *Runner) Start(_ context.Context) error {
 		return nil
 	}
 	r.started = true
-	items := append([]*scheduledGen(nil), r.items...)
+	items := append([]scheduledGen(nil), r.items...)
 	r.mu.Unlock()
 
-	for _, sg := range items {
-		r.armOne(sg)
+	if r.ownsSched {
+		if err := r.sched.Start(ctx); err != nil {
+			return err
+		}
 	}
-	r.logger.Info("generator runner started", "count", len(items))
+	for _, sg := range items {
+		r.sched.add(r, sg.gen, sg.interval)
+	}
+	r.logger.Debug("generator runner started", "count", len(items))
 	return nil
 }
 
-// Stop cancels every pending timer and waits up to ctx's deadline for
-// in-flight tick callbacks to return. Subsequent calls return nil.
+// Stop stops this CPE's generators and waits up to ctx's deadline for
+// in-flight ticks to return. Subsequent calls return nil. A Runner that
+// owns its scheduler stops that too; a Runner sharing the process-wide
+// scheduler leaves it running for the rest of the fleet.
+//
+// Queue entries are not removed here. The scheduler drops them when it
+// next reaches them, which keeps tearing down one CPE independent of
+// how many entries the whole fleet has queued.
 func (r *Runner) Stop(ctx context.Context) error {
 	r.mu.Lock()
 	if r.stopped {
@@ -181,10 +225,15 @@ func (r *Runner) Stop(ctx context.Context) error {
 	r.stopped = true
 	r.mu.Unlock()
 
-	r.cancel()
+	if r.ownsSched {
+		if err := r.sched.Stop(ctx); err != nil {
+			return err
+		}
+	}
+
 	done := make(chan struct{})
 	go func() {
-		r.wg.Wait()
+		r.inflight.Wait()
 		close(done)
 	}()
 	select {
@@ -195,28 +244,33 @@ func (r *Runner) Stop(ctx context.Context) error {
 	}
 }
 
-// armOne starts the per-generator drain goroutine.
-func (r *Runner) armOne(sg *scheduledGen) {
-	r.wg.Add(1)
-	timer := r.clock.NewTimer(sg.interval)
-	go func() {
-		defer r.wg.Done()
-		for {
-			select {
-			case <-r.ctx.Done():
-				timer.Stop()
-				return
-			case <-timer.C():
-				raw, err := sg.gen.Tick(r.tree, r.rng)
-				if err != nil {
-					r.logger.Warn("generator tick failed",
-						"path", sg.gen.Path(), "err", err.Error())
-				} else {
-					r.logger.Debug("generator tick",
-						"path", sg.gen.Path(), "raw", raw)
-				}
-				timer.Reset(sg.interval)
-			}
-		}
-	}()
+// running reports whether this Runner still wants ticks. The scheduler
+// consults it before dispatching and before re-queuing.
+func (r *Runner) running() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return !r.stopped
+}
+
+// tick executes one generator against this CPE's tree. Called from a
+// scheduler worker.
+func (r *Runner) tick(g Generator) {
+	r.mu.Lock()
+	if r.stopped {
+		r.mu.Unlock()
+		return
+	}
+	r.inflight.Add(1)
+	r.mu.Unlock()
+	defer r.inflight.Done()
+
+	r.tickMu.Lock()
+	raw, err := g.Tick(r.tree, r.rng)
+	r.tickMu.Unlock()
+
+	if err != nil {
+		r.logger.Warn("generator tick failed", "path", g.Path(), "err", err.Error())
+		return
+	}
+	r.logger.Debug("generator tick", "path", g.Path(), "raw", raw)
 }

@@ -103,13 +103,13 @@ func TestRunCRWithoutACSRejected(t *testing.T) {
 // and generators built, every CWMP piece nil.
 func TestBuildCPEStackUSPOnlySkipsCWMP(t *testing.T) {
 	cfg := cpeconfig.Config{ProfilePath: writeUSPTestProfile(t)}
-	st, err := buildCPEStack(cfg, cpeStackInputs{
-		id:         "cpe-1",
-		serial:     "TEST0001",
-		instance:   1,
-		fleetCount: 1,
-		rngSource:  cperng.New(1),
-		logger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
+	st, err := buildCPEStack(cfg, loadTemplate(t, cfg.ProfilePath), cpeStackInputs{
+		id:           "cpe-1",
+		serial:       "TEST0001",
+		instance:     1,
+		perCPECRPath: false,
+		rngSource:    cperng.New(1),
+		logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 	if err != nil {
 		t.Fatalf("buildCPEStack: %v", err)

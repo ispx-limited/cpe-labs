@@ -51,6 +51,9 @@ The same schema works as JSON (`gopkg.in/yaml.v3` accepts JSON natively). Use wh
 
 - `example-tr181-minimal.yaml`: modern TR-181 (`Device.*`) shape with DeviceInfo, ManagementServer, and a WiFi AccessPoint table
 - `example-tr098-genieacs-sim.yaml`: TR-098 (`InternetGatewayDevice.*`) layout matching the structure of [genieacs-sim](https://github.com/zaidka/genieacs-sim)'s reference data model
+- `example-arris/`: TR-098 residential gateway as a multi-file directory profile, with WAN and WiFi counters, associated-device tables and vendor extensions
+- `example-sagemcom-fast5598/`: TR-181 residential gateway, same shape in the modern data model
+- `scale-tr098/`: a generic TR-098 gateway sized for 150k to 200k CPE runs. Same parameter and generator class as the vendor examples, with a 300 second inform interval, a real firmware fetch, an 8-character serial tail and no address pools. See [Running a large fleet](../docs/guides/large-fleets.md).
 
 ## Out of scope (v0)
 

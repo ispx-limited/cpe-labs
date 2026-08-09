@@ -1,0 +1,50 @@
+# InternetGatewayDevice.LANDevice.1.Hosts.*, the LAN host table.
+#
+# Eight hosts, roughly what a household presents: phones, TVs, laptops
+# and a couple of always-on devices. The table matters at scale because
+# an ACS building a per-subscriber topology reads all of it, and eight
+# rows times 200k homes is a large table however it is stored.
+
+parameters:
+  - path: InternetGatewayDevice.LANDevice.1.Hosts.HostNumberOfEntries
+    type: xsd:unsignedInt
+    value: "8"
+
+objects:
+  - path: InternetGatewayDevice.LANDevice.1.Hosts.Host
+    instances: 8
+    parameters:
+      - path: IPAddress
+        value: "192.168.1.{i}0"
+      - path: MACAddress
+        value: "0A:1B:2C:00:01:0{i}"
+      # Host names carry the global fleet index so two homes in
+      # different shards do not present identical device names.
+      - path: HostName
+        value: "host-{i}-cpe{cpe:hex:6}"
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: AddressSource
+        value: "DHCP"
+      - path: LeaseTimeRemaining
+        type: xsd:int
+        value: "43200"
+        writable: true
+        generator:
+          type: drift
+          interval: 120s
+          min: 600
+          max: 86400
+          stepMax: 3600
+      - path: InterfaceType
+        value: "802.11"
+      - path: Layer2Interface
+        value: "InternetGatewayDevice.LANDevice.1.WLANConfiguration.1"
+      - path: X_00005E_LastActive
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+        writable: true
+        generator:
+          type: wallclock
+          interval: 120s

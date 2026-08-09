@@ -209,6 +209,32 @@ func (t *Tree) Reset(other *Tree) error {
 	return nil
 }
 
+// Clone returns a deep copy of the tree: every interior node, leaf
+// value, attribute set and table template is copied, so nothing mutable
+// is shared with the receiver and a write to either side is invisible
+// to the other.
+//
+// This exists because building a fleet by re-parsing the profile once
+// per CPE does not scale. A realistic residential-gateway profile is a
+// few hundred leaves spread over several YAML files, and at 200k CPEs
+// that is 200k parses of the same bytes before the first device says
+// anything to the ACS. Parsing once and cloning gives every CPE the
+// same independent tree for a fraction of the work.
+//
+// The clone starts with NO observers registered. Observers are wiring
+// belonging to whoever built the original (the USP agent's value-change
+// notifier, for instance), and silently carrying them onto a copy would
+// have one CPE's writes firing another CPE's notifications.
+//
+// Clone takes the read lock, so it is safe to call while other
+// goroutines read the same tree, and safe to call concurrently from
+// several goroutines building different CPEs from one template.
+func (t *Tree) Clone() *Tree {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return &Tree{root: t.root.clone()}
+}
+
 // GetAttributes returns the Attributes stored at path. If no
 // SetAttributes has run for path, returns the BBF defaults
 // (Notification=0, AccessList=nil, wire output renders nil as

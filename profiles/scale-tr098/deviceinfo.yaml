@@ -1,0 +1,140 @@
+# InternetGatewayDevice.DeviceInfo.*, device identity and health.
+#
+# Manufacturer OUI 00005E is IANA's, reserved for documentation and
+# examples, so a fleet built from this profile cannot be confused with
+# any shipping product at an ACS.
+
+groups:
+  - prefix: InternetGatewayDevice.DeviceInfo
+    parameters:
+      - path: Manufacturer
+        value: "Example Networks"
+      - path: ManufacturerOUI
+        value: "00005E"
+      - path: ModelName
+        value: "RG2400"
+      - path: Description
+        value: "Example Networks RG2400 residential gateway"
+      - path: ProductClass
+        value: "RG2400"
+      - path: SerialNumber
+        value: "BASE"
+      - path: HardwareVersion
+        value: "2.0"
+      - path: SoftwareVersion
+        value: "3.14.2"
+      - path: AdditionalSoftwareVersion
+        value: ""
+      - path: SpecVersion
+        value: "1.1"
+      - path: ProvisioningCode
+        value: ""
+        writable: true
+      - path: EnabledOptions
+        value: ""
+      - path: FirstUseDate
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: UpTime
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: uptime
+          # 30s, not 1s. A one-second tick would be 200k tree writes a
+          # second across a full fleet and would change nothing the ACS
+          # can see: UpTime is only read when the device informs, every
+          # 300 seconds, so a 30-second tick keeps every reported value
+          # within one tick of true at a thirtieth of the cost.
+          interval: 30s
+      - path: DeviceLog
+        value: ""
+
+  - prefix: InternetGatewayDevice.DeviceInfo.MemoryStatus
+    parameters:
+      - path: Total
+        type: xsd:unsignedInt
+        value: "524288"
+      - path: Free
+        type: xsd:unsignedInt
+        value: "262144"
+        writable: true
+        generator:
+          type: counter
+          interval: 60s
+          min: 180000
+          max: 320000
+          step: 4096
+          jitter: 0.5
+
+  # ProcessStatus (TR-098 amendment 8). CPUUsage is percent (0..100)
+  # and xsd:unsignedInt per the standard, so it cannot use the drift
+  # generator (which targets signed gauges); the counter walks it
+  # through a plausible band instead.
+  - prefix: InternetGatewayDevice.DeviceInfo.ProcessStatus
+    parameters:
+      - path: CPUUsage
+        type: xsd:unsignedInt
+        value: "14"
+        writable: true
+        generator:
+          type: counter
+          interval: 60s
+          min: 4
+          max: 62
+          step: 3
+          jitter: 0.9
+      - path: ProcessNumberOfEntries
+        type: xsd:unsignedInt
+        value: "78"
+
+  - prefix: InternetGatewayDevice.DeviceInfo.TemperatureStatus
+    parameters:
+      - path: TemperatureSensorNumberOfEntries
+        type: xsd:unsignedInt
+        value: "2"
+
+  - prefix: InternetGatewayDevice.ManagementServer.ManageableDevice
+    parameters:
+      - path: ManageableDeviceNumberOfEntries
+        type: xsd:unsignedInt
+        value: "0"
+
+# Two on-board sensors (SoC and WLAN module), both xsd:int degrees
+# celsius so they drift like live thermal readings.
+objects:
+  - path: InternetGatewayDevice.DeviceInfo.TemperatureStatus.TemperatureSensor
+    instances: 2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: Name
+        value: "sensor-{i}"
+      - path: Value
+        type: xsd:int
+        value: "57"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: 44
+          max: 76
+          stepMax: 2
+      - path: MinValue
+        type: xsd:int
+        value: "39"
+      - path: MaxValue
+        type: xsd:int
+        value: "81"
+      - path: LowAlarmValue
+        type: xsd:int
+        value: "0"
+        writable: true
+      - path: HighAlarmValue
+        type: xsd:int
+        value: "95"
+        writable: true

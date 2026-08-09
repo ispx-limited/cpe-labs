@@ -52,6 +52,7 @@ nav:
       - Quickstart: guides/quickstart.md
       - Profile Schema: guides/profiles.md
       - Multi-CPE Fleets: guides/multi-cpe.md
+      - Running a Large Fleet: guides/large-fleets.md
       - Value Generators: guides/generators.md
       - Periodic Inform Scheduler: guides/scheduler.md
       - Connection Request Listener: guides/connection-request.md

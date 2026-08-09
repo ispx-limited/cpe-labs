@@ -53,6 +53,21 @@ type FleetConfig struct {
 	// Count is the number of simulated CPEs. 0 or 1 -> single-CPE mode.
 	Count int
 
+	// Offset shifts every instance index this process produces: the
+	// process builds instances Offset+1 .. Offset+Count instead of
+	// 1 .. Count. It exists so a fleet larger than one process can
+	// carry runs as N processes over ONE profile: each shard is given a
+	// disjoint [Offset, Offset+Count) window and every index-derived
+	// value (serial, placeholders, pool allocations, per-CPE RNG
+	// stream) shifts with it, so shard 2's first CPE is a genuinely
+	// different device from shard 1's first CPE rather than a duplicate
+	// wearing a different serial.
+	//
+	// Operator contract: shards must be given disjoint windows, and
+	// pools must be sized for the whole fleet rather than per shard.
+	// Overlapping windows mint duplicate identities at the ACS.
+	Offset int
+
 	// SerialPattern is the template applied to each CPE's
 	// SerialNumber leaf. Recognized placeholders:
 	//   {base}, the SerialNumber the profile declares (template default)
@@ -322,19 +337,34 @@ type EventScheduleConfig struct {
 	//
 	// Zero / unset = bootstrap fires immediately.
 	BootDelay time.Duration
+
+	// BootRamp spreads the fleet's bootstrap Informs evenly across a
+	// window instead of firing them together: CPE k of N starts at
+	// BootDelay + k*BootRamp/N. A whole fleet bootstrapping in the same
+	// instant measures the simulator's ability to open sockets, not the
+	// ACS's ability to onboard devices, and it is not what a real
+	// population does either: gateways come back after a power cut or a
+	// firmware wave over minutes, not milliseconds.
+	//
+	// The ramp is per process. Operators wanting a fleet-wide ramp
+	// across shards stagger the process starts as well.
+	//
+	// Zero / unset = every CPE bootstraps as soon as BootDelay elapses,
+	// which is the behavior before this field existed.
+	BootRamp time.Duration
 }
 
 // IsZero reports whether the block was omitted (every field zero).
 func (e EventScheduleConfig) IsZero() bool {
-	return e.RebootDelay == 0 && e.FactoryResetDelay == 0 && e.BootDelay == 0
+	return e.RebootDelay == 0 && e.FactoryResetDelay == 0 && e.BootDelay == 0 && e.BootRamp == 0
 }
 
 // RequiresDaemon reports whether this configuration forces cmd/cpe-sim
 // into daemon mode regardless of scheduler / listener / generators
 // state. True iff RebootDelay > 0 or FactoryResetDelay > 0 (the
 // deferred Inform needs the process to outlive the delay). BootDelay
-// alone preserves one-shot behavior, the deferred bootstrap fires,
-// then the process exits.
+// and BootRamp alone preserve one-shot behavior, the deferred
+// bootstraps fire, then the process exits.
 func (e EventScheduleConfig) RequiresDaemon() bool {
 	return e.RebootDelay > 0 || e.FactoryResetDelay > 0
 }
@@ -534,6 +564,7 @@ type rawGroup struct {
 // Count=1 single-CPE mode.
 type rawFleet struct {
 	Count         int                     `yaml:"count"`
+	Offset        int                     `yaml:"offset"`
 	SerialPattern string                  `yaml:"serialPattern"`
 	Pools         map[string]rawFleetPool `yaml:"pools"`
 }
@@ -605,6 +636,7 @@ type rawEventSchedule struct {
 	RebootDelay       string `yaml:"rebootDelay"`
 	FactoryResetDelay string `yaml:"factoryResetDelay"`
 	BootDelay         string `yaml:"bootDelay"`
+	BootRamp          string `yaml:"bootRamp"`
 }
 
 // rawTransfer is the transfer schema. defaultDelay is parsed via
@@ -1237,6 +1269,7 @@ func mergeFiles(tree *Tree, files []*loadedFile) (mergedConfig, error) {
 			{"rebootDelay", raw.RebootDelay, &eventScheduleCfg.RebootDelay},
 			{"factoryResetDelay", raw.FactoryResetDelay, &eventScheduleCfg.FactoryResetDelay},
 			{"bootDelay", raw.BootDelay, &eventScheduleCfg.BootDelay},
+			{"bootRamp", raw.BootRamp, &eventScheduleCfg.BootRamp},
 		}
 		for _, e := range entries {
 			if e.raw == "" {
@@ -1352,7 +1385,12 @@ func mergeFiles(tree *Tree, files []*loadedFile) (mergedConfig, error) {
 			return mergedConfig{}, cpeerr.Wrap("paramtree.LoadProfile", cpeerr.KindInvalidArgument,
 				fmt.Errorf("%s: fleet.count must be >= 0, got %d", lf.path, raw.Count))
 		}
+		if raw.Offset < 0 {
+			return mergedConfig{}, cpeerr.Wrap("paramtree.LoadProfile", cpeerr.KindInvalidArgument,
+				fmt.Errorf("%s: fleet.offset must be >= 0, got %d", lf.path, raw.Offset))
+		}
 		fleetCfg.Count = raw.Count
+		fleetCfg.Offset = raw.Offset
 		fleetCfg.SerialPattern = raw.SerialPattern
 		if len(raw.Pools) > 0 {
 			fleetCfg.Pools = make(map[string]FleetPool, len(raw.Pools))
@@ -1367,24 +1405,20 @@ func mergeFiles(tree *Tree, files []*loadedFile) (mergedConfig, error) {
 		}
 		fleetSource = lf.path
 	}
-	// Cross-check pool capacity against fleet.count so an operator
-	// declaring count=1001 with a pool that holds 1000 gets a clear
-	// error at LoadProfile time instead of a per-CPE failure deep into
-	// fleet bootstrap. ResolvePool surfaces "instance N exceeds
-	// capacity M" when out of range; we probe with instance = the
-	// largest CPE index (count, since instances are 1-based).
+	// Cross-check pool capacity against the highest index this profile
+	// will ever ask for, so an operator declaring count=1001 with a pool
+	// that holds 1000 gets a clear error at LoadProfile time instead of
+	// a per-CPE failure deep into fleet bootstrap. The offset counts:
+	// a shard running offset=150000 count=50000 draws instances up to
+	// 200000, and validating against count alone would let a shard high
+	// in the range run off the end of its pool.
 	finalCount := fleetCfg.Count
 	if finalCount == 0 {
 		finalCount = 1
 	}
-	if finalCount > 1 {
-		for name, pool := range fleetCfg.Pools {
-			if _, perr := ResolvePool(pool, finalCount); perr != nil {
-				return mergedConfig{}, cpeerr.Wrap("paramtree.LoadProfile", cpeerr.KindInvalidArgument,
-					fmt.Errorf("%s: fleet.count=%d but pool %q can't satisfy that many CPEs: %w",
-						fleetSource, finalCount, name, perr))
-			}
-		}
+	if err := ValidatePoolCapacity(fleetCfg.Pools, fleetCfg.Offset+finalCount); err != nil {
+		return mergedConfig{}, cpeerr.Wrap("paramtree.LoadProfile", cpeerr.KindInvalidArgument,
+			fmt.Errorf("%s: %w", fleetSource, err))
 	}
 	if fleetCfg.Count == 0 {
 		fleetCfg.Count = 1

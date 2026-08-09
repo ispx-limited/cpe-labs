@@ -36,6 +36,18 @@ type ListenerOptions struct {
 	// Logger receives operational events (request accepted, dropped,
 	// shutdown, etc.). Required.
 	Logger *slog.Logger
+
+	// AdvertiseHost replaces the host part of the URLs this listener
+	// publishes. Empty derives the host from the bound address, which
+	// is only correct when the ACS shares a network namespace with the
+	// simulator. Anywhere else, in a container, behind a NAT, on a
+	// separate load-generator host, the bound address is 0.0.0.0 and
+	// the published URL is 127.0.0.1, so every ACS-initiated connection
+	// request fails and the whole fleet looks unreachable.
+	//
+	// A "host" or "host:port" value is used verbatim as the authority;
+	// with a bare host the bound port is kept.
+	AdvertiseHost string
 }
 
 // Endpoint is one per-CPE registration. The Listener routes requests
@@ -111,7 +123,13 @@ func NewListener(opts ListenerOptions) (*Listener, error) {
 }
 
 // Register adds an Endpoint. Must be called before Start.
+//
+// Goroutine-safe: a fleet is built on a worker pool, so several CPEs
+// register their endpoints at once. The lock covers the endpoint and
+// state maps; http.ServeMux does its own locking.
 func (l *Listener) Register(ep Endpoint) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	if l.started {
 		return cpeerr.Wrap("cr.Register", cpeerr.KindInvalidArgument,
 			fmt.Errorf("Register after Start is not supported"))
@@ -192,17 +210,31 @@ func (l *Listener) Shutdown(ctx context.Context) error {
 	return server.Shutdown(ctx)
 }
 
-// URL returns the externally-reachable URL for path, computed from
-// the actual bound address. If BindAddr's host is unspecified
-// (0.0.0.0 or ::), the published host is rewritten to 127.0.0.1 so
-// the URL is meaningful when handed to an ACS. Returns "" if Start
-// has not run.
+// URL returns the externally-reachable URL for path.
+//
+// With AdvertiseHost set, that value is the authority: bare hosts keep
+// the bound port, and a host:port form is used as given. Otherwise the
+// URL is computed from the actual bound address, and an unspecified
+// bind host (0.0.0.0 or ::) is rewritten to 127.0.0.1, which is right
+// on one machine and unreachable from anywhere else.
+//
+// Returns "" if Start has not run.
 func (l *Listener) URL(path string) string {
 	l.mu.Lock()
 	addr := l.addr
 	l.mu.Unlock()
 	if addr == nil {
 		return ""
+	}
+	if h := l.opts.AdvertiseHost; h != "" {
+		authority := h
+		if _, _, err := net.SplitHostPort(h); err != nil {
+			// No port in the value, so keep the bound one. JoinHostPort
+			// brackets a bare IPv6 literal, which SplitHostPort rejects
+			// for exactly that reason.
+			authority = net.JoinHostPort(h, strconv.Itoa(addr.Port))
+		}
+		return "http://" + authority + path
 	}
 	host := addr.IP.String()
 	if addr.IP.IsUnspecified() {

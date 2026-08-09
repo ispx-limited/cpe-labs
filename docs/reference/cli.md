@@ -31,6 +31,7 @@ For TR-369 (USP) mode, `--acs-url` may be omitted as long as `--usp-broker` is s
 | `--cr-bind-addr` | `CPE_SIM_CR_BIND_ADDR` | `crBindAddr` | "" | TCP bind address for the CR listener. Empty disables the listener. Setting it enables daemon mode. |
 | `--cr-path` | `CPE_SIM_CR_PATH` | `crPath` | `/cr` | URL path the listener serves. With `fleet.count > 1`, each CPE gets `/<cr-path>/<cpe-id>`. |
 | `--cr-publish-path` | `CPE_SIM_CR_PUBLISH_PATH` | `crPublishPath` | (required when `--cr-bind-addr` is set) | Tree path the listener URL is written to. |
+| `--cr-advertise-host` | `CPE_SIM_CR_ADVERTISE_HOST` | `crAdvertiseHost` | "" | Host (or `host:port`) to publish in the `ConnectionRequestURL` instead of the bound address. Empty derives the host from the socket, which publishes `127.0.0.1` when the bind address is a wildcard, so the ACS cannot reach a single CPE from a container or another host. A bare host keeps the bound port. A value containing a scheme or a path rejects at startup. |
 
 See [Connection Request Listener](../guides/connection-request.md) for a deeper treatment.
 
@@ -39,7 +40,9 @@ See [Connection Request Listener](../guides/connection-request.md) for a deeper 
 | Flag | Env | YAML | Default | Notes |
 | --- | --- | --- | --- | --- |
 | `--seed` | `CPE_SIM_SEED` | `seed` | `0` | Root RNG seed for jitter, generators, and per-CPE streams. `0` derives from `time.Now().UnixNano()` and is logged as `root_seed=<N>`. |
-| `--concurrency` | `CPE_SIM_CONCURRENCY` | `concurrency` | `1` | Reserved for parallel session control. Today this is the bootstrap goroutine count used by `bootstrapAll`; `fleet.count` from the profile is the per-CPE count. |
+| `--fleet-offset` | `CPE_SIM_FLEET_OFFSET` | `fleetOffset` | `fleet.offset` from the profile, else `0` | Shifts every instance index this process produces, so N processes running one profile carve disjoint fleets. Serials, placeholders, pool allocations, the `cpe-N` log id and the per-CPE RNG streams all move with it. Must be `>= 0`. See [Running a large fleet](../guides/large-fleets.md). |
+| `--boot-ramp` | `CPE_SIM_BOOT_RAMP` | `bootRamp` | `eventSchedule.bootRamp` from the profile, else `0` | Spreads the fleet's bootstrap Informs evenly across this window: CPE k of N starts at `bootDelay + k*ramp/N`. `0` bootstraps the whole fleet at once. Go duration syntax. |
+| `--concurrency` | `CPE_SIM_CONCURRENCY` | `concurrency` | `1` | Reserved for parallel session control. Nothing reads it today; `fleet.count` from the profile is the per-CPE count. |
 | `--config` | `CPE_SIM_CONFIG` | (n/a) | "" | Path to a YAML config file holding any of the keys in this reference. |
 | `--log-level` | `CPE_SIM_LOG_LEVEL` | `logLevel` | `info` | `debug` / `info` / `warn` / `error`. |
 | `--log-format` | `CPE_SIM_LOG_FORMAT` | `logFormat` | `text` | `text` / `json`. |
@@ -66,6 +69,9 @@ profile: /etc/cpe-sim/profile.yaml
 crBindAddr: 0.0.0.0:7547
 crPath: /cr
 crPublishPath: Device.ManagementServer.ConnectionRequestURL
+crAdvertiseHost: sim-1.lab.example
+fleetOffset: 20000
+bootRamp: 10m
 seed: 1
 logLevel: info
 logFormat: json
@@ -78,7 +84,7 @@ Unknown YAML keys reject (KnownFields = true) so a typo like `caCert` instead of
 1. Defaults are loaded.
 2. `--config` (or `CPE_SIM_CONFIG`) is resolved by pre-scanning args; the named YAML file (if present) overlays defaults.
 3. Every `CPE_SIM_*` env var is applied. Any unknown key in this prefix rejects.
-4. Flag parsing applies. Each flag's default is the post-env value, so flags only override when the caller explicitly sets them.
+4. Flag parsing applies. Each flag's default is the post-env value, so flags only override when the caller explicitly sets them. `--fleet-offset` and `--boot-ramp` are tracked separately, because their "unset" state has to survive the flag pass so the profile can still supply a value; `--fleet-offset=0` is a real override of a profile that declares an offset.
 5. Validation runs (interval > 0, log-level in known set, `--cr-publish-path` present when `--cr-bind-addr` is set, etc.).
 6. The validated `Config` is returned.
 

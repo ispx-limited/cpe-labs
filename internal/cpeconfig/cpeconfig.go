@@ -42,6 +42,30 @@ type Config struct {
 	CRPath        string        `yaml:"crPath"`
 	CRPublishPath string        `yaml:"crPublishPath"`
 
+	// CRAdvertiseHost replaces the host in the ConnectionRequestURL the
+	// CPE publishes to the ACS. Empty keeps the bound address, which is
+	// right on one host and wrong everywhere else: a container or a
+	// remote load generator binds 0.0.0.0, publishes 127.0.0.1, and the
+	// ACS silently cannot reach a single CPE. Port is unchanged; set
+	// this to the address the ACS should dial.
+	CRAdvertiseHost string `yaml:"crAdvertiseHost"`
+
+	// FleetOffset shifts every instance index this process produces, so
+	// N processes running ONE profile carve disjoint fleets out of the
+	// same [1, total] index space. Nil means "not set here", which lets
+	// the profile's own fleet.offset apply; a value set from any of the
+	// three sources above wins over the profile. Pointer rather than a
+	// plain int because 0 is a legitimate offset and the profile key
+	// sits BELOW all three of these sources in precedence, so
+	// "unset" and "explicitly zero" have to stay distinguishable.
+	FleetOffset *int `yaml:"fleetOffset"`
+
+	// BootRamp spreads the fleet's bootstrap Informs evenly across this
+	// window instead of firing them all at once. Nil means "not set
+	// here", deferring to the profile's eventSchedule.bootRamp; same
+	// pointer rationale as FleetOffset, zero is a meaningful value.
+	BootRamp *time.Duration `yaml:"bootRamp"`
+
 	// USP (TR-369) agent. Empty USPBroker leaves the whole USP path off, so a
 	// CWMP-only run is unchanged. The controller id and secret mirror what a
 	// controller expects: an authority-scheme endpoint id (TR-369 2.2) and the
@@ -93,6 +117,9 @@ var knownEnvKeys = map[string]struct{}{
 	envPrefix + "CR_BIND_ADDR":      {},
 	envPrefix + "CR_PATH":           {},
 	envPrefix + "CR_PUBLISH_PATH":   {},
+	envPrefix + "CR_ADVERTISE_HOST": {},
+	envPrefix + "FLEET_OFFSET":      {},
+	envPrefix + "BOOT_RAMP":         {},
 }
 
 // Load parses configuration from CLI args, env vars, and (optionally) a
@@ -260,6 +287,23 @@ func applyEnv(env map[string]string, cfg *Config) error {
 	if v, ok := env[envPrefix+"CR_PUBLISH_PATH"]; ok && v != "" {
 		cfg.CRPublishPath = v
 	}
+	if v, ok := env[envPrefix+"CR_ADVERTISE_HOST"]; ok && v != "" {
+		cfg.CRAdvertiseHost = v
+	}
+	if v, ok := env[envPrefix+"FLEET_OFFSET"]; ok && v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return fmt.Errorf("env %sFLEET_OFFSET: %w", envPrefix, err)
+		}
+		cfg.FleetOffset = &n
+	}
+	if v, ok := env[envPrefix+"BOOT_RAMP"]; ok && v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			return fmt.Errorf("env %sBOOT_RAMP: %w", envPrefix, err)
+		}
+		cfg.BootRamp = &d
+	}
 	if v, ok := env[envPrefix+"USP_BROKER"]; ok {
 		cfg.USPBroker = v
 	}
@@ -299,6 +343,9 @@ func applyFlags(args []string, cfg *Config) error {
 	crBindAddr := fs.String("cr-bind-addr", cfg.CRBindAddr, "TCP address to bind the connection-request listener (empty disables daemon mode)")
 	crPath := fs.String("cr-path", cfg.CRPath, "URL path the connection-request listener serves")
 	crPublishPath := fs.String("cr-publish-path", cfg.CRPublishPath, "parameter-tree path where the listener URL is published")
+	crAdvertiseHost := fs.String("cr-advertise-host", cfg.CRAdvertiseHost, "host to publish in the ConnectionRequestURL instead of the bound address")
+	fleetOffset := fs.Int("fleet-offset", derefInt(cfg.FleetOffset), "shift every instance index by this amount so shards produce disjoint fleets")
+	bootRamp := fs.Duration("boot-ramp", derefDuration(cfg.BootRamp), "spread the fleet's bootstrap Informs evenly across this window (e.g. 10m)")
 	uspBroker := fs.String("usp-broker", cfg.USPBroker, "USP MQTT broker host:port (enables the TR-369 agent)")
 	uspControllerID := fs.String("usp-controller-id", cfg.USPControllerID, "USP controller endpoint id, e.g. self::controller")
 	uspMQTTSecret := fs.String("usp-mqtt-secret", cfg.USPMQTTSecret, "shared secret the MQTT password is derived from")
@@ -316,6 +363,15 @@ func applyFlags(args []string, cfg *Config) error {
 		return fmt.Errorf("unexpected positional argument: %q", fs.Arg(0))
 	}
 
+	// Flags whose Config field is a pointer cannot use the
+	// prime-the-default trick the scalar fields above rely on: their
+	// "unset" state has to survive the flag pass so a lower-precedence
+	// source (the profile) can still supply a value. fs.Visit reports
+	// only the flags actually present in args, which is exactly that
+	// distinction.
+	explicit := make(map[string]struct{})
+	fs.Visit(func(f *flag.Flag) { explicit[f.Name] = struct{}{} })
+
 	cfg.ConfigPath = *configPath
 	cfg.ACSURL = *acsURL
 	cfg.ACSUsername = *acsUsername
@@ -331,12 +387,36 @@ func applyFlags(args []string, cfg *Config) error {
 	cfg.CRBindAddr = *crBindAddr
 	cfg.CRPath = *crPath
 	cfg.CRPublishPath = *crPublishPath
+	cfg.CRAdvertiseHost = *crAdvertiseHost
 	cfg.USPBroker = *uspBroker
 	cfg.USPControllerID = *uspControllerID
 	cfg.USPMQTTSecret = *uspMQTTSecret
 	cfg.USPMQTTUsername = *uspMQTTUsername
 	cfg.USPMQTTPassword = *uspMQTTPassword
+	if _, ok := explicit["fleet-offset"]; ok {
+		cfg.FleetOffset = fleetOffset
+	}
+	if _, ok := explicit["boot-ramp"]; ok {
+		cfg.BootRamp = bootRamp
+	}
 	return nil
+}
+
+// derefInt returns *p, or 0 when p is nil. Used to prime a pointer
+// field's flag default without losing the nil.
+func derefInt(p *int) int {
+	if p == nil {
+		return 0
+	}
+	return *p
+}
+
+// derefDuration is derefInt for durations.
+func derefDuration(p *time.Duration) time.Duration {
+	if p == nil {
+		return 0
+	}
+	return *p
 }
 
 func validate(cfg *Config) error {
@@ -355,6 +435,20 @@ func validate(cfg *Config) error {
 	}
 	if cfg.ACSTimeout <= 0 {
 		return fmt.Errorf("acs-timeout must be > 0, got %s", cfg.ACSTimeout)
+	}
+	if cfg.FleetOffset != nil && *cfg.FleetOffset < 0 {
+		return fmt.Errorf("fleet-offset must be >= 0, got %d", *cfg.FleetOffset)
+	}
+	if cfg.BootRamp != nil && *cfg.BootRamp < 0 {
+		return fmt.Errorf("boot-ramp must be >= 0, got %s", *cfg.BootRamp)
+	}
+	if cfg.CRAdvertiseHost != "" {
+		// A host, not a URL. Catching the mistake here beats publishing
+		// something like "http://http://host/cr" to the ACS and losing
+		// an afternoon to it.
+		if strings.ContainsAny(cfg.CRAdvertiseHost, "/ ") {
+			return fmt.Errorf("cr-advertise-host must be a host or host:port, got %q", cfg.CRAdvertiseHost)
+		}
 	}
 	if cfg.CRBindAddr != "" {
 		if !strings.HasPrefix(cfg.CRPath, "/") {

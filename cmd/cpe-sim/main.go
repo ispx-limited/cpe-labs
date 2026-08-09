@@ -19,6 +19,7 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -44,9 +45,10 @@ import (
 
 // cpeIDFmt is the per-CPE registration key format. Used as the
 // scheduler registration key, the cperng split-key, and the CR
-// listener path suffix when Fleet.Count > 1. When Fleet.Count == 1
-// the suffix is dropped from the CR path so single-CPE deployments
-// keep their existing URL shape.
+// listener path suffix. The number in it is the GLOBAL instance index
+// (fleet offset plus this process's local index), so a log line, an
+// RNG stream and a CR path all identify a device across the whole
+// fleet rather than only within the process that happens to run it.
 const cpeIDFmt = "cpe-%d"
 
 func main() {
@@ -156,6 +158,29 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 		pattern = "{base}-{i}"
 	}
 
+	// Effective fleet offset: --fleet-offset / CPE_SIM_FLEET_OFFSET /
+	// the config file's fleetOffset all outrank the profile's own
+	// fleet.offset, so one profile can be sharded across processes
+	// without editing a copy of it per shard.
+	offset := templateProf.Fleet.Offset
+	if cfg.FleetOffset != nil {
+		offset = *cfg.FleetOffset
+	}
+	// Re-check pool capacity against the effective range. LoadProfile
+	// checked the profile's own offset; a CLI or env override can push
+	// this shard past the end of a pool the profile sized correctly for
+	// itself, and finding that out one CPE at a time during bootstrap
+	// is a miserable way to learn it.
+	if poolErr := paramtree.ValidatePoolCapacity(templateProf.Fleet.Pools, offset+count); poolErr != nil {
+		return fmt.Errorf("fleet offset %d + count %d: %w", offset, count, poolErr)
+	}
+
+	// Effective boot ramp, same precedence story as the fleet offset.
+	bootRamp := templateProf.EventSchedule.BootRamp
+	if cfg.BootRamp != nil {
+		bootRamp = *cfg.BootRamp
+	}
+
 	// Read the base serial from the template tree so we know what to
 	// substitute when count > 1.
 	baseSerialLeaf, err := templateProf.Tree.Get(templateProf.DeviceIDPaths.SerialNumber)
@@ -189,12 +214,31 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 		}
 	}()
 
+	// One timing source for every value generator in the process. A
+	// timer and a goroutine per generator is affordable for one CPE and
+	// impossible for a fleet: a realistic profile ticks tens of
+	// generators, so the per-CPE cost is what decides how many CPEs a
+	// process can carry. Sharing the timing does not make the fleet
+	// quieter, the same leaves move at the same cadence.
+	genSched, err := generators.NewScheduler(generators.SchedulerOptions{Logger: logger})
+	if err != nil {
+		return fmt.Errorf("generator scheduler: %w", err)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if shutdownErr := genSched.Stop(shutdownCtx); shutdownErr != nil {
+			logger.Warn("generator scheduler shutdown error", "err", shutdownErr.Error())
+		}
+	}()
+
 	// CR listener (shared across the fleet; per-CPE Endpoint paths).
 	var listener *cr.Listener
 	if cfg.CRBindAddr != "" {
 		listener, err = cr.NewListener(cr.ListenerOptions{
-			BindAddr: cfg.CRBindAddr,
-			Logger:   logger,
+			BindAddr:      cfg.CRBindAddr,
+			AdvertiseHost: cfg.CRAdvertiseHost,
+			Logger:        logger,
 		})
 		if err != nil {
 			return fmt.Errorf("connection-request listener: %w", err)
@@ -208,45 +252,27 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 		}()
 	}
 
-	// Build per-CPE stacks.
-	stacks := make([]*cpeStack, 0, count)
-	for i := 1; i <= count; i++ {
-		id := fmt.Sprintf(cpeIDFmt, i)
-		serial, serialErr := stampSerial(pattern, baseSerial, i, id, templateProf.Fleet.Pools, rngSource)
-		if serialErr != nil {
-			return fmt.Errorf("serial pattern %q (cpe %s): %w", pattern, id, serialErr)
-		}
-		stack, buildErr := buildCPEStack(cfg, cpeStackInputs{
-			id:         id,
-			serial:     serial,
-			instance:   i,
-			fleetCount: count,
-			pool:       pool,
-			rngSource:  rngSource,
-			sched:      sched,
-			listener:   listener,
-			logger:     logger,
-		})
-		if buildErr != nil {
-			return fmt.Errorf("build CPE %s (serial=%s): %w", id, serial, buildErr)
-		}
-		stacks = append(stacks, stack)
+	// Build per-CPE stacks. The loop variable is the local index; every
+	// observable value derives from the GLOBAL index (offset + local),
+	// so two shards of the same profile never mint the same device.
+	buildStart := time.Now()
+	stacks, err := buildFleet(cfg, templateProf, fleetInputs{
+		count:        count,
+		offset:       offset,
+		pattern:      pattern,
+		baseSerial:   baseSerial,
+		perCPECRPath: count > 1 || offset > 0,
+		pool:         pool,
+		rngSource:    rngSource,
+		sched:        sched,
+		genSched:     genSched,
+		listener:     listener,
+		logger:       logger,
+	})
+	if err != nil {
+		return err
 	}
-
-	// Defer generator-runner shutdowns.
-	for _, st := range stacks {
-		st := st
-		if st.genRunner == nil {
-			continue
-		}
-		defer func() {
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			if shutdownErr := st.genRunner.Stop(shutdownCtx); shutdownErr != nil {
-				logger.Warn("generator runner shutdown error", "cpe_id", st.id, "err", shutdownErr.Error())
-			}
-		}()
-	}
+	logger.Info("fleet built", "count", count, "duration", time.Since(buildStart).String())
 
 	hasAnyScheduler := false
 	hasAnyGenerators := false
@@ -267,6 +293,8 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 		"profile", cfg.ProfilePath,
 		"cr_bind_addr", cfg.CRBindAddr,
 		"fleet_count", count,
+		"fleet_offset", offset,
+		"boot_ramp", bootRamp.String(),
 		"scheduler_enabled", hasAnyScheduler,
 		"generators_enabled", hasAnyGenerators,
 		"event_schedule_daemon", eventScheduleRequiresDaemon,
@@ -293,7 +321,7 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 	// session to bootstrap; the agent's announce below is their first
 	// contact.
 	if cfg.ACSURL != "" {
-		if bootstrapErr := bootstrapAll(ctx, stacks, templateProf.EventSchedule.BootDelay, logger); bootstrapErr != nil {
+		if bootstrapErr := bootstrapAll(ctx, stacks, templateProf.EventSchedule.BootDelay, bootRamp, logger); bootstrapErr != nil {
 			return bootstrapErr
 		}
 	}
@@ -306,12 +334,17 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 			return fmt.Errorf("scheduler.Start: %w", startErr)
 		}
 	}
-	for _, st := range stacks {
-		if st.genRunner == nil {
-			continue
+	if hasAnyGenerators {
+		if startErr := genSched.Start(ctx); startErr != nil {
+			return fmt.Errorf("generators.Scheduler.Start: %w", startErr)
 		}
-		if startErr := st.genRunner.Start(ctx); startErr != nil {
-			return fmt.Errorf("generators.Start (cpe=%s): %w", st.id, startErr)
+		for _, st := range stacks {
+			if st.genRunner == nil {
+				continue
+			}
+			if startErr := st.genRunner.Start(ctx); startErr != nil {
+				return fmt.Errorf("generators.Start (cpe=%s): %w", st.id, startErr)
+			}
 		}
 	}
 
@@ -685,30 +718,145 @@ func padIPlaceholder(s string, instance int) string {
 	return b.String()
 }
 
-// cpeStackInputs is the bundle buildCPEStack needs to assemble one CPE.
-type cpeStackInputs struct {
-	id         string
-	serial     string
-	instance   int
-	fleetCount int
-	pool       *transport.Pool
-	rngSource  *cperng.Source
-	sched      *scheduler.Scheduler
-	listener   *cr.Listener // may be nil
-	logger     *slog.Logger
+// fleetInputs is the process-wide half of fleet construction: the
+// things every CPE in this process shares.
+type fleetInputs struct {
+	count        int
+	offset       int
+	pattern      string
+	baseSerial   string
+	perCPECRPath bool
+	pool         *transport.Pool
+	rngSource    *cperng.Source
+	sched        *scheduler.Scheduler
+	genSched     *generators.Scheduler
+	listener     *cr.Listener // may be nil
+	logger       *slog.Logger
 }
 
-// buildCPEStack constructs one CPE: fresh tree (re-loaded from disk),
-// stamped serial, generator runner, and, when an ACS URL is configured,
-// the CWMP stack (transport, tracker, session, scheduler registration,
-// CR listener registration). A USP-only run (no --acs-url) gets just the
-// tree and generators; tracker / session / runner stay nil. The returned
-// stack's genRunner is non-nil iff the profile declares generators.
-func buildCPEStack(cfg cpeconfig.Config, in cpeStackInputs) (*cpeStack, error) {
-	prof, err := paramtree.LoadProfile(cfg.ProfilePath)
-	if err != nil {
-		return nil, fmt.Errorf("reload profile: %w", err)
+// buildFleet constructs every CPE stack for this process, in parallel
+// across a bounded worker pool, and returns them in instance order.
+//
+// Parallel is safe because construction is a pure function of the CPE's
+// own global index: the serial, the placeholder expansions, the pool
+// allocations and the RNG streams all derive from that index and from
+// the immutable template, never from what the previous CPE did. Results
+// land in a pre-sized slice by index rather than by append, so the
+// returned order does not depend on which worker finished first.
+//
+// The pool is bounded at GOMAXPROCS because the work is CPU-bound tree
+// cloning and validation; more goroutines than cores would add
+// scheduling overhead and peak memory without adding throughput.
+func buildFleet(cfg cpeconfig.Config, template *paramtree.Profile, in fleetInputs) ([]*cpeStack, error) {
+	stacks := make([]*cpeStack, in.count)
+	workers := runtime.GOMAXPROCS(0)
+	if workers > in.count {
+		workers = in.count
 	}
+
+	var (
+		next     atomic.Int64
+		wg       sync.WaitGroup
+		errMu    sync.Mutex
+		firstErr error
+	)
+	fail := func(err error) {
+		errMu.Lock()
+		if firstErr == nil {
+			firstErr = err
+		}
+		errMu.Unlock()
+	}
+	failed := func() bool {
+		errMu.Lock()
+		defer errMu.Unlock()
+		return firstErr != nil
+	}
+
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				i := int(next.Add(1))
+				if i > in.count || failed() {
+					return
+				}
+				instance := in.offset + i
+				id := fmt.Sprintf(cpeIDFmt, instance)
+				serial, serialErr := stampSerial(in.pattern, in.baseSerial, instance, id, template.Fleet.Pools, in.rngSource)
+				if serialErr != nil {
+					fail(fmt.Errorf("serial pattern %q (cpe %s): %w", in.pattern, id, serialErr))
+					return
+				}
+				stack, buildErr := buildCPEStack(cfg, template, cpeStackInputs{
+					id:           id,
+					serial:       serial,
+					instance:     instance,
+					perCPECRPath: in.perCPECRPath,
+					pool:         in.pool,
+					rngSource:    in.rngSource,
+					sched:        in.sched,
+					genSched:     in.genSched,
+					listener:     in.listener,
+					logger:       in.logger,
+				})
+				if buildErr != nil {
+					fail(fmt.Errorf("build CPE %s (serial=%s): %w", id, serial, buildErr))
+					return
+				}
+				stacks[i-1] = stack
+			}
+		}()
+	}
+	wg.Wait()
+
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	return stacks, nil
+}
+
+// cpeStackInputs is the bundle buildCPEStack needs to assemble one CPE.
+type cpeStackInputs struct {
+	id       string
+	serial   string
+	instance int
+
+	// perCPECRPath asks for a per-CPE connection-request path suffix.
+	// True whenever this process runs more than one CPE, and also when
+	// it runs a single CPE at a non-zero fleet offset, because that CPE
+	// is one member of a larger sharded fleet and its URL should say
+	// which member. False keeps the plain --cr-path a lone CPE has
+	// always published.
+	perCPECRPath bool
+
+	pool      *transport.Pool
+	rngSource *cperng.Source
+	sched     *scheduler.Scheduler
+	genSched  *generators.Scheduler
+	listener  *cr.Listener // may be nil
+	logger    *slog.Logger
+}
+
+// buildCPEStack constructs one CPE: its own tree cloned from the
+// parsed template, stamped serial, generator runner, and, when an ACS
+// URL is configured, the CWMP stack (transport, tracker, session,
+// scheduler registration, CR listener registration). A USP-only run
+// (no --acs-url) gets just the tree and generators; tracker / session /
+// runner stay nil. The returned stack's genRunner is non-nil iff the
+// profile declares generators.
+//
+// Everything except the tree is shared with the template by value: the
+// inform parameter map, generator declarations, pools and path
+// declarations are read-only after load, and copying them per CPE would
+// cost memory for nothing. The tree is the only mutable per-CPE state,
+// so it is the only thing cloned.
+func buildCPEStack(cfg cpeconfig.Config, template *paramtree.Profile, in cpeStackInputs) (*cpeStack, error) {
+	profCopy := *template
+	prof := &profCopy
+	prof.Tree = template.Tree.Clone()
+	var err error
 
 	// Stamp the per-CPE serial. SetSystem bypasses Writable so a
 	// read-only SerialNumber leaf still gets the per-CPE value.
@@ -730,7 +878,7 @@ func buildCPEStack(cfg cpeconfig.Config, in cpeStackInputs) (*cpeStack, error) {
 	// ValueChange notifies, so a USP-only run still needs its values moving.
 	var genRunner *generators.Runner
 	if len(prof.Generators) > 0 {
-		gr, gerr := buildGenerators(prof.Generators, prof.Tree, in.rngSource.ForCPE(in.id+":generators"), in.logger.With("cpe_id", in.id))
+		gr, gerr := buildGenerators(prof.Generators, prof.Tree, in.rngSource.ForCPE(in.id+":generators"), in.genSched, in.logger.With("cpe_id", in.id))
 		if gerr != nil {
 			return nil, fmt.Errorf("generators: %w", gerr)
 		}
@@ -826,11 +974,13 @@ func buildCPEStack(cfg cpeconfig.Config, in cpeStackInputs) (*cpeStack, error) {
 		scheduleTransfer := buildTransferScheduler(in.sched, in.id, tracker, prof.Transfer, prof.Tree, runner, pendingCancels, in.logger)
 
 		factoryReset := func() error {
-			fresh, loadErr := paramtree.LoadProfile(cfg.ProfilePath)
-			if loadErr != nil {
-				return fmt.Errorf("reload profile: %w", loadErr)
-			}
-			if resetErr := prof.Tree.Reset(fresh.Tree); resetErr != nil {
+			// Factory defaults come from the template parsed at startup,
+			// not from a fresh read of the profile file. Two reasons: a
+			// fleet-wide FactoryReset would otherwise be one YAML parse
+			// per CPE, and "factory defaults" should mean the image the
+			// process booted with rather than whatever the operator has
+			// since edited on disk.
+			if resetErr := prof.Tree.Reset(template.Tree.Clone()); resetErr != nil {
 				return fmt.Errorf("tree reset: %w", resetErr)
 			}
 			// Re-stamp serial post-reset so factory reset doesn't collapse
@@ -957,7 +1107,7 @@ func buildCPEStack(cfg cpeconfig.Config, in cpeStackInputs) (*cpeStack, error) {
 		// CR listener registration (per-CPE path when count > 1). The URL
 		// itself is published by publishCRURLs once the listener has bound.
 		if in.listener != nil {
-			regPath, regErr := registerCREndpoint(in.listener, cfg, prof, in.id, in.fleetCount, runner, in.logger)
+			regPath, regErr := registerCREndpoint(in.listener, cfg, prof, in.id, in.perCPECRPath, runner, in.logger)
 			if regErr != nil {
 				return nil, fmt.Errorf("register CR endpoint: %w", regErr)
 			}
@@ -986,16 +1136,28 @@ func buildCPEStack(cfg cpeconfig.Config, in cpeStackInputs) (*cpeStack, error) {
 	}, nil
 }
 
-// bootstrapAll fires the startup Inform for every CPE in parallel.
-// Returns nil if every CPE succeeds; the first error otherwise. Failed
-// CPEs are logged with their cpe_id so an operator can identify which
-// one of N misbehaved.
+// bootstrapAll fires the startup Inform for every CPE. Returns nil if
+// every CPE succeeds; the first error otherwise. Failed CPEs are logged
+// with their cpe_id so an operator can identify which one of N
+// misbehaved.
 //
-// bootDelay > 0 delays each per-CPE bootstrap by exactly that wall-
-// clock duration (real time.Sleep), modelling a CPE that takes time
-// to reach the ACS after process start. The fleet still bootstraps in
-// parallel, every CPE waits the same delay independently.
-func bootstrapAll(ctx context.Context, stacks []*cpeStack, bootDelay time.Duration, logger *slog.Logger) error {
+// bootDelay > 0 holds the whole fleet back by that wall-clock duration,
+// modelling a CPE that takes time to reach the ACS after power-on.
+//
+// bootRamp > 0 then spreads the fleet across a window: CPE k of N
+// starts at bootDelay + k*bootRamp/N. Zero keeps the previous
+// behavior, every CPE starting as soon as bootDelay elapses. The ramp
+// matters because a fleet that bootstraps in one instant measures how
+// fast the simulator can open sockets rather than how well the ACS
+// onboards devices, and a real population does not do it either.
+//
+// Releasing is done by this goroutine walking the (already
+// index-ordered) stacks and spawning each session at its due time,
+// rather than spawning every CPE up front to sleep on its own timer:
+// at fleet scale that would hold a goroutine and a timer per CPE for
+// the entire ramp window, which is exactly the kind of simulator-side
+// cost that shrinks how many CPEs a process can carry.
+func bootstrapAll(ctx context.Context, stacks []*cpeStack, bootDelay, bootRamp time.Duration, logger *slog.Logger) error {
 	if len(stacks) == 0 {
 		return nil
 	}
@@ -1006,24 +1168,36 @@ func bootstrapAll(ctx context.Context, stacks []*cpeStack, bootDelay time.Durati
 	results := make(chan result, len(stacks))
 	var wg sync.WaitGroup
 	spawned := 0
-	for _, st := range stacks {
+	startedAt := time.Now()
+	canceled := false
+	for k, st := range stacks {
 		st := st
 		if st.runner == nil {
 			// USP-only stack: no CWMP session to bootstrap.
 			continue
 		}
 		spawned++
+		due := bootDelay
+		if bootRamp > 0 {
+			due += time.Duration(int64(bootRamp) * int64(k) / int64(len(stacks)))
+		}
+		if wait := time.Until(startedAt.Add(due)); wait > 0 {
+			select {
+			case <-time.After(wait):
+			case <-ctx.Done():
+				canceled = true
+			}
+		}
+		if canceled || ctx.Err() != nil {
+			// Shutdown mid-ramp: the CPEs still waiting never get their
+			// turn. Recording them as failures keeps the "every CPE
+			// failed is fatal, some failed is not" rule honest.
+			results <- result{id: st.id, err: ctx.Err()}
+			continue
+		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if bootDelay > 0 {
-				select {
-				case <-time.After(bootDelay):
-				case <-ctx.Done():
-					results <- result{id: st.id, err: ctx.Err()}
-					return
-				}
-			}
 			start := time.Now()
 			if _, err := st.runner.request(ctx, cwmp.TriggerStartup); err != nil {
 				logger.Info("bootstrap session failed",
@@ -1113,9 +1287,9 @@ func withForcedInformParams(base map[string][]string, crPublishPath string) map[
 
 // registerCREndpoint registers one CPE's connection-request endpoint
 // with the shared listener and returns the path it was registered on.
-// When fleetCount > 1 the path is suffixed with /<cpeID> so the ACS can
-// route to a specific CPE; for fleet count == 1 the path is used as-is
-// to keep single-CPE deployments' URL shape unchanged.
+// When perCPEPath is set the path is suffixed with /<cpeID> so the ACS
+// can route to a specific CPE; otherwise the path is used as-is to keep
+// single-CPE deployments' URL shape unchanged.
 //
 // It deliberately does NOT publish the ConnectionRequestURL into the
 // tree: Listener.URL() derives the URL from the bound socket address,
@@ -1125,7 +1299,7 @@ func withForcedInformParams(base map[string][]string, crPublishPath string) map[
 // every connection request failed with "no connection request URL",
 // silently degrading all task dispatch to "wait for the next periodic
 // Inform". publishCRURLs does the publishing after Start.
-func registerCREndpoint(listener *cr.Listener, cfg cpeconfig.Config, prof *paramtree.Profile, cpeID string, fleetCount int, runner *sessionRunner, logger *slog.Logger) (string, error) {
+func registerCREndpoint(listener *cr.Listener, cfg cpeconfig.Config, prof *paramtree.Profile, cpeID string, perCPEPath bool, runner *sessionRunner, logger *slog.Logger) (string, error) {
 	tree := prof.Tree
 
 	// Existence check only: ConnectionRequestURL is read-only to the
@@ -1136,7 +1310,7 @@ func registerCREndpoint(listener *cr.Listener, cfg cpeconfig.Config, prof *param
 	}
 
 	path := cfg.CRPath
-	if fleetCount > 1 {
+	if perCPEPath {
 		// Per-CPE suffix so the listener routes inbound CRs to the
 		// right session. Single-CPE deployments keep cfg.CRPath
 		// unchanged for backward compat.
@@ -1702,11 +1876,12 @@ func buildFactoryResetScheduler(sched *scheduler.Scheduler, cpeID string, delay 
 // buildGenerators walks prof.Generators and constructs a runner with
 // one Generator per entry. Switches on cfg.Type, only "counter" is
 // supported in v0; future stories add drift / enum / timestamp.
-func buildGenerators(cfgs []paramtree.GeneratorConfig, tree *paramtree.Tree, rng *rand.Rand, logger *slog.Logger) (*generators.Runner, error) {
+func buildGenerators(cfgs []paramtree.GeneratorConfig, tree *paramtree.Tree, rng *rand.Rand, sched *generators.Scheduler, logger *slog.Logger) (*generators.Runner, error) {
 	r, err := generators.NewRunner(generators.RunnerOptions{
-		Logger: logger,
-		Tree:   tree,
-		RNG:    rng,
+		Logger:    logger,
+		Tree:      tree,
+		RNG:       rng,
+		Scheduler: sched,
 	})
 	if err != nil {
 		return nil, err

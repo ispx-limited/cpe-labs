@@ -1566,3 +1566,49 @@ eventSchedule:
 		t.Fatal("expected load error for unknown eventSchedule key")
 	}
 }
+
+func TestLoadProfileEventScheduleBootRamp(t *testing.T) {
+	t.Parallel()
+
+	prof, err := loadProfileFromStringFull(t, `parameters:
+  - path: Device.X
+    value: "y"
+eventSchedule:
+  bootDelay: 5s
+  bootRamp: 10m
+`)
+	if err != nil {
+		t.Fatalf("LoadProfile: %v", err)
+	}
+	if prof.EventSchedule.BootRamp != 10*time.Minute {
+		t.Errorf("BootRamp = %s, want 10m", prof.EventSchedule.BootRamp)
+	}
+	if prof.EventSchedule.BootDelay != 5*time.Second {
+		t.Errorf("BootDelay = %s, want 5s", prof.EventSchedule.BootDelay)
+	}
+	// A ramp on its own does not keep the process alive: the deferred
+	// bootstraps fire, then a one-shot run exits.
+	if prof.EventSchedule.RequiresDaemon() {
+		t.Error("bootRamp alone must not force daemon mode")
+	}
+	if prof.EventSchedule.IsZero() {
+		t.Error("IsZero must account for bootRamp")
+	}
+}
+
+func TestLoadProfileEventScheduleBootRampNegativeRejected(t *testing.T) {
+	t.Parallel()
+
+	_, err := loadProfileFromStringFull(t, `parameters:
+  - path: Device.X
+    value: "y"
+eventSchedule:
+  bootRamp: -1s
+`)
+	if err == nil {
+		t.Fatal("negative bootRamp must reject")
+	}
+	if !strings.Contains(err.Error(), "bootRamp") {
+		t.Errorf("error should name the field: %v", err)
+	}
+}
