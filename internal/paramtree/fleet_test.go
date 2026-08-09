@@ -1,6 +1,7 @@
 package paramtree_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -308,5 +309,90 @@ generators:
 	}
 	if !strings.Contains(err.Error(), "duplicate") {
 		t.Errorf("error should mention duplicate: %v", err)
+	}
+}
+
+func TestLoadProfileFleetOffset(t *testing.T) {
+	t.Parallel()
+
+	prof, err := loadProfileFromStringFull(t, `parameters:
+  - path: Device.X
+    value: "y"
+fleet:
+  count: 100
+  offset: 900
+`)
+	if err != nil {
+		t.Fatalf("LoadProfile: %v", err)
+	}
+	if prof.Fleet.Offset != 900 {
+		t.Errorf("Fleet.Offset = %d, want 900", prof.Fleet.Offset)
+	}
+	if prof.Fleet.Count != 100 {
+		t.Errorf("Fleet.Count = %d, want 100", prof.Fleet.Count)
+	}
+}
+
+func TestLoadProfileFleetOffsetNegativeRejected(t *testing.T) {
+	t.Parallel()
+
+	_, err := loadProfileFromStringFull(t, `parameters:
+  - path: Device.X
+    value: "y"
+fleet:
+  offset: -1
+`)
+	if err == nil {
+		t.Fatal("negative fleet.offset must reject")
+	}
+	if !strings.Contains(err.Error(), "fleet.offset") {
+		t.Errorf("error should name fleet.offset: %v", err)
+	}
+}
+
+// TestLoadProfilePoolCapacityCountsOffset locks the sharding contract:
+// pools are sized for the whole fleet, so a shard high in the index
+// range must fail at load rather than silently allocating past the end
+// of its pool.
+func TestLoadProfilePoolCapacityCountsOffset(t *testing.T) {
+	t.Parallel()
+
+	body := `parameters:
+  - path: Device.X
+    value: "y"
+fleet:
+  count: 100
+  offset: %d
+  pools:
+    wan:
+      type: ipv4
+      cidr: "203.0.113.0/24"
+`
+	if _, err := loadProfileFromStringFull(t, fmt.Sprintf(body, 100)); err != nil {
+		t.Fatalf("offset 100 + count 100 fits a /24; got %v", err)
+	}
+	_, err := loadProfileFromStringFull(t, fmt.Sprintf(body, 200))
+	if err == nil {
+		t.Fatal("offset 200 + count 100 exceeds a /24; must reject")
+	}
+	if !strings.Contains(err.Error(), "wan") {
+		t.Errorf("error should name the pool: %v", err)
+	}
+}
+
+func TestValidatePoolCapacity(t *testing.T) {
+	t.Parallel()
+
+	pools := map[string]paramtree.FleetPool{
+		"wan": {Type: "ipv4", CIDR: "203.0.113.0/24"},
+	}
+	if err := paramtree.ValidatePoolCapacity(pools, 255); err != nil {
+		t.Errorf("255 hosts fit a /24: %v", err)
+	}
+	if err := paramtree.ValidatePoolCapacity(pools, 256); err == nil {
+		t.Error("256 must not fit a /24")
+	}
+	if err := paramtree.ValidatePoolCapacity(pools, 0); err != nil {
+		t.Errorf("nothing to validate when highest < 1: %v", err)
 	}
 }

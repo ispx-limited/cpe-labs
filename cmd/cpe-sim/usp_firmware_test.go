@@ -153,12 +153,12 @@ func newFWHarness(t *testing.T) *fwHarness {
 		t.Fatal(err)
 	}
 	st, err := buildCPEStack(cpeconfig.Config{ProfilePath: profilePath}, cpeStackInputs{
-		id:         "cpe-1",
-		serial:     "TEST0001",
-		instance:   1,
-		fleetCount: 1,
-		rngSource:  cperng.New(1),
-		logger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
+		id:           "cpe-1",
+		serial:       "TEST0001",
+		instance:     1,
+		perCPECRPath: false,
+		rngSource:    cperng.New(1),
+		logger:       slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 	if err != nil {
 		t.Fatalf("buildCPEStack: %v", err)

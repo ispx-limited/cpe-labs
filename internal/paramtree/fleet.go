@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/netip"
 	"regexp"
+	"sort"
 	"strconv"
 )
 
@@ -87,6 +88,41 @@ func validateFleetPool(name string, raw rawFleetPool) (FleetPool, error) {
 		return FleetPool{}, fmt.Errorf("type %q unsupported (want ipv4, ipv6, ipv6prefix)", raw.Type)
 	}
 	return FleetPool(raw), nil
+}
+
+// ValidatePoolCapacity checks that every pool can allocate the highest
+// instance index the run will reach, which for a sharded fleet is
+// offset+count, not count. Called at profile load with the profile's
+// own fleet block and again by the simulator once flags and environment
+// have settled the effective offset, because a shard high in the range
+// otherwise runs off the end of a pool that looked large enough when
+// the profile was written.
+//
+// highest < 1 validates nothing: a pool that is never drawn from
+// cannot be too small.
+func ValidatePoolCapacity(pools map[string]FleetPool, highest int) error {
+	if highest < 1 {
+		return nil
+	}
+	for _, name := range sortedPoolNames(pools) {
+		if _, err := ResolvePool(pools[name], highest); err != nil {
+			return fmt.Errorf("pool %q cannot reach instance %d (pools are sized for the whole fleet, not one shard): %w",
+				name, highest, err)
+		}
+	}
+	return nil
+}
+
+// sortedPoolNames returns pool names in lexicographic order so a
+// capacity failure names the same pool on every run rather than
+// whichever one Go's map iteration reached first.
+func sortedPoolNames(pools map[string]FleetPool) []string {
+	out := make([]string, 0, len(pools))
+	for name := range pools {
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // ResolvePool returns the per-instance string value for the pool. The

@@ -44,9 +44,10 @@ import (
 
 // cpeIDFmt is the per-CPE registration key format. Used as the
 // scheduler registration key, the cperng split-key, and the CR
-// listener path suffix when Fleet.Count > 1. When Fleet.Count == 1
-// the suffix is dropped from the CR path so single-CPE deployments
-// keep their existing URL shape.
+// listener path suffix. The number in it is the GLOBAL instance index
+// (fleet offset plus this process's local index), so a log line, an
+// RNG stream and a CR path all identify a device across the whole
+// fleet rather than only within the process that happens to run it.
 const cpeIDFmt = "cpe-%d"
 
 func main() {
@@ -156,6 +157,23 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 		pattern = "{base}-{i}"
 	}
 
+	// Effective fleet offset: --fleet-offset / CPE_SIM_FLEET_OFFSET /
+	// the config file's fleetOffset all outrank the profile's own
+	// fleet.offset, so one profile can be sharded across processes
+	// without editing a copy of it per shard.
+	offset := templateProf.Fleet.Offset
+	if cfg.FleetOffset != nil {
+		offset = *cfg.FleetOffset
+	}
+	// Re-check pool capacity against the effective range. LoadProfile
+	// checked the profile's own offset; a CLI or env override can push
+	// this shard past the end of a pool the profile sized correctly for
+	// itself, and finding that out one CPE at a time during bootstrap
+	// is a miserable way to learn it.
+	if poolErr := paramtree.ValidatePoolCapacity(templateProf.Fleet.Pools, offset+count); poolErr != nil {
+		return fmt.Errorf("fleet offset %d + count %d: %w", offset, count, poolErr)
+	}
+
 	// Read the base serial from the template tree so we know what to
 	// substitute when count > 1.
 	baseSerialLeaf, err := templateProf.Tree.Get(templateProf.DeviceIDPaths.SerialNumber)
@@ -208,24 +226,27 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 		}()
 	}
 
-	// Build per-CPE stacks.
+	// Build per-CPE stacks. The loop variable is the local index; every
+	// observable value derives from the GLOBAL index (offset + local),
+	// so two shards of the same profile never mint the same device.
 	stacks := make([]*cpeStack, 0, count)
 	for i := 1; i <= count; i++ {
-		id := fmt.Sprintf(cpeIDFmt, i)
-		serial, serialErr := stampSerial(pattern, baseSerial, i, id, templateProf.Fleet.Pools, rngSource)
+		instance := offset + i
+		id := fmt.Sprintf(cpeIDFmt, instance)
+		serial, serialErr := stampSerial(pattern, baseSerial, instance, id, templateProf.Fleet.Pools, rngSource)
 		if serialErr != nil {
 			return fmt.Errorf("serial pattern %q (cpe %s): %w", pattern, id, serialErr)
 		}
 		stack, buildErr := buildCPEStack(cfg, cpeStackInputs{
-			id:         id,
-			serial:     serial,
-			instance:   i,
-			fleetCount: count,
-			pool:       pool,
-			rngSource:  rngSource,
-			sched:      sched,
-			listener:   listener,
-			logger:     logger,
+			id:           id,
+			serial:       serial,
+			instance:     instance,
+			perCPECRPath: count > 1 || offset > 0,
+			pool:         pool,
+			rngSource:    rngSource,
+			sched:        sched,
+			listener:     listener,
+			logger:       logger,
 		})
 		if buildErr != nil {
 			return fmt.Errorf("build CPE %s (serial=%s): %w", id, serial, buildErr)
@@ -267,6 +288,7 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 		"profile", cfg.ProfilePath,
 		"cr_bind_addr", cfg.CRBindAddr,
 		"fleet_count", count,
+		"fleet_offset", offset,
 		"scheduler_enabled", hasAnyScheduler,
 		"generators_enabled", hasAnyGenerators,
 		"event_schedule_daemon", eventScheduleRequiresDaemon,
@@ -687,15 +709,23 @@ func padIPlaceholder(s string, instance int) string {
 
 // cpeStackInputs is the bundle buildCPEStack needs to assemble one CPE.
 type cpeStackInputs struct {
-	id         string
-	serial     string
-	instance   int
-	fleetCount int
-	pool       *transport.Pool
-	rngSource  *cperng.Source
-	sched      *scheduler.Scheduler
-	listener   *cr.Listener // may be nil
-	logger     *slog.Logger
+	id       string
+	serial   string
+	instance int
+
+	// perCPECRPath asks for a per-CPE connection-request path suffix.
+	// True whenever this process runs more than one CPE, and also when
+	// it runs a single CPE at a non-zero fleet offset, because that CPE
+	// is one member of a larger sharded fleet and its URL should say
+	// which member. False keeps the plain --cr-path a lone CPE has
+	// always published.
+	perCPECRPath bool
+
+	pool      *transport.Pool
+	rngSource *cperng.Source
+	sched     *scheduler.Scheduler
+	listener  *cr.Listener // may be nil
+	logger    *slog.Logger
 }
 
 // buildCPEStack constructs one CPE: fresh tree (re-loaded from disk),
@@ -957,7 +987,7 @@ func buildCPEStack(cfg cpeconfig.Config, in cpeStackInputs) (*cpeStack, error) {
 		// CR listener registration (per-CPE path when count > 1). The URL
 		// itself is published by publishCRURLs once the listener has bound.
 		if in.listener != nil {
-			regPath, regErr := registerCREndpoint(in.listener, cfg, prof, in.id, in.fleetCount, runner, in.logger)
+			regPath, regErr := registerCREndpoint(in.listener, cfg, prof, in.id, in.perCPECRPath, runner, in.logger)
 			if regErr != nil {
 				return nil, fmt.Errorf("register CR endpoint: %w", regErr)
 			}
@@ -1113,9 +1143,9 @@ func withForcedInformParams(base map[string][]string, crPublishPath string) map[
 
 // registerCREndpoint registers one CPE's connection-request endpoint
 // with the shared listener and returns the path it was registered on.
-// When fleetCount > 1 the path is suffixed with /<cpeID> so the ACS can
-// route to a specific CPE; for fleet count == 1 the path is used as-is
-// to keep single-CPE deployments' URL shape unchanged.
+// When perCPEPath is set the path is suffixed with /<cpeID> so the ACS
+// can route to a specific CPE; otherwise the path is used as-is to keep
+// single-CPE deployments' URL shape unchanged.
 //
 // It deliberately does NOT publish the ConnectionRequestURL into the
 // tree: Listener.URL() derives the URL from the bound socket address,
@@ -1125,7 +1155,7 @@ func withForcedInformParams(base map[string][]string, crPublishPath string) map[
 // every connection request failed with "no connection request URL",
 // silently degrading all task dispatch to "wait for the next periodic
 // Inform". publishCRURLs does the publishing after Start.
-func registerCREndpoint(listener *cr.Listener, cfg cpeconfig.Config, prof *paramtree.Profile, cpeID string, fleetCount int, runner *sessionRunner, logger *slog.Logger) (string, error) {
+func registerCREndpoint(listener *cr.Listener, cfg cpeconfig.Config, prof *paramtree.Profile, cpeID string, perCPEPath bool, runner *sessionRunner, logger *slog.Logger) (string, error) {
 	tree := prof.Tree
 
 	// Existence check only: ConnectionRequestURL is read-only to the
@@ -1136,7 +1166,7 @@ func registerCREndpoint(listener *cr.Listener, cfg cpeconfig.Config, prof *param
 	}
 
 	path := cfg.CRPath
-	if fleetCount > 1 {
+	if perCPEPath {
 		// Per-CPE suffix so the listener routes inbound CRs to the
 		// right session. Single-CPE deployments keep cfg.CRPath
 		// unchanged for backward compat.

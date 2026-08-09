@@ -593,3 +593,90 @@ func writeYAML(t *testing.T, body string) string {
 	}
 	return path
 }
+
+func TestLoadFleetOffsetUnsetIsNil(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := cpeconfig.Load(nil, nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	// Nil, not 0: the profile's fleet.offset only gets a say when no
+	// higher-precedence source spoke, and an explicit --fleet-offset=0
+	// has to be able to override a profile that declares one.
+	if cfg.FleetOffset != nil {
+		t.Errorf("FleetOffset = %d, want nil", *cfg.FleetOffset)
+	}
+}
+
+func TestLoadFleetOffsetPrecedence(t *testing.T) {
+	t.Parallel()
+
+	path := writeYAML(t, `
+		fleetOffset: 100
+	`)
+	env := map[string]string{
+		"CPE_SIM_CONFIG":       path,
+		"CPE_SIM_FLEET_OFFSET": "200",
+	}
+
+	cfg, err := cpeconfig.Load(nil, env)
+	if err != nil {
+		t.Fatalf("Load (env over file): %v", err)
+	}
+	if cfg.FleetOffset == nil || *cfg.FleetOffset != 200 {
+		t.Errorf("env should beat file: %v", cfg.FleetOffset)
+	}
+
+	cfg, err = cpeconfig.Load([]string{"--fleet-offset=300"}, env)
+	if err != nil {
+		t.Fatalf("Load (flag over env): %v", err)
+	}
+	if cfg.FleetOffset == nil || *cfg.FleetOffset != 300 {
+		t.Errorf("flag should beat env: %v", cfg.FleetOffset)
+	}
+
+	cfg, err = cpeconfig.Load([]string{"--config=" + path}, nil)
+	if err != nil {
+		t.Fatalf("Load (file only): %v", err)
+	}
+	if cfg.FleetOffset == nil || *cfg.FleetOffset != 100 {
+		t.Errorf("file value not read: %v", cfg.FleetOffset)
+	}
+}
+
+func TestLoadFleetOffsetExplicitZeroIsSet(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := cpeconfig.Load([]string{"--fleet-offset=0"}, nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if cfg.FleetOffset == nil {
+		t.Fatal("--fleet-offset=0 must record a set value, not nil")
+	}
+	if *cfg.FleetOffset != 0 {
+		t.Errorf("FleetOffset = %d, want 0", *cfg.FleetOffset)
+	}
+}
+
+func TestLoadFleetOffsetNegativeRejected(t *testing.T) {
+	t.Parallel()
+
+	_, err := cpeconfig.Load([]string{"--fleet-offset=-1"}, nil)
+	if err == nil {
+		t.Fatal("negative fleet-offset must reject")
+	}
+	if !strings.Contains(err.Error(), "fleet-offset") {
+		t.Errorf("error should name the flag: %v", err)
+	}
+}
+
+func TestLoadFleetOffsetInvalidEnv(t *testing.T) {
+	t.Parallel()
+
+	_, err := cpeconfig.Load(nil, map[string]string{"CPE_SIM_FLEET_OFFSET": "many"})
+	if err == nil {
+		t.Fatal("unparseable CPE_SIM_FLEET_OFFSET must reject")
+	}
+}

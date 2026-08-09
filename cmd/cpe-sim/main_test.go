@@ -2393,3 +2393,197 @@ func TestWithForcedInformParams(t *testing.T) {
 		t.Errorf("empty publish path should be a no-op, got %v", out["0 BOOTSTRAP"])
 	}
 }
+
+// shardProfileYAML is a fleet profile whose every identity-bearing leaf
+// derives from the instance index, so a sharded run can be checked for
+// the one property that matters: two shards of the same profile must
+// produce two disjoint sets of devices, not the same devices twice.
+const shardProfileYAML = `deviceIdPaths:
+  manufacturer: Device.DeviceInfo.Manufacturer
+  oui:          Device.DeviceInfo.ManufacturerOUI
+  productClass: Device.DeviceInfo.ProductClass
+  serialNumber: Device.DeviceInfo.SerialNumber
+
+fleet:
+  count: 3
+  serialPattern: "SH{cpe:ALNUM:8}"
+  pools:
+    wan_ipv4:
+      type: ipv4
+      cidr: "203.0.113.0/24"
+
+parameters:
+  - path: Device.DeviceInfo.Manufacturer
+    value: "TestVendor"
+  - path: Device.DeviceInfo.ManufacturerOUI
+    value: "AABBCC"
+  - path: Device.DeviceInfo.ProductClass
+    value: "TestModel"
+  - path: Device.DeviceInfo.SerialNumber
+    value: "TEST"
+  - path: Device.DeviceInfo.HardwareVersion
+    value: "rev-{cpe}"
+  - path: Device.Ethernet.Link.1.MACAddress
+    value: "00:00:5E:{cpe:mac:3}"
+  - path: Device.IP.Interface.1.IPv4Address
+    value: "{wan_ipv4}"
+    writable: true
+
+informParameters:
+  bootstrap:
+    - Device.DeviceInfo.HardwareVersion
+    - Device.Ethernet.Link.1.MACAddress
+    - Device.IP.Interface.1.IPv4Address
+`
+
+// runShard runs one shard to completion against srvURL. The seed is
+// fixed so the alphanumeric serial tails are reproducible and a
+// collision between shards would be a real collision rather than luck.
+func runShard(t *testing.T, srvURL, profile string, extraArgs ...string) {
+	t.Helper()
+	args := append([]string{
+		"--acs-url=" + srvURL,
+		"--profile=" + profile,
+		"--log-level=error",
+		"--seed=7",
+	}, extraArgs...)
+	if err := run(context.Background(), args, os.Stdout, os.Stderr); err != nil {
+		t.Fatalf("run %v: %v", extraArgs, err)
+	}
+}
+
+// TestRunFleetOffsetProducesDisjointShards runs the same profile twice,
+// once unshifted and once at --fleet-offset=3, and asserts that every
+// index-derived value moved: serials, inline {cpe} placeholders, MAC
+// tails and pool allocations. Identical serials across shards would
+// mean the second process was minting the first process's devices
+// again, which at the ACS is one fleet of three, not two of three.
+func TestRunFleetOffsetProducesDisjointShards(t *testing.T) {
+	var (
+		mu     sync.Mutex
+		bodies []string
+	)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		if !strings.Contains(string(body), "<cwmp:Inform>") {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		mu.Lock()
+		bodies = append(bodies, string(body))
+		mu.Unlock()
+		w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+		_, _ = w.Write([]byte(informResponseEnvelope))
+	}))
+	defer srv.Close()
+
+	tmp := t.TempDir()
+	profile := filepath.Join(tmp, "profile.yaml")
+	if err := os.WriteFile(profile, []byte(shardProfileYAML), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	collect := func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		out := append([]string(nil), bodies...)
+		bodies = nil
+		return out
+	}
+
+	runShard(t, srv.URL, profile)
+	shardA := collect()
+	runShard(t, srv.URL, profile, "--fleet-offset=3")
+	shardB := collect()
+
+	if len(shardA) != 3 || len(shardB) != 3 {
+		t.Fatalf("expected 3 Informs per shard; got %d and %d", len(shardA), len(shardB))
+	}
+
+	serialRE := regexp.MustCompile(`<SerialNumber>([^<]+)</SerialNumber>`)
+	serialsOf := func(bs []string) map[string]bool {
+		out := make(map[string]bool, len(bs))
+		for _, b := range bs {
+			m := serialRE.FindStringSubmatch(b)
+			if len(m) != 2 {
+				t.Fatalf("no serial in Inform body")
+			}
+			out[m[1]] = true
+		}
+		return out
+	}
+	a, b := serialsOf(shardA), serialsOf(shardB)
+	if len(a) != 3 || len(b) != 3 {
+		t.Fatalf("serials collided within a shard: %v / %v", a, b)
+	}
+	for s := range a {
+		if b[s] {
+			t.Errorf("serial %q appears in both shards; shards are not disjoint", s)
+		}
+	}
+
+	// Placeholders, MAC tails and pool allocations all follow the global
+	// index: shard B is instances 4..6.
+	joinedB := strings.Join(shardB, "\n")
+	for instance := 4; instance <= 6; instance++ {
+		for _, want := range []string{
+			fmt.Sprintf(">rev-%d<", instance),
+			fmt.Sprintf(">00:00:5E:00:00:%02x<", instance),
+			fmt.Sprintf(">203.0.113.%d<", instance),
+		} {
+			if !strings.Contains(joinedB, want) {
+				t.Errorf("shard at offset 3 never reported %s", want)
+			}
+		}
+	}
+	joinedA := strings.Join(shardA, "\n")
+	if strings.Contains(joinedA, ">rev-4<") {
+		t.Error("unshifted shard reported an instance from the shifted range")
+	}
+}
+
+// TestRunFleetOffsetRNGStreamShifts is the identity half of sharding:
+// the per-CPE RNG stream is keyed on the global cpe id, so shard 2's
+// first CPE draws different random material from shard 1's first CPE
+// rather than being a duplicate device wearing a different serial.
+func TestRunFleetOffsetRNGStreamShifts(t *testing.T) {
+	t.Parallel()
+
+	src := cperng.New(99)
+	first := src.ForCPE("cpe-1:serial").Int63()
+	shifted := src.ForCPE("cpe-4:serial").Int63()
+	if first == shifted {
+		t.Error("cpe-1 and cpe-4 must not share an RNG stream")
+	}
+	again := cperng.New(99).ForCPE("cpe-4:serial").Int63()
+	if again != shifted {
+		t.Error("the same global id under the same seed must replay identically")
+	}
+}
+
+// TestRunFleetOffsetPoolOverrunRejected checks the operator contract
+// that pools are sized for the whole fleet: a shard pushed past the end
+// of its pool by a CLI offset fails at startup with the pool named,
+// rather than allocating wrong addresses one CPE at a time.
+func TestRunFleetOffsetPoolOverrunRejected(t *testing.T) {
+	t.Parallel()
+
+	tmp := t.TempDir()
+	profile := filepath.Join(tmp, "profile.yaml")
+	if err := os.WriteFile(profile, []byte(shardProfileYAML), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := run(context.Background(), []string{
+		"--acs-url=http://127.0.0.1:1",
+		"--profile=" + profile,
+		"--log-level=error",
+		"--fleet-offset=1000",
+	}, os.Stdout, os.Stderr)
+	if err == nil {
+		t.Fatal("offset past the end of the pool must reject at startup")
+	}
+	if !strings.Contains(err.Error(), "wan_ipv4") {
+		t.Errorf("error should name the exhausted pool: %v", err)
+	}
+}
