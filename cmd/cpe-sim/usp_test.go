@@ -146,7 +146,7 @@ func (f *fakeAnnouncer) Announce(cause string) error {
 func TestUSPOperateUSPOnlyReannounces(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	fake := &fakeAnnouncer{}
-	op := uspOperateFunc(&cpeStack{}, log, func() uspAnnouncer { return fake })
+	op := uspOperateFunc(&cpeStack{}, log, func() uspAnnouncer { return fake }, func() uspFirmwareAgent { return nil })
 
 	if _, err := op("Device.Reboot()", "k1", nil); err != nil {
 		t.Fatalf("Reboot: %v", err)
@@ -173,7 +173,7 @@ func TestUSPOperateDualStackUsesTracker(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	fake := &fakeAnnouncer{}
 	st := &cpeStack{tracker: cwmp.NewEventTracker(nil)}
-	op := uspOperateFunc(st, log, func() uspAnnouncer { return fake })
+	op := uspOperateFunc(st, log, func() uspAnnouncer { return fake }, func() uspFirmwareAgent { return nil })
 
 	if _, err := op("Device.Reboot()", "k1", nil); err != nil {
 		t.Fatalf("Reboot: %v", err)
@@ -244,7 +244,7 @@ func TestEndpointIDLoggedExactlyOncePerLine(t *testing.T) {
 	buf.Reset()
 	boundLog := logger.With("cpe_id", "cpe-1", "endpoint_id", "os::0000C5TEST0001")
 	fake := &fakeAnnouncer{}
-	op := uspOperateFunc(&cpeStack{}, boundLog, func() uspAnnouncer { return fake })
+	op := uspOperateFunc(&cpeStack{}, boundLog, func() uspAnnouncer { return fake }, func() uspFirmwareAgent { return nil })
 	if _, err := op("Device.Reboot()", "k1", nil); err != nil {
 		t.Fatalf("Reboot: %v", err)
 	}

@@ -11,8 +11,12 @@ import (
 
 // TR-369 Table 15 error codes used by the write and lifecycle operations.
 const (
-	// ErrCodeInvalidArguments is 7005, for a request whose shape is wrong.
-	ErrCodeInvalidArguments = 7005
+	// ErrCodeResourcesExceeded is 7005, the answer when accepting more work
+	// would exceed what the agent can carry. The async Operate path uses it
+	// to refuse a command that already has an active Request row (TR-369
+	// R-OPR.3: in-progress work is not cancelled by a repeat request, and
+	// this simulator's documented choice is to refuse the repeat outright).
+	ErrCodeResourcesExceeded = 7005
 	// ErrCodeMessageNotSupported is 7004.
 	ErrCodeMessageNotSupported = 7004
 	// ErrCodeParamActionFailed is 7008, for a parameter that exists and is
@@ -513,58 +517,66 @@ func paramValueType(t paramtree.Type) usp.GetSupportedDMResp_ParamValueType {
 	}
 }
 
-// OperateFunc runs a USP command. Returning an error becomes a 7021 failure in
-// the OperateResp.
-type OperateFunc func(command, commandKey string, inputArgs map[string]string) (map[string]string, error)
-
-// HandleOperate runs a command and reports the result.
+// OperateFunc runs a USP command.
 //
-// TR-369 models Reboot and FactoryReset as commands on the data model
-// (Device.Reboot(), Device.FactoryReset()) rather than as dedicated RPCs the way
-// CWMP does, so one handler covers what CWMP needs two for. Commands the
-// simulator has no implementation for fail with 7021 rather than silently
-// reporting success, because a controller that believes it rebooted a device
-// which did not is worse off than one told the command failed.
-func HandleOperate(msgID string, req *usp.Operate, run OperateFunc) *usp.Msg {
-	result := &usp.OperateResp_OperationResult{ExecutedCommand: req.GetCommand()}
+// TR-369 models Reboot, FactoryReset and the firmware commands as commands on
+// the data model rather than as dedicated RPCs the way CWMP does, so one hook
+// covers what CWMP needs several handlers for. The implementation decides per
+// command whether it is synchronous or asynchronous:
+//
+//   - Synchronous: return an OperateResult carrying OutputArgs (nil is an
+//     empty set) and the OperateResp reports them directly.
+//   - Asynchronous: return an OperateResult carrying Async, and the agent
+//     creates a Device.LocalAgent.Request row, answers the OperateResp with
+//     that row's path (TR-369 R-OPR.0), and runs the operation on its own
+//     goroutine.
+//   - Failure: return an error. It becomes a cmd_failure in the OperateResp,
+//     code 7021 unless the error is a *CommandError carrying its own code.
+type OperateFunc func(command, commandKey string, inputArgs map[string]string) (*OperateResult, error)
 
-	var (
-		outputArgs map[string]string
-		err        error
-	)
-	if run == nil {
-		err = fmt.Errorf("command %q is not implemented by this simulator", req.GetCommand())
-	} else {
-		outputArgs, err = run(req.GetCommand(), req.GetCommandKey(), req.GetInputArgs())
-	}
-
-	if err != nil {
-		result.OperationResp = &usp.OperateResp_OperationResult_CmdFailure{
-			CmdFailure: &usp.OperateResp_OperationResult_CommandFailure{
-				ErrCode: ErrCodeCommandFailure,
-				ErrMsg:  err.Error(),
-			},
-		}
-	} else {
-		if outputArgs == nil {
-			outputArgs = map[string]string{}
-		}
-		result.OperationResp = &usp.OperateResp_OperationResult_ReqOutputArgs{
-			ReqOutputArgs: &usp.OperateResp_OperationResult_OutputArgs{OutputArgs: outputArgs},
-		}
-	}
-
-	return &usp.Msg{
-		Header: &usp.Header{MsgId: msgID, MsgType: usp.Header_OPERATE_RESP},
-		Body: &usp.Body{MsgBody: &usp.Body_Response{Response: &usp.Response{
-			RespType: &usp.Response_OperateResp{
-				OperateResp: &usp.OperateResp{
-					OperationResults: []*usp.OperateResp_OperationResult{result},
-				},
-			},
-		}}},
-	}
+// OperateResult is one command's outcome as decided at dispatch time.
+type OperateResult struct {
+	// OutputArgs is the synchronous result. Ignored when Async is set.
+	OutputArgs map[string]string
+	// Async, when non-nil, marks the command asynchronous.
+	Async *AsyncOperation
 }
+
+// AsyncOperation describes work the agent performs after the OperateResp is
+// answered. ObjPath + CommandName must re-assemble to the command path the
+// controller invoked (they are carried split because the OperationComplete
+// notify reports them as separate fields).
+type AsyncOperation struct {
+	// ObjPath is the data-model object the command lives on, with its
+	// trailing dot: "Device.DeviceInfo.FirmwareImage.1.".
+	ObjPath string
+	// CommandName is the command leaf including parentheses: "Download()".
+	CommandName string
+	// Run performs the operation on its own goroutine, after the agent has
+	// created the Request row. It MUST finish by calling exactly one of
+	// op.Complete or op.Fail, which transition and remove the row and send
+	// the OperationComplete notify; anything the implementation wants
+	// ordered after that notify (events, an activation reboot) simply runs
+	// after the call.
+	Run func(op *AsyncOp)
+	// Abort, when non-nil, is called instead of Run if the agent refused to
+	// start the operation after dispatch accepted it (an active Request for
+	// the same command, or a Request row that could not be created). The
+	// OperateResp already reported the failure; Abort releases whatever the
+	// dispatch reserved.
+	Abort func()
+}
+
+// CommandError is an Operate failure with a specific TR-369 error code, for
+// implementations that need to answer something more precise than the 7021
+// a plain error maps to (7005 for a refused concurrent request, 7016 for a
+// command on an object that does not exist).
+type CommandError struct {
+	Code uint32
+	Msg  string
+}
+
+func (e *CommandError) Error() string { return e.Msg }
 
 // ExpandSearchPath resolves the "*" wildcards in a USP search path into the
 // concrete paths that exist in the tree right now.

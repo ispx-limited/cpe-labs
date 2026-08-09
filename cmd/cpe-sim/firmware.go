@@ -17,21 +17,16 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
-	"net/http"
-	neturl "net/url"
-	"path"
-	"strings"
 	"time"
 
 	"github.com/ispx-limited/cpe-labs/internal/cwmp"
 	"github.com/ispx-limited/cpe-labs/internal/cwmp/handlers"
 	"github.com/ispx-limited/cpe-labs/internal/cwmp/scheduler"
 	"github.com/ispx-limited/cpe-labs/internal/cwmp/transfer"
+	"github.com/ispx-limited/cpe-labs/internal/firmwareimage"
 	"github.com/ispx-limited/cpe-labs/internal/paramtree"
 )
 
@@ -39,23 +34,6 @@ import (
 // (A.3.2.8 Table 30). A spec constant, not vendor knowledge: every
 // compliant ACS sends exactly this string for a firmware Download.
 const firmwareFileType = "1 Firmware Upgrade Image"
-
-// firmwareVersionHeader is the line prefix a fetched image is scanned
-// for. A test author makes a "firmware image" by putting
-// "cpe-labs-firmware-version: <version>" on any line within the first
-// firmwareVersionScanLimit bytes, followed by arbitrary padding.
-const firmwareVersionHeader = "cpe-labs-firmware-version:"
-
-// firmwareVersionScanLimit bounds how much of the image body is held
-// in memory for the header scan. The rest is drained to io.Discard so
-// the serving side observes a complete download (a fleet-scale test of
-// the ACS's delivery path needs the full transfer to happen).
-const firmwareVersionScanLimit = 64 * 1024
-
-// firmwareFetchTimeout bounds the whole image GET, connect through
-// body drain. Generous because fleet-scale tests may saturate the
-// image server; a hung fetch must still settle as a fault eventually.
-const firmwareFetchTimeout = 60 * time.Second
 
 // firmwareFaultCode is the TransferComplete fault emitted when the
 // image cannot be fetched or carries no version header. 9010 is the
@@ -185,100 +163,23 @@ func deliverFirmwareFault(tracker *cwmp.EventTracker, runner *sessionRunner, cpe
 // resolveFirmwareVersion derives the version the image carries: a real
 // fetch + header scan when fw.Fetch, the URL's last path segment
 // otherwise. An error means the image is invalid and the sequence
-// settles as fault 9010.
+// settles as fault 9010. CWMP has no separate download-vs-validation
+// failure surface, so a fetch error and a versionless image collapse
+// onto the same fault here (the USP path keeps them distinct).
 func resolveFirmwareVersion(fw *paramtree.FirmwareConfig, url string) (string, error) {
 	if fw.Fetch {
-		return fetchFirmwareVersion(url)
+		img, err := firmwareimage.Fetch(url, "")
+		if err != nil {
+			return "", err
+		}
+		if img.Version == "" {
+			return "", fmt.Errorf("no %q line in the image header", firmwareimage.VersionHeader)
+		}
+		return img.Version, nil
 	}
-	v := versionFromURL(url)
+	v := firmwareimage.VersionFromURL(url)
 	if v == "" {
 		return "", fmt.Errorf("no version derivable from URL %q", url)
 	}
 	return v, nil
-}
-
-// fetchFirmwareVersion GETs url the way the observed device does (one
-// plain GET, no range requests), scans the first
-// firmwareVersionScanLimit bytes for the version header, and drains
-// the remainder so the server sees the full download complete.
-func fetchFirmwareVersion(url string) (string, error) {
-	client := &http.Client{Timeout: firmwareFetchTimeout}
-	resp, err := client.Get(url) //nolint:gosec // ACS-supplied URL; fetching it is the point
-	if err != nil {
-		return "", fmt.Errorf("fetch firmware image: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("fetch firmware image: status %d", resp.StatusCode)
-	}
-	prefix := make([]byte, firmwareVersionScanLimit)
-	n, rerr := io.ReadFull(resp.Body, prefix)
-	if rerr != nil && rerr != io.ErrUnexpectedEOF && rerr != io.EOF {
-		return "", fmt.Errorf("read firmware image: %w", rerr)
-	}
-	// Drain whatever follows the scanned prefix; the serving side
-	// should observe a complete transfer, exactly like a real device
-	// that flashes the whole image.
-	_, _ = io.Copy(io.Discard, resp.Body)
-	v, ok := parseFirmwareVersionHeader(prefix[:n])
-	if !ok {
-		return "", fmt.Errorf("no %q line in the first %d bytes of the image",
-			firmwareVersionHeader, firmwareVersionScanLimit)
-	}
-	return v, nil
-}
-
-// parseFirmwareVersionHeader scans prefix line by line for the version
-// header. Lines are whitespace-trimmed; the first match wins. Returns
-// ("", false) when no line matches or the matched line carries an
-// empty version.
-func parseFirmwareVersionHeader(prefix []byte) (string, bool) {
-	for _, line := range bytes.Split(prefix, []byte("\n")) {
-		s := strings.TrimSpace(string(line))
-		if !strings.HasPrefix(s, firmwareVersionHeader) {
-			continue
-		}
-		v := strings.TrimSpace(strings.TrimPrefix(s, firmwareVersionHeader))
-		if v == "" {
-			return "", false
-		}
-		return v, true
-	}
-	return "", false
-}
-
-// versionFromURL derives the version for fetch: false mode: the URL's
-// last path segment, stripped of its extension. A purely numeric
-// "extension" is kept, it is the tail of a dotted version ("2.0.0"),
-// not a file suffix (".bin"). Returns "" when the URL does not parse
-// or has no usable last segment; the caller treats that as an invalid
-// image.
-func versionFromURL(rawURL string) string {
-	u, err := neturl.Parse(rawURL)
-	if err != nil || u.Path == "" || strings.HasSuffix(u.Path, "/") {
-		return ""
-	}
-	base := path.Base(u.Path)
-	if base == "." || base == "/" {
-		return ""
-	}
-	if ext := path.Ext(base); ext != "" && !isNumericExt(ext) {
-		base = strings.TrimSuffix(base, ext)
-	}
-	return base
-}
-
-// isNumericExt reports whether ext (leading dot included) is digits
-// only, which marks it as part of a dotted version rather than a file
-// extension.
-func isNumericExt(ext string) bool {
-	if len(ext) < 2 {
-		return false
-	}
-	for _, r := range ext[1:] {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-	return true
 }

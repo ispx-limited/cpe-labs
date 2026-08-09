@@ -56,11 +56,18 @@ func startUSPAgent(ctx context.Context, cfg cpeconfig.Config, st *cpeStack, logg
 	}
 
 	// The operate func needs the runner (to re-announce on reboot / factory
-	// reset in USP-only mode) and the runner needs the operate func, so the
-	// reference goes through a closure. The assignment below happens before
-	// Run starts the goroutine that can invoke Operate, so there is no race.
+	// reset in USP-only mode, and to drive the firmware dark window) and the
+	// runner needs the operate func, so the references go through closures.
+	// The assignment below happens before Run starts the goroutine that can
+	// invoke Operate, so there is no race.
 	var runner *uspagent.Runner
 	announcer := func() uspAnnouncer {
+		if runner == nil {
+			return nil
+		}
+		return runner
+	}
+	firmwareAgent := func() uspFirmwareAgent {
 		if runner == nil {
 			return nil
 		}
@@ -72,7 +79,7 @@ func startUSPAgent(ctx context.Context, cfg cpeconfig.Config, st *cpeStack, logg
 		Tree:           st.tree,
 		Transport:      transport,
 		BootParameters: st.uspBootParams,
-		Operate:        uspOperateFunc(st, log, announcer),
+		Operate:        uspOperateFunc(st, log, announcer, firmwareAgent),
 		// Not `log`: the runner stamps endpoint_id on its own lines, since it
 		// is usable without this caller, so passing the already-bound logger
 		// duplicates the field on every message it emits. Same reasoning as
@@ -173,14 +180,18 @@ type uspAnnouncer interface {
 // it simulates the management plane, not the OS), it produces the events a
 // real CPE would announce afterwards.
 //
-// Dual-stack (tracker present): the CWMP EventTracker queues the reboot /
-// bootstrap events and the next CWMP session reports them, which keeps a
-// dual-stack CPE self-consistent. USP-only (tracker nil): there is no CWMP
-// session to ever drain those queues, so the agent re-announces itself the
-// way a restarted device would: Boot! for a reboot, OnBoardRequest then Boot!
-// for a factory reset.
-func uspOperateFunc(st *cpeStack, log *slog.Logger, agent func() uspAnnouncer) uspagent.OperateFunc {
-	return func(command, commandKey string, _ map[string]string) (map[string]string, error) {
+// Reboot and FactoryReset run synchronously. Dual-stack (tracker present):
+// the CWMP EventTracker queues the reboot / bootstrap events and the next
+// CWMP session reports them, which keeps a dual-stack CPE self-consistent.
+// USP-only (tracker nil): there is no CWMP session to ever drain those
+// queues, so the agent re-announces itself the way a restarted device would:
+// Boot! for a reboot, OnBoardRequest then Boot! for a factory reset.
+//
+// The firmware commands (Device.DeviceInfo.FirmwareImage.{i}.Download() and
+// Activate()) are asynchronous, matched by suffix under any FirmwareImage
+// instance the profile declares; see usp_firmware.go.
+func uspOperateFunc(st *cpeStack, log *slog.Logger, agent func() uspAnnouncer, fwAgent func() uspFirmwareAgent) uspagent.OperateFunc {
+	return func(command, commandKey string, inputArgs map[string]string) (*uspagent.OperateResult, error) {
 		switch command {
 		case "Device.Reboot()":
 			if st.tracker != nil {
@@ -221,6 +232,9 @@ func uspOperateFunc(st *cpeStack, log *slog.Logger, agent func() uspAnnouncer) u
 			return nil, nil
 
 		default:
+			if cmd, ok := parseFirmwareCommand(command); ok {
+				return uspFirmwareOperate(st, log, fwAgent, cmd, commandKey, inputArgs)
+			}
 			return nil, fmt.Errorf("command %q is not implemented", command)
 		}
 	}

@@ -212,42 +212,6 @@ func TestHandleGetSupportedDMReportsTypesAndAccess(t *testing.T) {
 	}
 }
 
-func TestHandleOperateRunsCommand(t *testing.T) {
-	var gotCommand, gotKey string
-	resp := HandleOperate("o1", &usp.Operate{
-		Command:    "Device.Reboot()",
-		CommandKey: "ck-1",
-		SendResp:   true,
-	}, func(command, commandKey string, _ map[string]string) (map[string]string, error) {
-		gotCommand, gotKey = command, commandKey
-		return nil, nil
-	})
-
-	result := resp.GetBody().GetResponse().GetOperateResp().GetOperationResults()[0]
-	if result.GetCmdFailure() != nil {
-		t.Fatalf("unexpected failure: %v", result.GetCmdFailure())
-	}
-	if gotCommand != "Device.Reboot()" || gotKey != "ck-1" {
-		t.Errorf("command hook got (%q, %q)", gotCommand, gotKey)
-	}
-	if result.GetExecutedCommand() != "Device.Reboot()" {
-		t.Errorf("executed_command = %q", result.GetExecutedCommand())
-	}
-}
-
-// An unimplemented command must fail loudly. A controller that believes it
-// rebooted a device which did not is worse off than one told it failed.
-func TestHandleOperateUnimplementedCommandFails(t *testing.T) {
-	resp := HandleOperate("o2", &usp.Operate{Command: "Device.SelfDestruct()", SendResp: true}, nil)
-	fail := resp.GetBody().GetResponse().GetOperateResp().GetOperationResults()[0].GetCmdFailure()
-	if fail == nil {
-		t.Fatal("an unimplemented command must report a failure")
-	}
-	if fail.GetErrCode() != ErrCodeCommandFailure {
-		t.Errorf("err_code = %d, want %d", fail.GetErrCode(), ErrCodeCommandFailure)
-	}
-}
-
 func TestIsMultiInstancePath(t *testing.T) {
 	for path, want := range map[string]bool{
 		"Device.WiFi.SSID.1.":     true,

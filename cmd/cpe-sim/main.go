@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -86,6 +87,17 @@ type cpeStack struct {
 	// declares no deviceIdPaths.
 	uspIdentityPaths paramtree.DeviceIDPaths
 	uspBootParams    []string
+
+	// firmware is the profile's transfer.firmware block, shared by the CWMP
+	// Download sequence and the USP FirmwareImage commands. Nil disables
+	// firmware simulation on both protocols.
+	firmware *paramtree.FirmwareConfig
+
+	// uspFirmwareBusy serializes USP firmware operations for this CPE: one
+	// Download()/Activate() in flight at a time, a second is refused with
+	// 7005 (see uspFirmwareOperate). Accessed from the agent's dispatch
+	// goroutine and from the async operation's own goroutine.
+	uspFirmwareBusy atomic.Bool
 }
 
 func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
@@ -891,6 +903,7 @@ func buildCPEStack(cfg cpeconfig.Config, in cpeStackInputs) (*cpeStack, error) {
 
 		uspIdentityPaths: prof.DeviceIDPaths,
 		uspBootParams:    uspBootParameters(prof),
+		firmware:         prof.Transfer.Firmware,
 	}, nil
 }
 
