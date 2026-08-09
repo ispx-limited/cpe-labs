@@ -157,8 +157,9 @@ func uspFirmwareOperate(st *cpeStack, log *slog.Logger, fwAgent func() uspFirmwa
 		checksum := strings.TrimSpace(args["CheckSum"])
 		alg := ""
 		if checksum != "" {
-			// TR-181: a supplied CheckSum MUST be verified. Herder sends
-			// SHA-256; an empty CheckSumAlgorithm defaults to it.
+			// TR-181: a supplied CheckSum MUST be verified. An empty
+			// CheckSumAlgorithm defaults to SHA-256, the algorithm
+			// Controllers most commonly send.
 			alg = strings.TrimSpace(args["CheckSumAlgorithm"])
 			if alg == "" {
 				alg = "SHA-256"
