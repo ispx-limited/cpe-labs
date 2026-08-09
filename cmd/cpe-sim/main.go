@@ -214,6 +214,24 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 		}
 	}()
 
+	// One timing source for every value generator in the process. A
+	// timer and a goroutine per generator is affordable for one CPE and
+	// impossible for a fleet: a realistic profile ticks tens of
+	// generators, so the per-CPE cost is what decides how many CPEs a
+	// process can carry. Sharing the timing does not make the fleet
+	// quieter, the same leaves move at the same cadence.
+	genSched, err := generators.NewScheduler(generators.SchedulerOptions{Logger: logger})
+	if err != nil {
+		return fmt.Errorf("generator scheduler: %w", err)
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if shutdownErr := genSched.Stop(shutdownCtx); shutdownErr != nil {
+			logger.Warn("generator scheduler shutdown error", "err", shutdownErr.Error())
+		}
+	}()
+
 	// CR listener (shared across the fleet; per-CPE Endpoint paths).
 	var listener *cr.Listener
 	if cfg.CRBindAddr != "" {
@@ -246,6 +264,7 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 		pool:         pool,
 		rngSource:    rngSource,
 		sched:        sched,
+		genSched:     genSched,
 		listener:     listener,
 		logger:       logger,
 	})
@@ -253,21 +272,6 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 		return err
 	}
 	logger.Info("fleet built", "count", count, "duration", time.Since(buildStart).String())
-
-	// Defer generator-runner shutdowns.
-	for _, st := range stacks {
-		st := st
-		if st.genRunner == nil {
-			continue
-		}
-		defer func() {
-			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			if shutdownErr := st.genRunner.Stop(shutdownCtx); shutdownErr != nil {
-				logger.Warn("generator runner shutdown error", "cpe_id", st.id, "err", shutdownErr.Error())
-			}
-		}()
-	}
 
 	hasAnyScheduler := false
 	hasAnyGenerators := false
@@ -329,12 +333,17 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 			return fmt.Errorf("scheduler.Start: %w", startErr)
 		}
 	}
-	for _, st := range stacks {
-		if st.genRunner == nil {
-			continue
+	if hasAnyGenerators {
+		if startErr := genSched.Start(ctx); startErr != nil {
+			return fmt.Errorf("generators.Scheduler.Start: %w", startErr)
 		}
-		if startErr := st.genRunner.Start(ctx); startErr != nil {
-			return fmt.Errorf("generators.Start (cpe=%s): %w", st.id, startErr)
+		for _, st := range stacks {
+			if st.genRunner == nil {
+				continue
+			}
+			if startErr := st.genRunner.Start(ctx); startErr != nil {
+				return fmt.Errorf("generators.Start (cpe=%s): %w", st.id, startErr)
+			}
 		}
 	}
 
@@ -719,6 +728,7 @@ type fleetInputs struct {
 	pool         *transport.Pool
 	rngSource    *cperng.Source
 	sched        *scheduler.Scheduler
+	genSched     *generators.Scheduler
 	listener     *cr.Listener // may be nil
 	logger       *slog.Logger
 }
@@ -786,6 +796,7 @@ func buildFleet(cfg cpeconfig.Config, template *paramtree.Profile, in fleetInput
 					pool:         in.pool,
 					rngSource:    in.rngSource,
 					sched:        in.sched,
+					genSched:     in.genSched,
 					listener:     in.listener,
 					logger:       in.logger,
 				})
@@ -822,6 +833,7 @@ type cpeStackInputs struct {
 	pool      *transport.Pool
 	rngSource *cperng.Source
 	sched     *scheduler.Scheduler
+	genSched  *generators.Scheduler
 	listener  *cr.Listener // may be nil
 	logger    *slog.Logger
 }
@@ -865,7 +877,7 @@ func buildCPEStack(cfg cpeconfig.Config, template *paramtree.Profile, in cpeStac
 	// ValueChange notifies, so a USP-only run still needs its values moving.
 	var genRunner *generators.Runner
 	if len(prof.Generators) > 0 {
-		gr, gerr := buildGenerators(prof.Generators, prof.Tree, in.rngSource.ForCPE(in.id+":generators"), in.logger.With("cpe_id", in.id))
+		gr, gerr := buildGenerators(prof.Generators, prof.Tree, in.rngSource.ForCPE(in.id+":generators"), in.genSched, in.logger.With("cpe_id", in.id))
 		if gerr != nil {
 			return nil, fmt.Errorf("generators: %w", gerr)
 		}
@@ -1863,11 +1875,12 @@ func buildFactoryResetScheduler(sched *scheduler.Scheduler, cpeID string, delay 
 // buildGenerators walks prof.Generators and constructs a runner with
 // one Generator per entry. Switches on cfg.Type, only "counter" is
 // supported in v0; future stories add drift / enum / timestamp.
-func buildGenerators(cfgs []paramtree.GeneratorConfig, tree *paramtree.Tree, rng *rand.Rand, logger *slog.Logger) (*generators.Runner, error) {
+func buildGenerators(cfgs []paramtree.GeneratorConfig, tree *paramtree.Tree, rng *rand.Rand, sched *generators.Scheduler, logger *slog.Logger) (*generators.Runner, error) {
 	r, err := generators.NewRunner(generators.RunnerOptions{
-		Logger: logger,
-		Tree:   tree,
-		RNG:    rng,
+		Logger:    logger,
+		Tree:      tree,
+		RNG:       rng,
+		Scheduler: sched,
 	})
 	if err != nil {
 		return nil, err
