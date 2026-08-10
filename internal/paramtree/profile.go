@@ -1898,26 +1898,29 @@ func profileErrAt(source, paramPath string, cause error) error {
 }
 
 
-// samplePickPlaceholders replaces every {cpe:pick:a,b,c} form with its
-// first option so type validation can run against a representative
-// value. Unrelated placeholders and malformed forms pass through
-// untouched; the boot-time substitution is where they are diagnosed.
+// samplePickPlaceholders replaces every {cpe:pick:a,b,c} and
+// {cpe:rpick:a,b,c} form with its first option so type validation can
+// run against a representative value. Unrelated placeholders and
+// malformed forms pass through untouched; the boot-time substitution
+// is where they are diagnosed.
 func samplePickPlaceholders(s string) string {
-	const marker = "{cpe:pick:"
-	for {
-		i := strings.Index(s, marker)
-		if i < 0 {
-			return s
+	for _, marker := range []string{"{cpe:pick:", "{cpe:rpick:"} {
+		for {
+			i := strings.Index(s, marker)
+			if i < 0 {
+				break
+			}
+			j := strings.IndexByte(s[i:], '}')
+			if j < 0 {
+				break
+			}
+			opts := s[i+len(marker) : i+j]
+			first := opts
+			if c := strings.IndexByte(opts, ','); c >= 0 {
+				first = opts[:c]
+			}
+			s = s[:i] + strings.TrimSpace(first) + s[i+j+1:]
 		}
-		j := strings.IndexByte(s[i:], '}')
-		if j < 0 {
-			return s
-		}
-		opts := s[i+len(marker) : i+j]
-		first := opts
-		if c := strings.IndexByte(opts, ','); c >= 0 {
-			first = opts[:c]
-		}
-		s = s[:i] + strings.TrimSpace(first) + s[i+j+1:]
 	}
+	return s
 }

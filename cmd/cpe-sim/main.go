@@ -401,6 +401,7 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 //	{cpe:ipv6:CIDR}, Nth host in the IPv6 CIDR (inline form)
 //	{cpe:ipv6prefix:SUPER,SUBLEN}, Nth /SUBLEN prefix from SUPER (DHCPv6-PD style)
 //	{cpe:pick:a,b,c}, deterministic per-instance choice from the list (wraps)
+//	{cpe:rpick:a,b,c}, deterministic per-device random choice (binomial counts)
 //	{cpe_id}, assigned CPE ID (e.g. "cpe-3")
 //	{<named-pool>}, value resolved from fleet.pools[<named-pool>]
 //
@@ -478,6 +479,11 @@ func substituteFleetPlaceholders(s string, instance int, cpeID string, resolved 
 	}
 	return expandCPEFormPlaceholders(out, instance, func() *rand.Rand {
 		return rng.ForCPE(cpeID + ":serial")
+	}, func(spec string) *rand.Rand {
+		// Salted per spec so two different rpick lists on one device
+		// draw independently; the same list always reproduces the same
+		// choice for a device, informs and restarts included.
+		return rng.ForCPE(cpeID + ":rpick:" + spec)
 	})
 }
 
@@ -502,7 +508,7 @@ func substituteFleetPlaceholders(s string, instance int, cpeID string, resolved 
 // independent of tree-walk order and means the same form at the same
 // position reproduces the same token for a given CPE wherever it
 // appears.
-func expandCPEFormPlaceholders(s string, instance int, newAlnumRNG func() *rand.Rand) (string, error) {
+func expandCPEFormPlaceholders(s string, instance int, newAlnumRNG func() *rand.Rand, newSpecRNG func(string) *rand.Rand) (string, error) {
 	var stream *rand.Rand
 	alnumRNG := func() *rand.Rand {
 		if stream == nil {
@@ -525,7 +531,7 @@ func expandCPEFormPlaceholders(s string, instance int, newAlnumRNG func() *rand.
 		}
 		j += i
 		spec := s[i+len(marker) : j]
-		expanded, ok, err := evalCPEForm(spec, instance, alnumRNG)
+		expanded, ok, err := evalCPEForm(spec, instance, alnumRNG, newSpecRNG)
 		if err != nil {
 			return "", fmt.Errorf("{cpe:%s}: %w", spec, err)
 		}
@@ -544,7 +550,7 @@ func expandCPEFormPlaceholders(s string, instance int, newAlnumRNG func() *rand.
 // recognized=false means the spec didn't match any known form so the
 // caller leaves it literal; err is non-nil only when a recognized form
 // has invalid arguments (bad CIDR, sublen out of range, etc.).
-func evalCPEForm(spec string, instance int, alnumRNG func() *rand.Rand) (string, bool, error) {
+func evalCPEForm(spec string, instance int, alnumRNG func() *rand.Rand, newSpecRNG func(string) *rand.Rand) (string, bool, error) {
 	// Plain decimal width: {cpe:N}.
 	if w, err := strconv.Atoi(spec); err == nil && w >= 0 {
 		return fmt.Sprintf("%0*d", w, instance), true, nil
@@ -556,6 +562,20 @@ func evalCPEForm(spec string, instance int, alnumRNG func() *rand.Rand) (string,
 	}
 	kind, arg := spec[:colon], spec[colon+1:]
 	switch kind {
+	case "rpick":
+		// Per-device random choice, unlike pick's striding: a fleet's
+		// counts land binomially spread around list-share times fleet
+		// size instead of exactly on it, which is what real
+		// populations look like. Deterministic per device and per
+		// list, so the value survives informs and restarts.
+		opts := strings.Split(arg, ",")
+		if len(opts) == 0 || (len(opts) == 1 && strings.TrimSpace(opts[0]) == "") {
+			return "", true, fmt.Errorf("rpick %q: empty option list", arg)
+		}
+		if newSpecRNG == nil {
+			return "", true, fmt.Errorf("rpick %q: no per-device stream available", arg)
+		}
+		return strings.TrimSpace(opts[newSpecRNG(spec).Intn(len(opts))]), true, nil
 	case "pick":
 		// Deterministic per-instance choice from a comma-separated
 		// list: instance 1 gets the first entry, and the sequence

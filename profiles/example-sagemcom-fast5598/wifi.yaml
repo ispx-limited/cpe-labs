@@ -252,7 +252,7 @@ groups:
     parameters:
       - path: Channel
         type: xsd:unsignedInt
-        value: "{cpe:pick:1,6,11}"
+        value: "{cpe:rpick:1,6,11}"
         writable: true
       - path: OperatingFrequencyBand
         value: "2.4GHz"
@@ -270,7 +270,7 @@ groups:
     parameters:
       - path: Channel
         type: xsd:unsignedInt
-        value: "{cpe:pick:36,40,44,48,100,116,149,157}"
+        value: "{cpe:rpick:36,40,44,48,100,116,149,157}"
         writable: true
       - path: OperatingFrequencyBand
         value: "5GHz"
@@ -282,7 +282,7 @@ groups:
       # back to 40, another to 20 (dense air, sticky drivers). The
       # 20MHz slice is what a narrow-channels audit exists to find.
       - path: OperatingChannelBandwidth
-        value: "{cpe:pick:80MHz,80MHz,80MHz,80MHz,80MHz,80MHz,80MHz,40MHz,80MHz,80MHz,80MHz,80MHz,80MHz,80MHz,20MHz,80MHz}"
+        value: "{cpe:rpick:80MHz,80MHz,80MHz,80MHz,80MHz,80MHz,80MHz,40MHz,80MHz,80MHz,80MHz,80MHz,80MHz,80MHz,20MHz,80MHz}"
         writable: true
       - path: MaxBitRate
         type: xsd:unsignedInt
