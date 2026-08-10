@@ -268,11 +268,20 @@ groups:
       - path: Standard
         value: "n"
         writable: true
+  # The second radio is 5GHz for most homes, with two engineered
+  # slices minted by pick-position correlation against the 2.4GHz
+  # radio's three-entry list (same instance drives both picks):
+  # entry 5 ("6", zero-based index 4, index mod 3 = 1, so the 2.4
+  # radio is also on 6) models the home whose 5GHz radio fell back to
+  # 2.4 on top of its own AP, real self-interference; entry 11 ("11",
+  # index 10, mod 3 = 1, 2.4 radio on 6) models the 2.4-only home
+  # whose channels 6 and 11 do not overlap.
+  # One home in 24 each, DFS channels in the healthy remainder.
   - prefix: InternetGatewayDevice.LANDevice.1.WLANConfiguration.2
     parameters:
       - path: Channel
         type: xsd:unsignedInt
-        value: "{cpe:pick:36,40,44,48,149,153,157,161}"
+        value: "{cpe:pick:36,40,44,48,6,52,100,116,132,149,11,153,157,161,36,44,48,100,149,153,40,157,161,116}"
         writable: true
       - path: Standard
         value: "ac"

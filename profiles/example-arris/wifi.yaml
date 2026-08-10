@@ -373,10 +373,13 @@ groups:
         writable: true
   - prefix: InternetGatewayDevice.LANDevice.1.WLANConfiguration.2
     parameters:
-      # 5GHz radio on a spread of UNII-1/UNII-3 channels.
+      # 5GHz radio spread across UNII-1, UNII-2 (DFS), and UNII-3:
+      # auto-channel on real hardware lands on DFS channels for a
+      # third of a dense fleet, and a spectrum view with zero DFS
+      # exposure looks simulated because it is.
       - path: Channel
         type: xsd:unsignedInt
-        value: "{cpe:pick:36,40,44,48,149,153,157,161}"
+        value: "{cpe:pick:36,40,44,48,52,100,116,132,149,153,157,161}"
         writable: true
       - path: Standard
         value: "ac"
