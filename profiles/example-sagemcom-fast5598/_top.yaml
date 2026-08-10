@@ -19,7 +19,10 @@ fleet:
   pools:
     wan_ipv4:
       type: ipv4
-      cidr: "203.0.113.0/24"          # RFC 5737 doc range
+      # CGNAT space rather than a doc /24: the pool must reach every
+      # fleet offset a manifest cohort can take, and /10 holds four
+      # million homes. Also what a real access network hands a CPE.
+      cidr: "100.64.0.0/10"
     wan_ipv6:
       type: ipv6
       cidr: "2001:db8:2::/64"          # RFC 3849 doc range
