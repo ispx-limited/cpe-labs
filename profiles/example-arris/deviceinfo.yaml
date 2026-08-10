@@ -27,6 +27,10 @@ groups:
       - path: UpTime
         type: xsd:unsignedInt
         value: "0"
+        writable: true
+        generator:
+          type: uptime
+          interval: 30s
       - path: DeviceLog
         value: ""
 
