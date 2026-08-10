@@ -27,14 +27,17 @@ fleet:
   pools:
     wan_ipv4:
       type: ipv4
-      cidr: "203.0.113.0/24"           # 254 CPEs of WAN IPv4
+      # CGNAT space: reaches every fleet offset, and matches what a
+      # real access network delegates.
+      cidr: "100.64.0.0/10"
     wan_ipv6:
       type: ipv6
       cidr: "2001:db8:1::/64"
     voice_ipv4:
       type: ipv4
-      cidr: "198.51.100.0/24"          # PPPoE voice/mgmt session WAN IP
-                                        # (RFC 5737 TEST-NET-2)
+      cidr: "198.18.0.0/15"            # PPPoE voice/mgmt session WAN IP
+                                        # (RFC 2544 benchmark range,
+                                        # 131k addresses)
     delegated_prefix:
       type: ipv6prefix
       # A /36 operator block, not /48: /56 per home gives 2^20
@@ -43,8 +46,10 @@ fleet:
       sublen: 56                        # /56 per CPE
     lan_ipv4:
       type: ipv4
-      cidr: "192.168.0.0/16"           # /24 per CPE; lan_ipv4 is the
-                                        # base address for each.
+      cidr: "10.0.0.0/8"               # /24 per CPE; lan_ipv4 is the
+                                        # base address for each. 10/8
+                                        # holds 65k homes, which a
+                                        # 192.168/16 did not.
 
 periodicInformPaths:
   interval: InternetGatewayDevice.ManagementServer.PeriodicInformInterval
