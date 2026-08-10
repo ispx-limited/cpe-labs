@@ -1,0 +1,152 @@
+# Top-level configuration for the scale-tr098 profile.
+# Loads first lexicographically (underscore prefix).
+#
+# This profile exists for large-fleet runs, 150k to 200k CPEs against
+# one ACS. It is a realistic TR-098 residential gateway and nothing
+# about what the ACS can see has been trimmed to make the numbers
+# easier: a few hundred parameters, tens of moving values, a 300 second
+# inform interval, and a firmware transfer that actually moves the
+# bytes. The only things left out are things no ACS can observe, such
+# as the address pools the example profiles use to differentiate WAN
+# IPs, which no query path here depends on.
+#
+# The device is deliberately generic rather than a copy of any shipping
+# product: an IANA documentation OUI and a made-up model, so nothing
+# here implies a real vendor's behavior.
+
+deviceIdPaths:
+  manufacturer: InternetGatewayDevice.DeviceInfo.Manufacturer
+  oui:          InternetGatewayDevice.DeviceInfo.ManufacturerOUI
+  productClass: InternetGatewayDevice.DeviceInfo.ProductClass
+  serialNumber: InternetGatewayDevice.DeviceInfo.SerialNumber
+
+fleet:
+  # A modest default so running this profile casually does not fork a
+  # small fleet onto a laptop. A scale run raises it per shard and
+  # gives each shard a disjoint offset:
+  #
+  #   cpe-sim --profile=profiles/scale-tr098 --fleet-offset=0     --config=shard.yaml
+  #   cpe-sim --profile=profiles/scale-tr098 --fleet-offset=20000 --config=shard.yaml
+  #
+  # See docs/guides/large-fleets.md.
+  count: 1000
+
+  # 8-character alphanumeric tail. The space is 36^8, about 2.8e12, so
+  # a 200k fleet's birthday collision probability stays under one
+  # percent; a 6-character tail would not. Serials are drawn from the
+  # per-CPE seeded RNG, so they are stable for a given --seed and
+  # unique across the fleet. Changing the pattern on an existing
+  # deployment mints new device identities at the ACS (identity is OUI
+  # plus serial).
+  serialPattern: "RG24{cpe:ALNUM:8}"
+
+  # No pools. The example profiles carve WAN addresses out of RFC 5737
+  # documentation ranges, whose /24s hold 255 CPEs and would fail
+  # capacity validation at the first shard. Nothing in this profile
+  # needs a per-CPE routable address, so there is nothing to size.
+
+# periodicInformPaths deliberately declares interval and enable ONLY.
+#
+# Declaring time: as well switches the scheduler into phase-anchored
+# mode (TR-069 3.2.1.2), where the next tick lands on the next
+# PeriodicInformTime + n*interval boundary and jitter is suppressed on
+# purpose, because the point of an ACS-assigned phase is deterministic
+# de-synchronization. Anchoring an entire fleet to one shared value
+# does the opposite: every CPE fires on the same boundary, and a
+# 200k-CPE fleet lands on the ACS in one instant every 300 seconds.
+# That measures the ACS's ability to survive a thundering herd, not its
+# ability to carry a fleet, and it is not a shape a real population
+# produces. Undeclared, the scheduler free-runs at interval plus or
+# minus ten percent per CPE, which spreads the fleet across the window.
+#
+# The PeriodicInformTime leaf itself is still present and writable
+# (managementserver.yaml), holding the TR-069 Unknown Time sentinel
+# 0001-01-01T00:00:00Z, so an ACS can read it and write it exactly as
+# it would against real hardware.
+periodicInformPaths:
+  interval: InternetGatewayDevice.ManagementServer.PeriodicInformInterval
+  enable:   InternetGatewayDevice.ManagementServer.PeriodicInformEnable
+
+# ACS auth identity read live from the tree, so credential rotation via
+# SetParameterValues lands on the next session. Empty values fall back
+# to --acs-username / --acs-password.
+acsCredentialPaths:
+  username: InternetGatewayDevice.ManagementServer.Username
+  password: InternetGatewayDevice.ManagementServer.Password
+
+# Firmware transfers fetch the image for real. A campaign at fleet
+# scale is as much a test of the ACS's delivery path, its URL auth and
+# whatever sits in front of it as it is of the campaign logic, and
+# fetch: false would quietly take all of that out of the run. Set
+# fetch: false only for repeated cohort waves where the campaign logic
+# is what is under test and the bytes have already been proven.
+#
+# applyDelay is the dark window between fetching the image and the
+# post-flash boot session: 60s, roughly what real hardware spends
+# flashing and rebooting, and long enough that an ACS watching a
+# campaign sees a realistic gap rather than an instant version flip.
+transfer:
+  firmware:
+    versionPath: InternetGatewayDevice.DeviceInfo.SoftwareVersion
+    applyDelay: 60s
+    fetch: true
+
+informParameters:
+  # TR-069 Annex A names a forced-Inform set every CPE reports on every
+  # Inform, and ConnectionRequestURL is the load-bearing one: an ACS
+  # that never receives it has no address to wake the device on, so
+  # every task it queues waits for the next periodic Inform and expires
+  # first. Leaving it out made a fleet look like it was ignoring tasks
+  # when the ACS simply could not reach it.
+  # First contact: vendor identity, running firmware, and the WAN
+  # addressing shape, so the ACS can make provisioning and firmware
+  # decisions without a round of GetParameterValues per device. At
+  # 200k devices those round trips are the difference between an
+  # onboarding wave the ACS absorbs and one it does not.
+  bootstrap:
+    - InternetGatewayDevice.DeviceSummary
+    - InternetGatewayDevice.DeviceInfo.Manufacturer
+    - InternetGatewayDevice.DeviceInfo.ManufacturerOUI
+    - InternetGatewayDevice.DeviceInfo.ModelName
+    - InternetGatewayDevice.DeviceInfo.ProductClass
+    - InternetGatewayDevice.DeviceInfo.SerialNumber
+    - InternetGatewayDevice.DeviceInfo.HardwareVersion
+    - InternetGatewayDevice.DeviceInfo.SoftwareVersion
+    - InternetGatewayDevice.DeviceInfo.ProvisioningCode
+    - InternetGatewayDevice.ManagementServer.URL
+    - InternetGatewayDevice.ManagementServer.ParameterKey
+    - InternetGatewayDevice.ManagementServer.ConnectionRequestURL
+    - InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.AddressingType
+    - InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ExternalIPAddress
+  # SoftwareVersion rides every event class, not just bootstrap. An ACS
+  # that never sees a reported firmware version cannot verify that a
+  # campaign landed and cannot skip devices that are already on the
+  # target build, so a firmware run against a fleet that reports it
+  # only once is not a firmware run at all.
+  boot:
+    - InternetGatewayDevice.DeviceInfo.SoftwareVersion
+    - InternetGatewayDevice.DeviceInfo.UpTime
+    - InternetGatewayDevice.ManagementServer.ConnectionRequestURL
+    - InternetGatewayDevice.ManagementServer.ParameterKey
+  periodic:
+    - InternetGatewayDevice.DeviceInfo.SoftwareVersion
+    - InternetGatewayDevice.DeviceInfo.UpTime
+    - InternetGatewayDevice.ManagementServer.ConnectionRequestURL
+    - InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.TotalBytesSent
+    - InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.TotalBytesReceived
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalBytesSent
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalBytesReceived
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.TotalBytesSent
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.TotalBytesReceived
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalAssociations
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.TotalAssociations
+  valueChange:
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalAssociations
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.TotalAssociations
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Status
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Status
+  connectionRequest:
+    - InternetGatewayDevice.DeviceInfo.UpTime
+  transferComplete:
+    - InternetGatewayDevice.DeviceInfo.SoftwareVersion
+    - InternetGatewayDevice.DeviceInfo.UpTime
