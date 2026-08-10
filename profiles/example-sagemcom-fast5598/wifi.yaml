@@ -453,13 +453,17 @@ groups:
         type: xsd:unsignedInt
         value: "0"
 
+  # Security posture spreads like a real installed base: most homes on
+  # WPA3 transition mode, a tail still on WPA2-only. The same rpick
+  # list on both access points draws the same value for a device, so
+  # a home's two bands never disagree about its posture.
   - prefix: Device.WiFi.AccessPoint.1.Security
     parameters:
       - path: ModeEnabled
-        value: "WPA2-Personal"
+        value: "{cpe:rpick:WPA3-Personal-Transition,WPA3-Personal-Transition,WPA3-Personal-Transition,WPA2-Personal}"
         writable: true
       - path: ModesSupported
-        value: "WPA2-Personal,WPA-WPA2-Personal,WPA3-Personal"
+        value: "WPA2-Personal,WPA-WPA2-Personal,WPA3-Personal,WPA3-Personal-Transition"
       - path: KeyPassphrase
         value: ""
         writable: true
@@ -467,10 +471,10 @@ groups:
   - prefix: Device.WiFi.AccessPoint.2.Security
     parameters:
       - path: ModeEnabled
-        value: "WPA2-Personal"
+        value: "{cpe:rpick:WPA3-Personal-Transition,WPA3-Personal-Transition,WPA3-Personal-Transition,WPA2-Personal}"
         writable: true
       - path: ModesSupported
-        value: "WPA2-Personal,WPA-WPA2-Personal,WPA3-Personal"
+        value: "WPA2-Personal,WPA-WPA2-Personal,WPA3-Personal,WPA3-Personal-Transition"
       - path: KeyPassphrase
         value: ""
         writable: true
