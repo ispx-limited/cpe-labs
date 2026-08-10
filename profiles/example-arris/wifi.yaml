@@ -359,7 +359,7 @@ groups:
       # analysis, which no healthy deployment looks like.
       - path: Channel
         type: xsd:unsignedInt
-        value: "{cpe:pick:1,6,11}"
+        value: "{cpe:rpick:1,6,11}"
         writable: true
       - path: Standard
         value: "n"
@@ -379,7 +379,7 @@ groups:
       # exposure looks simulated because it is.
       - path: Channel
         type: xsd:unsignedInt
-        value: "{cpe:pick:36,40,44,48,52,100,116,132,149,153,157,161}"
+        value: "{cpe:rpick:36,40,44,48,52,100,116,132,149,153,157,161}"
         writable: true
       - path: Standard
         value: "ac"

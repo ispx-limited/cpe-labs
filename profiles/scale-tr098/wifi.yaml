@@ -263,25 +263,24 @@ groups:
     parameters:
       - path: Channel
         type: xsd:unsignedInt
-        value: "{cpe:pick:1,6,11}"
+        value: "{cpe:rpick:1,6,11}"
         writable: true
       - path: Standard
         value: "n"
         writable: true
-  # The second radio is 5GHz for most homes, with two engineered
-  # slices minted by pick-position correlation against the 2.4GHz
-  # radio's three-entry list (same instance drives both picks):
-  # entry 5 ("6", zero-based index 4, index mod 3 = 1, so the 2.4
-  # radio is also on 6) models the home whose 5GHz radio fell back to
-  # 2.4 on top of its own AP, real self-interference; entry 11 ("11",
-  # index 10, mod 3 = 1, 2.4 radio on 6) models the 2.4-only home
-  # whose channels 6 and 11 do not overlap.
-  # One home in 24 each, DFS channels in the healthy remainder.
+  # The second radio is 5GHz for most homes. Two 2.4GHz entries in
+  # the list ("6" and "11", one home in twelve combined) model the
+  # radio that fell back to 2.4: because both radios draw randomly
+  # and independently, about a third of those homes land on the same
+  # channel as their own 2.4 radio (real self-interference) and the
+  # rest are 2.4-only without colliding, so the two issue counts come
+  # out ragged and unequal the way a real fleet's do. DFS channels
+  # sit in the healthy remainder.
   - prefix: InternetGatewayDevice.LANDevice.1.WLANConfiguration.2
     parameters:
       - path: Channel
         type: xsd:unsignedInt
-        value: "{cpe:pick:36,40,44,48,6,52,100,116,132,149,11,153,157,161,36,44,48,100,149,153,40,157,161,116}"
+        value: "{cpe:rpick:36,40,44,48,6,52,100,116,132,149,11,153,157,161,36,44,48,100,149,153,40,157,161,116}"
         writable: true
       - path: Standard
         value: "ac"

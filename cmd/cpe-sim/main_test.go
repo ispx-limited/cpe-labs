@@ -3000,3 +3000,34 @@ func TestPickPlaceholder(t *testing.T) {
 		t.Error("empty option list must error")
 	}
 }
+
+func TestRpickPlaceholder(t *testing.T) {
+	rng := cperng.New(7)
+
+	a1, err := substituteFleetPlaceholders("{cpe:rpick:1,6,11}", 1, "cpe-9", nil, rng)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a2, _ := substituteFleetPlaceholders("{cpe:rpick:1,6,11}", 1, "cpe-9", nil, rng)
+	if a1 != a2 {
+		t.Errorf("same device same list must reproduce: %q vs %q", a1, a2)
+	}
+
+	// Distribution: over many devices the choice must not stride.
+	counts := map[string]int{}
+	for i := 1; i <= 300; i++ {
+		v, err := substituteFleetPlaceholders("{cpe:rpick:1,6,11}", i, "cpe-"+strconv.Itoa(i), nil, rng)
+		if err != nil {
+			t.Fatal(err)
+		}
+		counts[v]++
+	}
+	for _, opt := range []string{"1", "6", "11"} {
+		if counts[opt] < 60 || counts[opt] > 140 {
+			t.Errorf("option %s count %d outside plausible binomial range", opt, counts[opt])
+		}
+	}
+	if counts["1"] == 100 && counts["6"] == 100 && counts["11"] == 100 {
+		t.Error("perfectly even split suggests striding, not sampling")
+	}
+}
