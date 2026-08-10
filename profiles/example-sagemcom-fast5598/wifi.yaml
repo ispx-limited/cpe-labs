@@ -49,13 +49,6 @@ objects:
       - path: Upstream
         type: xsd:boolean
         value: "false"
-      - path: MaxBitRate
-        type: xsd:unsignedInt
-        value: "300"
-      - path: Channel
-        type: xsd:unsignedInt
-        value: "6"
-        writable: true
       - path: AutoChannelEnable
         type: xsd:boolean
         value: "true"
@@ -65,17 +58,8 @@ objects:
         value: "true"
       - path: SupportedFrequencyBands
         value: "2.4GHz,5GHz"
-      - path: OperatingFrequencyBand
-        value: "2.4GHz"
-        writable: true
       - path: SupportedStandards
         value: "b,g,n,ac,ax"
-      - path: OperatingStandards
-        value: "b,g,n,ax"
-        writable: true
-      - path: OperatingChannelBandwidth
-        value: "20MHz"
-        writable: true
       - path: TransmitPower
         type: xsd:int
         value: "100"
@@ -258,6 +242,48 @@ objects:
 
 # Singleton sub-objects: Radio Stats, SSID Stats, AccessPoint Security.
 groups:
+  # Per-radio operating posture. Radio 1 is the 2.4GHz PHY with the
+  # channel spread across the three non-overlapping choices per device;
+  # radio 2 is the 5GHz PHY at 80MHz. A fleet with both radios parked
+  # on 2.4GHz channel 6 at 20MHz reads as fleet-wide self-interference
+  # with no 5GHz and narrow channels, which no healthy deployment
+  # looks like.
+  - prefix: Device.WiFi.Radio.1
+    parameters:
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "{cpe:pick:1,6,11}"
+        writable: true
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+        writable: true
+      - path: OperatingStandards
+        value: "b,g,n,ax"
+        writable: true
+      - path: OperatingChannelBandwidth
+        value: "20MHz"
+        writable: true
+      - path: MaxBitRate
+        type: xsd:unsignedInt
+        value: "300"
+  - prefix: Device.WiFi.Radio.2
+    parameters:
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "{cpe:pick:36,40,44,48,149,153,157,161}"
+        writable: true
+      - path: OperatingFrequencyBand
+        value: "5GHz"
+        writable: true
+      - path: OperatingStandards
+        value: "n,ac,ax"
+        writable: true
+      - path: OperatingChannelBandwidth
+        value: "80MHz"
+        writable: true
+      - path: MaxBitRate
+        type: xsd:unsignedInt
+        value: "1200"
   - prefix: Device.WiFi.Radio.1.Stats
     parameters:
       - path: BytesSent

@@ -400,6 +400,7 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 //	{cpe:ipv4:CIDR}, Nth host in the IPv4 CIDR (inline form)
 //	{cpe:ipv6:CIDR}, Nth host in the IPv6 CIDR (inline form)
 //	{cpe:ipv6prefix:SUPER,SUBLEN}, Nth /SUBLEN prefix from SUPER (DHCPv6-PD style)
+//	{cpe:pick:a,b,c}, deterministic per-instance choice from the list (wraps)
 //	{cpe_id}, assigned CPE ID (e.g. "cpe-3")
 //	{<named-pool>}, value resolved from fleet.pools[<named-pool>]
 //
@@ -555,6 +556,22 @@ func evalCPEForm(spec string, instance int, alnumRNG func() *rand.Rand) (string,
 	}
 	kind, arg := spec[:colon], spec[colon+1:]
 	switch kind {
+	case "pick":
+		// Deterministic per-instance choice from a comma-separated
+		// list: instance 1 gets the first entry, and the sequence
+		// wraps. Exists so a fleet can be heterogeneous where the real
+		// world is: WiFi channels spread across 1/6/11 instead of a
+		// whole fleet parked on channel 6, which an ACS's spectrum
+		// analysis rightly grades as fleet-wide self-interference.
+		opts := strings.Split(arg, ",")
+		if len(opts) == 0 || (len(opts) == 1 && strings.TrimSpace(opts[0]) == "") {
+			return "", true, fmt.Errorf("pick %q: empty option list", arg)
+		}
+		idx := (instance - 1) % len(opts)
+		if idx < 0 {
+			idx += len(opts)
+		}
+		return strings.TrimSpace(opts[idx]), true, nil
 	case "hex":
 		w, err := strconv.Atoi(arg)
 		if err != nil || w < 0 {
