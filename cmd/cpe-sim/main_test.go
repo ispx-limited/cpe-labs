@@ -2974,3 +2974,29 @@ func copyProfileWithSmallFleet(t *testing.T, src string, count int) string {
 	}
 	return dst
 }
+
+func TestPickPlaceholder(t *testing.T) {
+	rng := cperng.New(1)
+	got := make([]string, 0, 5)
+	for instance := 1; instance <= 5; instance++ {
+		out, err := substituteFleetPlaceholders("{cpe:pick:1,6,11}", instance, "cpe-x", nil, rng)
+		if err != nil {
+			t.Fatalf("instance %d: %v", instance, err)
+		}
+		got = append(got, out)
+	}
+	want := []string{"1", "6", "11", "1", "6"}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("instance %d = %q, want %q (deterministic wrap)", i+1, got[i], want[i])
+		}
+	}
+
+	if out, err := substituteFleetPlaceholders("ch{cpe:pick: 36 , 149 }", 2, "cpe-x", nil, rng); err != nil || out != "ch149" {
+		t.Errorf("whitespace options: got %q err %v, want ch149", out, err)
+	}
+
+	if _, err := substituteFleetPlaceholders("{cpe:pick:}", 1, "cpe-x", nil, rng); err == nil {
+		t.Error("empty option list must error")
+	}
+}

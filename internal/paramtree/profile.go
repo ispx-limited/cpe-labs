@@ -1723,8 +1723,14 @@ func applyRows(tree *Tree, rows []profileParam) error {
 		}
 		valueForValidate := row.Value
 		if hasI {
-			valueForValidate = strings.ReplaceAll(row.Value, "{i}", "1")
+			valueForValidate = strings.ReplaceAll(valueForValidate, "{i}", "1")
 		}
+		// {cpe:pick:...} resolves per fleet instance at boot, after
+		// this validation has run, so validate the shape it will take:
+		// each form is replaced by its first option. A list whose
+		// options disagree with the declared type still fails here on
+		// the first one, which is where the operator is looking.
+		valueForValidate = samplePickPlaceholders(valueForValidate)
 		if err := Validate(row.Type, valueForValidate); err != nil {
 			return profileErrAt(row.Source, row.Path,
 				fmt.Errorf("value %q does not match type %s: %w", row.Value, row.Type, err))
@@ -1889,4 +1895,29 @@ func profileErrAt(source, paramPath string, cause error) error {
 	}
 	return cpeerr.Wrap("paramtree.LoadProfile", cpeerr.KindInvalidArgument,
 		fmt.Errorf("%s: parameter %q: %w", source, paramPath, cause))
+}
+
+
+// samplePickPlaceholders replaces every {cpe:pick:a,b,c} form with its
+// first option so type validation can run against a representative
+// value. Unrelated placeholders and malformed forms pass through
+// untouched; the boot-time substitution is where they are diagnosed.
+func samplePickPlaceholders(s string) string {
+	const marker = "{cpe:pick:"
+	for {
+		i := strings.Index(s, marker)
+		if i < 0 {
+			return s
+		}
+		j := strings.IndexByte(s[i:], '}')
+		if j < 0 {
+			return s
+		}
+		opts := s[i+len(marker) : i+j]
+		first := opts
+		if c := strings.IndexByte(opts, ','); c >= 0 {
+			first = opts[:c]
+		}
+		s = s[:i] + strings.TrimSpace(first) + s[i+j+1:]
+	}
 }

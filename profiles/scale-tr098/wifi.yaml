@@ -32,16 +32,9 @@ objects:
       - path: BeaconType
         value: "11i"
         writable: true
-      - path: Channel
-        type: xsd:unsignedInt
-        value: "6"
-        writable: true
       - path: AutoChannelEnable
         type: xsd:boolean
         value: "true"
-        writable: true
-      - path: Standard
-        value: "n"
         writable: true
       - path: SSIDAdvertisementEnabled
         type: xsd:boolean
@@ -259,3 +252,28 @@ objects:
         value: "2.4GHz"
       - path: SecurityModeEnabled
         value: "WPA2-Personal"
+
+# Per-radio operating posture. Instance 1 is the 2.4GHz radio with the
+# channel spread across the three non-overlapping choices per device;
+# instance 2 is the 5GHz radio. A fleet with both instances on 2.4GHz
+# channel 6 reads as fleet-wide self-interference with no 5GHz, which
+# no healthy deployment looks like.
+groups:
+  - prefix: InternetGatewayDevice.LANDevice.1.WLANConfiguration.1
+    parameters:
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "{cpe:pick:1,6,11}"
+        writable: true
+      - path: Standard
+        value: "n"
+        writable: true
+  - prefix: InternetGatewayDevice.LANDevice.1.WLANConfiguration.2
+    parameters:
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "{cpe:pick:36,40,44,48,149,153,157,161}"
+        writable: true
+      - path: Standard
+        value: "ac"
+        writable: true

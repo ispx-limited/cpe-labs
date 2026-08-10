@@ -31,16 +31,9 @@ objects:
       - path: BeaconType
         value: "11i"
         writable: true
-      - path: Channel
-        type: xsd:unsignedInt
-        value: "6"
-        writable: true
       - path: AutoChannelEnable
         type: xsd:boolean
         value: "true"
-        writable: true
-      - path: Standard
-        value: "n"
         writable: true
       - path: SSIDAdvertisementEnabled
         type: xsd:boolean
@@ -360,6 +353,17 @@ groups:
   # radios report different bands and PHY rates.
   - prefix: InternetGatewayDevice.LANDevice.1.WLANConfiguration.1
     parameters:
+      # 2.4GHz radio. The channel spreads across the three
+      # non-overlapping choices per device: a fleet parked on one
+      # channel reads as fleet-wide self-interference to any spectrum
+      # analysis, which no healthy deployment looks like.
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "{cpe:pick:1,6,11}"
+        writable: true
+      - path: Standard
+        value: "n"
+        writable: true
       - path: X_0000C5_CurrentBitRate
         value: "144"
       - path: X_0000C5_CurrentDuplexMode
@@ -369,6 +373,14 @@ groups:
         writable: true
   - prefix: InternetGatewayDevice.LANDevice.1.WLANConfiguration.2
     parameters:
+      # 5GHz radio on a spread of UNII-1/UNII-3 channels.
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "{cpe:pick:36,40,44,48,149,153,157,161}"
+        writable: true
+      - path: Standard
+        value: "ac"
+        writable: true
       - path: X_0000C5_CurrentBitRate
         value: "433"
       - path: X_0000C5_CurrentDuplexMode
