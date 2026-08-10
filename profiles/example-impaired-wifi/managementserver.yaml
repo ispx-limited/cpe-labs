@@ -1,0 +1,92 @@
+# InternetGatewayDevice.ManagementServer.*, TR-069 ACS bindings.
+# periodicInformPaths lives in _top.yaml and deliberately does not
+# reference PeriodicInformTime; the reasoning is written out there.
+
+groups:
+  - prefix: InternetGatewayDevice.ManagementServer
+    parameters:
+      - path: URL
+        value: "http://acs.example/cwmp"
+        writable: true
+      - path: Username
+        value: "cpe"
+        writable: true
+      - path: Password
+        value: ""
+        writable: true
+      - path: PeriodicInformEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      # 300 seconds, the interval most deployed fleets actually run.
+      # Raising it would make a scale run look calmer without making
+      # the ACS's job easier in any way that matters: the session rate
+      # a fleet produces is the load, and at 200k CPEs 300 seconds is
+      # roughly 670 sessions per second.
+      - path: PeriodicInformInterval
+        type: xsd:unsignedInt
+        value: "300"
+        writable: true
+      # The TR-069 Unknown Time sentinel: present and writable so an
+      # ACS sees and can set it exactly as against real hardware, but
+      # holding a value that requests no phase. Combined with _top.yaml
+      # not declaring periodicInformPaths.time, the fleet free-runs
+      # with per-CPE jitter instead of firing on a shared boundary.
+      - path: PeriodicInformTime
+        type: xsd:dateTime
+        value: "0001-01-01T00:00:00Z"
+        writable: true
+      - path: ParameterKey
+        value: ""
+      - path: ConnectionRequestURL
+        value: "http://192.0.2.1:7547/"
+      - path: ConnectionRequestUsername
+        value: "acs"
+        writable: true
+      - path: ConnectionRequestPassword
+        value: ""
+        writable: true
+      - path: UpgradesManaged
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: DefaultActiveNotificationThrottle
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: CWMPRetryMinimumWaitInterval
+        type: xsd:unsignedInt
+        value: "5"
+        writable: true
+      - path: CWMPRetryIntervalMultiplier
+        type: xsd:unsignedInt
+        value: "2000"
+        writable: true
+      - path: AliasBasedAddressing
+        type: xsd:boolean
+        value: "false"
+
+  - prefix: InternetGatewayDevice.Time
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Synchronized"
+      - path: NTPServer1
+        value: "ntp1.example.net"
+        writable: true
+      - path: NTPServer2
+        value: "ntp2.example.net"
+        writable: true
+      - path: CurrentLocalTime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+        writable: true
+        generator:
+          type: wallclock
+          interval: 60s
+      - path: LocalTimeZoneName
+        value: "UTC"
+        writable: true
