@@ -25,7 +25,10 @@ fleet:
       cidr: "2001:db8:2::/64"          # RFC 3849 doc range
     delegated_prefix:
       type: ipv6prefix
-      super: "2001:db8:beef::/48"
+      # A /36 super so the pool holds a six-figure fleet: /56 per home
+      # gives 2^20 prefixes, and manifest cohorts take offsets well
+      # past the 256 a /48 super allowed.
+      super: "2001:db8:b000::/36"
       sublen: 56                       # /56 per CPE
 
 periodicInformPaths:

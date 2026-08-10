@@ -37,8 +37,10 @@ fleet:
                                         # (RFC 5737 TEST-NET-2)
     delegated_prefix:
       type: ipv6prefix
-      super: "2001:db8:cafe::/48"      # operator delegation block
-      sublen: 56                        # /56 per CPE (256 CPEs)
+      # A /36 operator block, not /48: /56 per home gives 2^20
+      # prefixes, so fleet offsets past 256 still resolve.
+      super: "2001:db8:c000::/36"
+      sublen: 56                        # /56 per CPE
     lan_ipv4:
       type: ipv4
       cidr: "192.168.0.0/16"           # /24 per CPE; lan_ipv4 is the
