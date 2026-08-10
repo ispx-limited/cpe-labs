@@ -133,6 +133,31 @@ groups:
           max: 4294967295
           step: 15000
           jitter: 0.3
+      # A healthy line still takes the odd errored frame; a handful per
+      # minute against tens of thousands of packets keeps the error
+      # rate around the parts-per-million a real clean loop shows.
+      - path: EthernetErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 1
+          jitter: 1.0
+      - path: EthernetErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 2
+          jitter: 1.0
 
   # PPPoE session counters. Voice/mgmt VLAN traffic is small compared
   # to the data path, so the steps model roughly 100 kbit/s of RTP.
@@ -218,6 +243,10 @@ objects:
       - path: Uptime
         type: xsd:unsignedInt
         value: "0"
+        writable: true
+        generator:
+          type: uptime
+          interval: 30s
       - path: LastConnectionError
         value: "ERROR_NONE"
       - path: X_ARRIS_COM_IPv6Address
