@@ -1,0 +1,72 @@
+# Plume SuperPod AX (PP403Z), TR-181 (Device.*) profile.
+#
+# A mesh node, not a gateway, and that is the reason it is here. Every
+# other profile in the fleet terminates a WAN; this one hangs off a
+# gateway over a backhaul link and serves clients in a room the main
+# router does not reach. A fleet made only of gateways never exercises
+# the extender half of the vocabulary, and per-subscriber topology has
+# nothing to draw but a star with one node.
+#
+# It has two Ethernet ports and no four-port LAN switch, no PPP, and no
+# optical termination. Interface.1 is the backhaul rather than a WAN,
+# which is why its stats still matter: a mesh node with a degraded
+# backhaul is one of the more common real causes of a bad-looking home.
+#
+# Modelled from public operator catalogues, not from a device capture.
+# The OUI is the documentation OUI (00005E) rather than a Plume
+# registration.
+
+deviceIdPaths:
+  manufacturer: Device.DeviceInfo.Manufacturer
+  oui:          Device.DeviceInfo.ManufacturerOUI
+  productClass: Device.DeviceInfo.ProductClass
+  serialNumber: Device.DeviceInfo.SerialNumber
+
+fleet:
+  count: 1
+  serialPattern: "PP403{cpe:ALNUM:9}"
+  pools:
+    wan_ipv4:
+      type: ipv4
+      cidr: "100.64.0.0/10"
+    wan_ipv6:
+      type: ipv6
+      cidr: "2001:db8:7::/64"
+
+periodicInformPaths:
+  interval: Device.ManagementServer.PeriodicInformInterval
+  enable:   Device.ManagementServer.PeriodicInformEnable
+
+informParameters:
+  bootstrap:
+    - Device.DeviceInfo.Manufacturer
+    - Device.DeviceInfo.ManufacturerOUI
+    - Device.DeviceInfo.ModelName
+    - Device.DeviceInfo.ProductClass
+    - Device.DeviceInfo.SerialNumber
+    - Device.DeviceInfo.HardwareVersion
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.ManagementServer.URL
+    - Device.ManagementServer.ParameterKey
+  boot:
+    - Device.DeviceInfo.UpTime
+  periodic:
+    # Identity repeats on every periodic Inform, not just bootstrap.
+    # Model and firmware reach the device row through identity
+    # enrichment, which reads the Inform's own parameter list, so a
+    # device whose bootstrap the ACS missed (restart, re-registration,
+    # a fleet that predates the profile) would otherwise carry a blank
+    # model for the rest of its life. Real CPEs report these every
+    # session for the same reason.
+    - Device.DeviceInfo.ModelName
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.DeviceInfo.UpTime
+    - Device.Ethernet.Interface.1.Stats.BytesSent
+    - Device.Ethernet.Interface.1.Stats.BytesReceived
+    - Device.Ethernet.Interface.1.Stats.ErrorsReceived
+    - Device.Ethernet.Interface.1.Stats.PacketsReceived
+  valueChange:
+    - Device.WiFi.AccessPoint.1.AssociatedDeviceNumberOfEntries
+    - Device.WiFi.AccessPoint.2.AssociatedDeviceNumberOfEntries
+  connectionRequest:
+    - Device.DeviceInfo.UpTime

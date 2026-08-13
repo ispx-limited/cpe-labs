@@ -1,0 +1,491 @@
+# LANDevice.1.WLANConfiguration.{i}.*, WiFi (2.4 GHz + 5 GHz radios).
+# Path templates use {i} (table-instance index), distinct from {cpe}
+# (fleet instance).
+
+# Two WLANConfiguration entries (1 = 2.4 GHz, 2 = 5 GHz) plus stats
+# counters folded into the same object block.
+#
+# Stats.BytesSent/BytesReceived: TR-098 defines only error/packet-kind
+# counters under WLANConfiguration.{i}.Stats (byte totals live on the
+# WLANConfiguration object as TotalBytesSent/Received), but an ACS's
+# WiFi telemetry profile GPVs Stats.BytesSent/BytesReceived and plenty of
+# field firmware ships them, so the flagship example carries both
+# spellings.
+objects:
+  - path: InternetGatewayDevice.LANDevice.1.WLANConfiguration
+    instances: 2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: SSID
+        value: "Technicolor-{cpe:hex:4}-{i}"
+        writable: true
+      - path: BSSID
+        value: "00:00:5E:{cpe:mac:3}"
+      - path: MACAddress
+        value: "00:00:5E:{cpe:mac:3}"
+      - path: BeaconType
+        value: "11i"
+        writable: true
+      - path: AutoChannelEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: SSIDAdvertisementEnabled
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      # WPA2-PSK posture: BeaconType=11i means the IEEE11i* pair is
+      # authoritative; BasicAuthenticationMode=None reflects no legacy
+      # basic auth in use. All four feed the tr098-wifi security audit.
+      - path: BasicAuthenticationMode
+        value: "None"
+        writable: true
+      - path: WPAEncryptionModes
+        value: "AESEncryption"
+        writable: true
+      - path: WPAAuthenticationMode
+        value: "PSKAuthentication"
+        writable: true
+      - path: IEEE11iEncryptionModes
+        value: "AESEncryption"
+        writable: true
+      - path: IEEE11iAuthenticationMode
+        value: "PSKAuthentication"
+        writable: true
+      - path: TransmitPower
+        type: xsd:unsignedInt
+        value: "100"
+        writable: true
+      - path: TotalAssociations
+        type: xsd:unsignedInt
+        value: "3"
+      - path: AssociatedDeviceNumberOfEntries
+        type: xsd:unsignedInt
+        value: "3"
+      - path: MaxBitRate
+        value: "Auto"
+        writable: true
+      - path: RegulatoryDomain
+        value: "US"
+        writable: true
+      - path: RadioEnabled
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: TotalBytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 6000000
+          jitter: 0.3
+      - path: TotalBytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 9000000
+          jitter: 0.3
+      - path: TotalPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 5000
+          jitter: 0.3
+      - path: TotalPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 7000
+          jitter: 0.3
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 6000000
+          jitter: 0.3
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 9000000
+          jitter: 0.3
+
+  # ---- 2.4 GHz radio: 3 associated stations ----
+  # X_00005E_RSSI is the Arris per-client RSSI extension (xsd:int dBm,
+  # drifts like a live reading); X_00005E_SignalStrength is the
+  # percent-style companion real NVG firmware reports as unsignedInt.
+  - path: InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.AssociatedDevice
+    instances: 3
+    parameters:
+      - path: AssociatedDeviceMACAddress
+        value: "0A:1B:2C:00:00:0{i}"
+      - path: AssociatedDeviceIPAddress
+        value: "192.168.1.{i}0"
+      - path: LastDataTransmitRate
+        value: "144"
+      - path: AssociatedDeviceAuthenticationState
+        type: xsd:boolean
+        value: "true"
+      - path: X_00005E_RSSI
+        type: xsd:int
+        value: "-52"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -78
+          max: -38
+          stepMax: 4
+      - path: X_00005E_SignalStrength
+        type: xsd:unsignedInt
+        value: "68"
+
+  # ---- 5 GHz radio: 3 associated stations ----
+  - path: InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.AssociatedDevice
+    instances: 3
+    parameters:
+      - path: AssociatedDeviceMACAddress
+        value: "0A:1B:2D:00:00:0{i}"
+      - path: AssociatedDeviceIPAddress
+        value: "192.168.1.{i}5"
+      - path: LastDataTransmitRate
+        value: "433"
+      - path: AssociatedDeviceAuthenticationState
+        type: xsd:boolean
+        value: "true"
+      - path: X_00005E_RSSI
+        type: xsd:int
+        value: "-47"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -72
+          max: -35
+          stepMax: 4
+      - path: X_00005E_SignalStrength
+        type: xsd:unsignedInt
+        value: "76"
+
+  # ---- X_00005E_NeighboringWiFi.{i} on the 2.4 GHz radio ----
+  - path: InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.X_00005E_NeighboringWiFi
+    instances: 4
+    parameters:
+      - path: SSID
+        value: "neighbor-{i}"
+      - path: BSSID
+        value: "DE:AD:BE:EF:00:0{i}"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "{i}"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-65"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+      - path: SecurityModeEnabled
+        value: "WPA2-Personal"
+
+  # ---- X_00005E_WLANStats.{w}.AssociatedDevice.{a}.Stats.{s} ----
+  # The real per-client RSSI tree on NVG/SURFboard firmware. Index
+  # tuples (wlan idx, associated-device idx) mirror
+  # WLANConfiguration.{w}.AssociatedDevice.{a} above so an ACS's
+  # per-client signal enrichment can correlate both sides; Stats.1 is
+  # the newest sample row. ClientRSSI/ClientNoise are xsd:int dBm.
+  - path: InternetGatewayDevice.LANDevice.1.X_00005E_WLANStats.1.AssociatedDevice
+    instances: 3
+    parameters:
+      - path: Stats.1.ClientRSSI
+        type: xsd:int
+        value: "-52"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -78
+          max: -38
+          stepMax: 4
+      - path: Stats.1.ClientNoise
+        type: xsd:int
+        value: "-92"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -100
+          max: -85
+          stepMax: 2
+
+  - path: InternetGatewayDevice.LANDevice.1.X_00005E_WLANStats.2.AssociatedDevice
+    instances: 3
+    parameters:
+      - path: Stats.1.ClientRSSI
+        type: xsd:int
+        value: "-47"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -72
+          max: -35
+          stepMax: 4
+      - path: Stats.1.ClientNoise
+        type: xsd:int
+        value: "-95"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -102
+          max: -88
+          stepMax: 2
+
+  # ---- HNC.Steer.SummaryStats.STA.{i}: per-client steering stats ----
+  # One row per client MAC ever steered; MACs line up with the
+  # Hosts.Host table (0A:1B:2C:00:01:0{i}) so enrichment cross-refs
+  # resolve. Types follow real NVG firmware: STAStatus and the event
+  # counters are unsignedInt, BandSupport/SteeringUnfriendly are
+  # hexBinary bitmasks (carried as strings here), LastSteerTime is
+  # seconds-since-steer.
+  - path: InternetGatewayDevice.LANDevice.1.X_00005E_Wireless.HNC.Steer.SummaryStats.STA
+    instances: 3
+    parameters:
+      - path: MACAddress
+        value: "0A:1B:2C:00:01:0{i}"
+      - path: STAStatus
+        type: xsd:unsignedInt
+        value: "1"
+      - path: BandSupport
+        value: "07"
+      - path: DualBandCapable
+        type: xsd:unsignedInt
+        value: "1"
+      - path: LastSteerTime
+        type: xsd:unsignedInt
+        value: "3600"
+      - path: SelfSteerCount
+        type: xsd:unsignedInt
+        value: "{i}"
+      - path: BTMAttempts
+        type: xsd:unsignedInt
+        value: "4"
+        writable: true
+        generator:
+          type: counter
+          interval: 900s
+          min: 0
+          max: 4294967295
+          step: 1
+          jitter: 0.5
+      - path: BTMSuccesses
+        type: xsd:unsignedInt
+        value: "3"
+      - path: BlacklistAttempts
+        type: xsd:unsignedInt
+        value: "0"
+      - path: BlacklistSuccesses
+        type: xsd:unsignedInt
+        value: "0"
+      - path: SteeringUnfriendly
+        value: "00"
+      - path: WiFiChannelUtilizationEvents
+        type: xsd:unsignedInt
+        value: "5"
+      - path: WiFiLinkQualityEvents
+        type: xsd:unsignedInt
+        value: "2"
+      - path: BHUtilizationEvents
+        type: xsd:unsignedInt
+        value: "1"
+
+# Vendor mesh tree, X_00005E_Wireless.HNC.* (Arris Home Network
+# Controller). The arris-hnc topology rule roots the mesh off this:
+#   HNE.1 = gateway (Type=="Gateway"), HNE.2+ = paired extenders.
+# Client stations hang off HNE.{i}.Radio.{j}.SSID.{k}.STA.{l}; their MACs
+# match the Hosts.Host table (hosts.yaml: 0A:1B:2C:00:01:0{i}) so the
+# script's hostname/IPv4 cross-ref by MAC resolves. Modeled explicitly
+# (groups, not a templated table) because the gateway and extender nodes
+# differ structurally (Type, MAC) and clients map to specific hosts.
+groups:
+  # Mesh ESS identity (telemetry: HNC.ESS.1.ESSName).
+  - prefix: InternetGatewayDevice.LANDevice.1.X_00005E_Wireless.HNC.ESS.1
+    parameters:
+      - path: ESSName
+        value: "Technicolor-mesh-{cpe:hex:4}"
+
+  # Per-WLAN Arris link-layer extensions (vendor telemetry:
+  # X_00005E_CurrentBitRate / CurrentDuplexMode /
+  # OperatingFrequencyBand). Grouped per instance because the two
+  # radios report different bands and PHY rates.
+  - prefix: InternetGatewayDevice.LANDevice.1.WLANConfiguration.1
+    parameters:
+      # 2.4GHz radio. The channel spreads across the three
+      # non-overlapping choices per device: a fleet parked on one
+      # channel reads as fleet-wide self-interference to any spectrum
+      # analysis, which no healthy deployment looks like.
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:1,6,11}"
+        writable: true
+      - path: Standard
+        value: "n"
+        writable: true
+      - path: X_00005E_CurrentBitRate
+        value: "144"
+      - path: X_00005E_CurrentDuplexMode
+        value: "Half"
+      - path: X_00005E_OperatingFrequencyBand
+        value: "2.4GHz"
+        writable: true
+  - prefix: InternetGatewayDevice.LANDevice.1.WLANConfiguration.2
+    parameters:
+      # 5GHz radio spread across UNII-1, UNII-2 (DFS), and UNII-3:
+      # auto-channel on real hardware lands on DFS channels for a
+      # third of a dense fleet, and a spectrum view with zero DFS
+      # exposure looks simulated because it is.
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:36,40,44,48,52,100,116,132,149,153,157,161}"
+        writable: true
+      - path: Standard
+        value: "ac"
+        writable: true
+      - path: X_00005E_CurrentBitRate
+        value: "433"
+      - path: X_00005E_CurrentDuplexMode
+        value: "Half"
+      - path: X_00005E_OperatingFrequencyBand
+        value: "5GHz"
+        writable: true
+
+  # ---- HNE.1 = gateway (this CPE) ----
+  - prefix: InternetGatewayDevice.LANDevice.1.X_00005E_Wireless.HNC.HNE.1
+    parameters:
+      - path: Type
+        value: "Gateway"
+      - path: MACAddress
+        value: "00:00:5E:{cpe:mac:3}"
+      - path: Model
+        value: "CGM4331COM"
+      - path: SoftwareVersion
+        value: "SGE1.2.3.4"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_00005E_Wireless.HNC.HNE.1.Radio.1
+    parameters:
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_00005E_Wireless.HNC.HNE.1.Radio.1.SSID.1
+    parameters:
+      - path: SSID
+        value: "Technicolor-{cpe:hex:4}-home"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_00005E_Wireless.HNC.HNE.1.Radio.1.SSID.1.STA.1
+    parameters:
+      - path: MACAddress
+        value: "0A:1B:2C:00:01:01"
+      - path: RSSI
+        type: xsd:int
+        value: "-45"
+      - path: TxPHYRate
+        type: xsd:unsignedInt
+        value: "144"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_00005E_Wireless.HNC.HNE.1.Radio.1.SSID.1.STA.2
+    parameters:
+      - path: MACAddress
+        value: "0A:1B:2C:00:01:02"
+      - path: RSSI
+        type: xsd:int
+        value: "-52"
+      - path: TxPHYRate
+        type: xsd:unsignedInt
+        value: "144"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_00005E_Wireless.HNC.HNE.1.Radio.2
+    parameters:
+      - path: OperatingFrequencyBand
+        value: "5GHz"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_00005E_Wireless.HNC.HNE.1.Radio.2.SSID.1
+    parameters:
+      - path: SSID
+        value: "Technicolor-{cpe:hex:4}-5G"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_00005E_Wireless.HNC.HNE.1.Radio.2.SSID.1.STA.1
+    parameters:
+      - path: MACAddress
+        value: "0A:1B:2C:00:01:03"
+      - path: RSSI
+        type: xsd:int
+        value: "-48"
+      - path: TxPHYRate
+        type: xsd:unsignedInt
+        value: "433"
+
+  # ---- HNE.2 = paired extender (parents to the gateway over backhaul) ----
+  - prefix: InternetGatewayDevice.LANDevice.1.X_00005E_Wireless.HNC.HNE.2
+    parameters:
+      - path: Type
+        value: "Extender"
+      - path: MACAddress
+        value: "0E:EE:EE:{cpe:mac:3}"
+      - path: Model
+        value: "TCH-EXT"
+      - path: SoftwareVersion
+        value: "SGE1.2.3.4"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_00005E_Wireless.HNC.HNE.2.Radio.1
+    parameters:
+      - path: OperatingFrequencyBand
+        value: "5GHz"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_00005E_Wireless.HNC.HNE.2.Radio.1.SSID.1
+    parameters:
+      - path: SSID
+        value: "Technicolor-{cpe:hex:4}-5G"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_00005E_Wireless.HNC.HNE.2.Radio.1.SSID.1.STA.1
+    parameters:
+      - path: MACAddress
+        value: "0A:1B:2C:00:01:04"
+      - path: RSSI
+        type: xsd:int
+        value: "-63"
+      - path: TxPHYRate
+        type: xsd:unsignedInt
+        value: "433"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_00005E_Wireless.HNC.HNE.2.Radio.1.SSID.1.STA.2
+    parameters:
+      - path: MACAddress
+        value: "0A:1B:2C:00:01:05"
+      - path: RSSI
+        type: xsd:int
+        value: "-67"
+      - path: TxPHYRate
+        type: xsd:unsignedInt
+        value: "433"

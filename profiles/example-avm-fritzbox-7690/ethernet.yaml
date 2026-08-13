@@ -1,0 +1,287 @@
+# Device.Ethernet.*: one 2.5G WAN port at instance 1 plus four LAN
+# ports, the layout the baseline TR-181 mappings expect (WAN is
+# Interface.1, LAN ports are Interface.2 through 5). A profile that
+# stops at the WAN port renders a device page with four empty LAN rows.
+#
+# Interface.1.Stats is also the WAN half of experience scoring: the
+# error-rate component is ErrorsReceived over PacketsReceived, so a
+# profile missing either scores every device identically.
+
+parameters:
+  - path: Device.Ethernet.InterfaceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "5"
+  - path: Device.IP.InterfaceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "2"
+
+objects:
+  - path: Device.Ethernet.Interface
+    instances: 5
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Alias
+        value: "PHY{i}"
+        writable: true
+      - path: LowerLayers
+        value: ""
+        writable: true
+      - path: MACAddress
+        value: "00:00:5E:{cpe:hex:2}:00:0{i}"
+      - path: DuplexMode
+        value: "Auto"
+        writable: true
+
+# Port speed and direction are declared per instance rather than in the
+# table above: the loader rejects a group that redeclares a path a
+# table already materialized, so a value that differs for one port
+# cannot be a table default with an override. The WAN port runs at
+# 2.5G, which is why this model appears on multi-gig fibre packages;
+# the four LAN ports stay at 1G.
+groups:
+  - prefix: Device.Ethernet.Interface.1
+    parameters:
+      - path: Name
+        value: "wan"
+      - path: Upstream
+        type: xsd:boolean
+        value: "true"
+      - path: MaxBitRate
+        type: xsd:int
+        value: "2500"
+        writable: true
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "2500"
+
+  - prefix: Device.Ethernet.Interface.2
+    parameters:
+      - path: Name
+        value: "lan1"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: MaxBitRate
+        type: xsd:int
+        value: "1000"
+        writable: true
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "1000"
+
+  - prefix: Device.Ethernet.Interface.3
+    parameters:
+      - path: Name
+        value: "lan2"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: MaxBitRate
+        type: xsd:int
+        value: "1000"
+        writable: true
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "1000"
+
+  - prefix: Device.Ethernet.Interface.4
+    parameters:
+      - path: Name
+        value: "lan3"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: MaxBitRate
+        type: xsd:int
+        value: "1000"
+        writable: true
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "1000"
+
+  - prefix: Device.Ethernet.Interface.5
+    parameters:
+      - path: Name
+        value: "lan4"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: MaxBitRate
+        type: xsd:int
+        value: "1000"
+        writable: true
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "1000"
+
+  - prefix: Device.Ethernet.Interface.1.Stats
+    parameters:
+      - path: BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 14000000
+          jitter: 0.2
+      - path: BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 31000000
+          jitter: 0.2
+      - path: PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 9000
+          jitter: 0.3
+      - path: PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 18000
+          jitter: 0.3
+      # Cumulative since boot, drawn per device rather than fixed at
+      # zero. Generator bounds are literals and cannot take a
+      # placeholder, so the spread lives in the value: most lines are
+      # clean, a minority carry the count a marginal drop produces.
+      # Without it every device scores an identical, and therefore
+      # useless, perfect WAN.
+      - path: ErrorsReceived
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:0,0,0,0,0,0,0,0,4,11,37,140}"
+      - path: ErrorsSent
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:0,0,0,0,0,0,0,0,2,6,19,64}"
+      - path: DiscardPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: DiscardPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.IP.Interface.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Name
+        value: "wan"
+      - path: LowerLayers
+        value: "Device.Ethernet.Interface.1"
+        writable: true
+
+  - prefix: Device.IP.Interface.1.IPv4Address.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: IPAddress
+        value: "{wan_ipv4}"
+      - path: SubnetMask
+        value: "255.192.0.0"
+      - path: AddressingType
+        value: "DHCP"
+
+  # The IPv6 address table is not optional decoration. The baseline
+  # TR-181 mapping walks Device.IP.Interface.{i}.IPv6Address. as a
+  # subtree, and a profile that advertises the interface without the
+  # table answers GPV fault 9005 on every session. Caught by running
+  # the profile against a live ACS, not by loading it.
+  - prefix: Device.IP.Interface.1.IPv6Address.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Preferred"
+      - path: IPAddress
+        value: "{wan_ipv6}"
+      - path: Origin
+        value: "AutoConfigured"
+      - path: Prefix
+        value: ""
+
+  # Interface.2 is the LAN side. InterfaceNumberOfEntries claims two,
+  # so both have to exist: a count that overstates the table is the
+  # same 9005 by another route.
+  - prefix: Device.IP.Interface.2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Name
+        value: "br-lan"
+      - path: LowerLayers
+        value: "Device.Ethernet.Interface.2"
+        writable: true
+
+  - prefix: Device.IP.Interface.2.IPv4Address.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: IPAddress
+        value: "192.168.1.1"
+      - path: SubnetMask
+        value: "255.255.255.0"
+      - path: AddressingType
+        value: "Static"
+
+  # Interface.2 needs its IPv6 table for the same reason Interface.1
+  # does: the baseline TR-181 mapping walks
+  # Device.IP.Interface.{i}.IPv6Address. as a subtree on every
+  # interface it finds, so advertising the interface without the table
+  # answers GPV fault 9005 on every session. Adding it to the WAN and
+  # forgetting the LAN produced 795 faults in fifteen minutes.
+  - prefix: Device.IP.Interface.2.IPv6Address.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Preferred"
+      - path: IPAddress
+        value: "{delegated_prefix}"
+      - path: Origin
+        value: "Static"
+      - path: Prefix
+        value: ""

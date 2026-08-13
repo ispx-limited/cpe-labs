@@ -1,0 +1,172 @@
+# Device.Ethernet.*: two ports, not five. A mesh node has a backhaul
+# and one spare port, not a four-port LAN switch, so the baseline
+# mappings' LAN 2 through 4 legitimately resolve to nothing here. That
+# is the correct answer for this device, and a profile that invented
+# two extra ports to fill the device page would be lying about the
+# hardware.
+#
+# Interface.1 is the backhaul. Its stats still feed WAN scoring, which
+# is right: a node whose backhaul is dropping frames gives the home a
+# bad experience just as surely as a bad WAN does, and that is one of
+# the more common real causes an operator has to find.
+
+parameters:
+  - path: Device.Ethernet.InterfaceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "2"
+  - path: Device.IP.InterfaceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+
+objects:
+  - path: Device.Ethernet.Interface
+    instances: 2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Alias
+        value: "PHY{i}"
+        writable: true
+      - path: LowerLayers
+        value: ""
+        writable: true
+      - path: MACAddress
+        value: "00:00:5E:{cpe:hex:2}:00:0{i}"
+      - path: MaxBitRate
+        type: xsd:int
+        value: "1000"
+        writable: true
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "1000"
+      - path: DuplexMode
+        value: "Auto"
+        writable: true
+
+groups:
+  - prefix: Device.Ethernet.Interface.1
+    parameters:
+      - path: Name
+        value: "backhaul"
+      - path: Upstream
+        type: xsd:boolean
+        value: "true"
+
+  - prefix: Device.Ethernet.Interface.2
+    parameters:
+      - path: Name
+        value: "lan1"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+
+  - prefix: Device.Ethernet.Interface.1.Stats
+    parameters:
+      - path: BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 6000000
+          jitter: 0.25
+      - path: BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 13000000
+          jitter: 0.25
+      - path: PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 4000
+          jitter: 0.3
+      - path: PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 8000
+          jitter: 0.3
+      # A wireless-backhauled node drops frames more often than a wired
+      # gateway does, so the error draw is weighted harder than the
+      # gateway profiles. This is the population an operator is looking
+      # for when a home scores badly and the line itself is clean.
+      - path: ErrorsReceived
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:0,0,0,0,0,9,24,61,150,420}"
+      - path: ErrorsSent
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:0,0,0,0,0,5,13,32,78,210}"
+      - path: DiscardPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: DiscardPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.IP.Interface.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Name
+        value: "br-lan"
+      - path: LowerLayers
+        value: "Device.Ethernet.Interface.1"
+        writable: true
+
+  - prefix: Device.IP.Interface.1.IPv4Address.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: IPAddress
+        value: "192.168.1.{cpe:rpick:2,3,4,5}"
+      - path: SubnetMask
+        value: "255.255.255.0"
+      - path: AddressingType
+        value: "DHCP"
+
+  - prefix: Device.IP.Interface.1.IPv6Address.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Preferred"
+      - path: IPAddress
+        value: "{wan_ipv6}"
+      - path: Origin
+        value: "AutoConfigured"
+      - path: Prefix
+        value: ""

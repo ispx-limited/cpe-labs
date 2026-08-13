@@ -1,0 +1,133 @@
+# Technicolor CGM4331COM, TR-098 (InternetGatewayDevice.*) profile.
+#
+# A DOCSIS 3.1 cable gateway. It earns its place two ways: it is the
+# same base platform two of the largest US cable operators deploy, and
+# it keeps the legacy IGD data model in the fleet alongside the TR-181
+# devices. A mixed fleet that is quietly all-TR-181 never proves the
+# mapping layer does its job.
+#
+# Modelled from public operator catalogues, not from a device capture.
+# The OUI is the documentation OUI (00005E) rather than a Technicolor
+# registration: a fabricated real-looking OUI in a public profile is
+# exactly the value someone would paste into a production mapping.
+# Loads first lexicographically (underscore prefix).
+
+deviceIdPaths:
+  manufacturer: InternetGatewayDevice.DeviceInfo.Manufacturer
+  oui:          InternetGatewayDevice.DeviceInfo.ManufacturerOUI
+  productClass: InternetGatewayDevice.DeviceInfo.ProductClass
+  serialNumber: InternetGatewayDevice.DeviceInfo.SerialNumber
+
+# Fleet defaults to count=1; bump count to spawn N CPEs from this same
+# template. Pools below are referenced as {wan_ipv4} / {wan_ipv6} /
+# {delegated_prefix} / {lan_subnet} from any leaf, declare CIDRs once
+# here, reference them from every leaf that needs differentiation.
+#
+# IPv6 ranges are RFC 3849 documentation prefixes. The IPv4 pools use
+# CGNAT (RFC 6598) and private space rather than the RFC 5737 doc
+# ranges, which are /24s and far too small for a fleet: these values
+# are reported to the ACS as parameter data and never bound to an
+# interface, so size matters and reachability does not.
+fleet:
+  count: 1
+  # Cable-style shape: a three-letter vendor prefix and a 9-character
+  # tail drawn from the per-CPE seeded RNG, so serials stay stable for
+  # a given --seed and unique across the fleet. The prefix must differ
+  # from every other profile sharing the documentation OUI, because
+  # identity at the ACS is OUI plus serial and two cohorts on one
+  # pattern would collapse into a single device population.
+  serialPattern: "TCH{cpe:ALNUM:9}"
+  pools:
+    wan_ipv4:
+      type: ipv4
+      # CGNAT space: reaches every fleet offset, and matches what a
+      # real access network delegates.
+      cidr: "100.64.0.0/10"
+    wan_ipv6:
+      type: ipv6
+      cidr: "2001:db8:1::/64"
+    voice_ipv4:
+      type: ipv4
+      # Voice/mgmt session WAN IP. A /12, not the RFC 2544 /15: pools
+      # are sized for the whole fleet rather than one shard, and a
+      # cohort placed at a six-figure manifest offset walks straight
+      # off the end of a 131k range ("instance 950200 exceeds capacity
+      # 131071"). A million addresses covers any offset a manifest is
+      # likely to use. These values are reported to the ACS, never
+      # bound to an interface, so the range only has to be large and
+      # unambiguous.
+      cidr: "172.16.0.0/12"
+    delegated_prefix:
+      type: ipv6prefix
+      # A /36 operator block, not /48: /56 per home gives 2^20
+      # prefixes, so fleet offsets past 256 still resolve.
+      super: "2001:db8:c000::/36"
+      sublen: 56                        # /56 per CPE
+    lan_ipv4:
+      type: ipv4
+      cidr: "10.0.0.0/8"               # /24 per CPE; lan_ipv4 is the
+                                        # base address for each. 10/8
+                                        # holds 65k homes, which a
+                                        # 192.168/16 did not.
+
+periodicInformPaths:
+  interval: InternetGatewayDevice.ManagementServer.PeriodicInformInterval
+  enable:   InternetGatewayDevice.ManagementServer.PeriodicInformEnable
+  time:     InternetGatewayDevice.ManagementServer.PeriodicInformTime
+
+# ACS auth identity read live from the tree, so credential rotation
+# via SetParameterValues lands on the next session. Empty values fall
+# back to --acs-username/--acs-password.
+acsCredentialPaths:
+  username: InternetGatewayDevice.ManagementServer.Username
+  password: InternetGatewayDevice.ManagementServer.Password
+
+informParameters:
+  # First-contact set, vendor identity + WAN IP + addressing type so
+  # the ACS can immediately decide DHCP/PPP routing + firmware
+  # decisions without GPV roundtrips.
+  bootstrap:
+    - InternetGatewayDevice.DeviceInfo.Manufacturer
+    - InternetGatewayDevice.DeviceInfo.ManufacturerOUI
+    - InternetGatewayDevice.DeviceInfo.ModelName
+    - InternetGatewayDevice.DeviceInfo.ProductClass
+    - InternetGatewayDevice.DeviceInfo.SerialNumber
+    - InternetGatewayDevice.DeviceInfo.HardwareVersion
+    - InternetGatewayDevice.DeviceInfo.SoftwareVersion
+    - InternetGatewayDevice.ManagementServer.URL
+    - InternetGatewayDevice.ManagementServer.ParameterKey
+    - InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.AddressingType
+    - InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ExternalIPAddress
+  boot:
+    - InternetGatewayDevice.DeviceInfo.UpTime
+  # Periodic carries the moving counters + uptime so the ACS dashboard
+  # sees activity without GPV polling.
+  periodic:
+    # Identity repeats on every periodic Inform, not just bootstrap.
+    # Model and firmware reach the device row through identity
+    # enrichment, which reads the Inform's own parameter list, so a
+    # device whose bootstrap the ACS missed (restart, re-registration,
+    # a fleet that predates the profile) would otherwise carry a blank
+    # model for the rest of its life. Real CPEs report these every
+    # session for the same reason.
+    - InternetGatewayDevice.DeviceInfo.ModelName
+    - InternetGatewayDevice.DeviceInfo.SoftwareVersion
+    - InternetGatewayDevice.DeviceInfo.UpTime
+    - InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.TotalBytesSent
+    - InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.TotalBytesReceived
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalBytesSent
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalBytesReceived
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.TotalBytesSent
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.TotalBytesReceived
+  # Vendor "disassociation event" shape: WiFi association count flips
+  # on station join/leave. NOTE: today's generators write silently and
+  # don't fire ValueChange Informs on background mutations; the wifi
+  # fabricator (#62) + a "notify on update" knob will wire this through.
+  # The profile structure is ready for when that lands.
+  valueChange:
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalAssociations
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.TotalAssociations
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Status
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.2.Status
+  connectionRequest:
+    - InternetGatewayDevice.DeviceInfo.UpTime

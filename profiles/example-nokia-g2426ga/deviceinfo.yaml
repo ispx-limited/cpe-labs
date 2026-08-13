@@ -1,0 +1,54 @@
+groups:
+  - prefix: Device.DeviceInfo
+    parameters:
+      - path: Manufacturer
+        value: "Nokia"
+      - path: ManufacturerOUI
+        value: "00005E"
+      - path: ModelName
+        value: "G-2426G-A"
+      - path: Description
+        value: "Nokia G-2426G-A integrated GPON gateway"
+      - path: ProductClass
+        value: "G-2426G-A"
+      - path: SerialNumber
+        value: "BASE"
+      - path: HardwareVersion
+        value: "3FE48810AAAA"
+      # Firmware spreads across the cohort rather than sitting on one
+      # value: a fleet where everything runs the same build has nothing
+      # to upgrade, and campaigns, canary cohorts and "what is behind"
+      # all need a real distribution. Weighted current, with a tail.
+      - path: SoftwareVersion
+        value: "{cpe:rpick:3FE49362IJKL41,3FE49362IJKL41,3FE49362IJKL41,3FE49362IJKL38,3FE49362IJKL38,3FE49362IJKL22}"
+      - path: AdditionalSoftwareVersion
+        value: ""
+      - path: SpecVersion
+        value: "1.0"
+      - path: ProvisioningCode
+        value: ""
+        writable: true
+      - path: UpTime
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: uptime
+          interval: 30s
+      - path: DeviceLog
+        value: ""
+
+  - prefix: Device.DeviceInfo.MemoryStatus
+    parameters:
+      - path: Total
+        type: xsd:unsignedInt
+        value: "262144"
+      - path: Free
+        type: xsd:unsignedInt
+        value: "118784"
+
+  - prefix: Device.DeviceInfo.ProcessStatus
+    parameters:
+      - path: CPUUsage
+        type: xsd:unsignedInt
+        value: "19"

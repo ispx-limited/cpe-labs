@@ -1,0 +1,224 @@
+# Device.WiFi.*: two Wi-Fi 6 radios (2.4 GHz and 5 GHz), one SSID and
+# one AccessPoint each, with associated stations under
+# AccessPoint.{i}.AssociatedDevice.{i}.
+#
+# The associated-device table is the WiFi half of experience scoring:
+# SignalStrength feeds the client_rssi component and
+# LastDataDownlinkRate feeds phy_rate. Both drift, because a fleet of
+# stations pinned at one RSSI produces a flat score that never moves
+# and hides the very variation an operator is looking for.
+
+parameters:
+  - path: Device.WiFi.RadioNumberOfEntries
+    type: xsd:unsignedInt
+    value: "2"
+  - path: Device.WiFi.SSIDNumberOfEntries
+    type: xsd:unsignedInt
+    value: "2"
+  - path: Device.WiFi.AccessPointNumberOfEntries
+    type: xsd:unsignedInt
+    value: "2"
+
+objects:
+  - path: Device.WiFi.Radio
+    instances: 2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Alias
+        value: "WLAN_{i}"
+        writable: true
+      - path: Name
+        value: "wlan{i}"
+      - path: AutoChannelEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: AutoChannelSupported
+        type: xsd:boolean
+        value: "true"
+      - path: SupportedStandards
+        value: "b,g,n,ac,ax"
+      - path: TransmitPower
+        type: xsd:int
+        value: "100"
+        writable: true
+      - path: RegulatoryDomain
+        value: "GB"
+        writable: true
+
+  - path: Device.WiFi.SSID
+    instances: 2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Name
+        value: "wlan{i}"
+      - path: SSID
+        value: "Zyxel-{cpe:hex:4}"
+        writable: true
+      - path: BSSID
+        value: "{cpe:mac:3}"
+      - path: MACAddress
+        value: "{cpe:mac:3}"
+      - path: LowerLayers
+        value: "Device.WiFi.Radio.{i}"
+        writable: true
+
+  - path: Device.WiFi.AccessPoint
+    instances: 2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: SSIDReference
+        value: "Device.WiFi.SSID.{i}"
+        writable: true
+      - path: SSIDAdvertisementEnabled
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: AssociatedDeviceNumberOfEntries
+        type: xsd:unsignedInt
+        value: "3"
+      - path: MaxAssociatedDevices
+        type: xsd:unsignedInt
+        value: "64"
+        writable: true
+
+  # ---- 2.4 GHz stations ----
+  - path: Device.WiFi.AccessPoint.1.AssociatedDevice
+    instances: 3
+    parameters:
+      - path: MACAddress
+        value: "{cpe:mac:3}"
+      - path: AuthenticationState
+        type: xsd:boolean
+        value: "true"
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      # Rate is drawn per device, not animated: TR-181 types these as
+      # xsd:unsignedInt and the drift generator only targets signed
+      # gauges, so the standard type wins over the animation. The
+      # spread still gives the phy_rate component something real to
+      # score, it just varies across the fleet rather than over time.
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:286000,286000,229000,172000,114000,57000}"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:229000,229000,172000,114000,86000,43000}"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-58"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -82
+          max: -41
+          stepMax: 4
+      - path: OperatingStandard
+        value: "{cpe:rpick:ax,ax,n,n,g}"
+      - path: AssociationTime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+
+  # ---- 5 GHz stations: closer to the AP and materially faster, which
+  # is what makes the per-band split worth showing at all ----
+  - path: Device.WiFi.AccessPoint.2.AssociatedDevice
+    instances: 3
+    parameters:
+      - path: MACAddress
+        value: "{cpe:mac:3}"
+      - path: AuthenticationState
+        type: xsd:boolean
+        value: "true"
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:1201000,1201000,961000,720000,480000,240000}"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:961000,961000,720000,480000,360000,180000}"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-51"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -74
+          max: -36
+          stepMax: 4
+      - path: OperatingStandard
+        value: "{cpe:rpick:ax,ax,ac,ac,n}"
+      - path: AssociationTime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+
+groups:
+  - prefix: Device.WiFi.Radio.1
+    parameters:
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+      - path: SupportedFrequencyBands
+        value: "2.4GHz"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:1,6,11}"
+        writable: true
+      - path: OperatingChannelBandwidth
+        value: "20MHz"
+      - path: OperatingStandards
+        value: "b,g,n,ax"
+        writable: true
+
+  - prefix: Device.WiFi.Radio.2
+    parameters:
+      - path: OperatingFrequencyBand
+        value: "5GHz"
+      - path: SupportedFrequencyBands
+        value: "5GHz"
+      # Auto-channel across the UK 5 GHz plan. Repeats weight the
+      # result: the low band is picked more often because indoor
+      # gateways avoid DFS, which is why real fleets bunch at 36-48.
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:36,40,44,48,36,40,44,48,52,100,116,132,149,153,157,161}"
+        writable: true
+      - path: OperatingChannelBandwidth
+        value: "{cpe:rpick:80MHz,80MHz,80MHz,80MHz,80MHz,40MHz}"
+      - path: OperatingStandards
+        value: "a,n,ac,ax"
+        writable: true
+
+  - prefix: Device.WiFi.AccessPoint.1.Security
+    parameters:
+      - path: ModeEnabled
+        value: "{cpe:rpick:WPA3-Personal-Transition,WPA3-Personal-Transition,WPA2-Personal}"
+        writable: true
+      - path: ModesSupported
+        value: "None,WPA2-Personal,WPA3-Personal,WPA3-Personal-Transition"
+
+  - prefix: Device.WiFi.AccessPoint.2.Security
+    parameters:
+      - path: ModeEnabled
+        value: "{cpe:rpick:WPA3-Personal-Transition,WPA3-Personal-Transition,WPA2-Personal}"
+        writable: true
+      - path: ModesSupported
+        value: "None,WPA2-Personal,WPA3-Personal,WPA3-Personal-Transition"

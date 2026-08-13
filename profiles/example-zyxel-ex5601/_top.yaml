@@ -1,0 +1,79 @@
+# Zyxel EX5601-T0, TR-181 (Device.*) profile.
+#
+# A Wi-Fi 6 fibre gateway with an Ethernet WAN, the shape that recurs
+# across more operators than any other traditional gateway family.
+#
+# Modelled from public operator catalogues, not from a device capture.
+# The parameter tree is standard TR-181 and the identity strings are
+# the published model codes, but the OUI is the documentation OUI
+# (00005E) rather than a Zyxel registration: real OUIs belong to real
+# hardware, and a fabricated one in a public profile is exactly the
+# kind of value someone would paste into a production mapping. Bind a
+# production profile to an OUI observed from a device, not from here.
+
+deviceIdPaths:
+  manufacturer: Device.DeviceInfo.Manufacturer
+  oui:          Device.DeviceInfo.ManufacturerOUI
+  productClass: Device.DeviceInfo.ProductClass
+  serialNumber: Device.DeviceInfo.SerialNumber
+
+fleet:
+  count: 1
+  # Zyxel-style shape: S-prefixed factory code plus a 9-character tail.
+  # The prefix has to differ from every other profile that shares the
+  # documentation OUI, because device identity at the ACS is OUI plus
+  # serial and two cohorts minting the same pattern would collide into
+  # one device population.
+  serialPattern: "S22{cpe:ALNUM:9}"
+  pools:
+    wan_ipv4:
+      type: ipv4
+      cidr: "100.64.0.0/10"
+    wan_ipv6:
+      type: ipv6
+      cidr: "2001:db8:3::/64"
+    delegated_prefix:
+      type: ipv6prefix
+      super: "2001:db8:d000::/36"
+      sublen: 56
+
+periodicInformPaths:
+  interval: Device.ManagementServer.PeriodicInformInterval
+  enable:   Device.ManagementServer.PeriodicInformEnable
+
+informParameters:
+  bootstrap:
+    - Device.DeviceInfo.Manufacturer
+    - Device.DeviceInfo.ManufacturerOUI
+    - Device.DeviceInfo.ModelName
+    - Device.DeviceInfo.ProductClass
+    - Device.DeviceInfo.SerialNumber
+    - Device.DeviceInfo.HardwareVersion
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.ManagementServer.URL
+    - Device.ManagementServer.ParameterKey
+    - Device.IP.Interface.1.IPv4Address.1.IPAddress
+  boot:
+    - Device.DeviceInfo.UpTime
+  periodic:
+    # Identity repeats on every periodic Inform, not just bootstrap.
+    # Model and firmware reach the device row through identity
+    # enrichment, which reads the Inform's own parameter list, so a
+    # device whose bootstrap the ACS missed (restart, re-registration,
+    # a fleet that predates the profile) would otherwise carry a blank
+    # model for the rest of its life. Real CPEs report these every
+    # session for the same reason.
+    - Device.DeviceInfo.ModelName
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.DeviceInfo.UpTime
+    - Device.Ethernet.Interface.1.Stats.BytesSent
+    - Device.Ethernet.Interface.1.Stats.BytesReceived
+    - Device.Ethernet.Interface.1.Stats.ErrorsReceived
+    - Device.Ethernet.Interface.1.Stats.PacketsReceived
+  valueChange:
+    - Device.WiFi.AccessPoint.1.AssociatedDeviceNumberOfEntries
+    - Device.WiFi.AccessPoint.2.AssociatedDeviceNumberOfEntries
+    - Device.WiFi.SSID.1.Status
+    - Device.WiFi.SSID.2.Status
+  connectionRequest:
+    - Device.DeviceInfo.UpTime

@@ -1,0 +1,77 @@
+# Device.Optical.*: the GPON termination inside the gateway.
+#
+# This is what separates an integrated PON gateway from every
+# Ethernet-WAN model in the fleet. Rx power is the number an operator
+# actually looks at when a fibre line degrades, so it drifts rather
+# than sitting still: a dBm reading pinned at one value cannot show the
+# slow decline that a dirty connector or a bending fibre produces.
+#
+# Units follow TR-181: power is reported in units of 0.1 dBm as a
+# signed integer, so -2410 is -24.1 dBm. A healthy GPON ONT sits around
+# -15 to -25 dBm and an operator investigates past roughly -27.
+
+parameters:
+  - path: Device.Optical.InterfaceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+
+groups:
+  - prefix: Device.Optical.Interface.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Name
+        value: "pon0"
+      - path: LowerLayers
+        value: ""
+        writable: true
+      - path: Upstream
+        type: xsd:boolean
+        value: "true"
+      - path: OpticalSignalLevel
+        type: xsd:int
+        value: "-2410"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -2850
+          max: -1580
+          stepMax: 25
+      - path: CurrentDownstreamRxPower
+        type: xsd:int
+        value: "-2410"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -2850
+          max: -1580
+          stepMax: 25
+      - path: CurrentUpstreamTxPower
+        type: xsd:int
+        value: "230"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: 100
+          max: 400
+          stepMax: 15
+      - path: TransceiverTemperature
+        type: xsd:int
+        value: "42"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: 28
+          max: 71
+          stepMax: 2
+      - path: SupplyVoltage
+        type: xsd:int
+        value: "3300"

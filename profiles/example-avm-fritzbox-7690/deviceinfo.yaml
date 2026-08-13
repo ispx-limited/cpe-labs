@@ -1,0 +1,54 @@
+groups:
+  - prefix: Device.DeviceInfo
+    parameters:
+      - path: Manufacturer
+        value: "AVM"
+      - path: ManufacturerOUI
+        value: "00005E"
+      - path: ModelName
+        value: "FRITZ!Box 7690"
+      - path: Description
+        value: "AVM FRITZ!Box 7690 Wi-Fi 7 gateway"
+      # ProductClass carries no space. Operator tooling, selector
+      # values and URL path segments all handle the model name badly
+      # when it does, and the published marketing name keeps the space
+      # while the device class does not.
+      - path: ProductClass
+        value: "FRITZBox7690"
+      - path: SerialNumber
+        value: "BASE"
+      - path: HardwareVersion
+        value: "1.0"
+      - path: SoftwareVersion
+        value: "{cpe:rpick:8.03,8.03,8.03,8.02,8.02,8.00}"
+      - path: AdditionalSoftwareVersion
+        value: ""
+      - path: SpecVersion
+        value: "1.0"
+      - path: ProvisioningCode
+        value: ""
+        writable: true
+      - path: UpTime
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: uptime
+          interval: 30s
+      - path: DeviceLog
+        value: ""
+
+  - prefix: Device.DeviceInfo.MemoryStatus
+    parameters:
+      - path: Total
+        type: xsd:unsignedInt
+        value: "1048576"
+      - path: Free
+        type: xsd:unsignedInt
+        value: "624640"
+
+  - prefix: Device.DeviceInfo.ProcessStatus
+    parameters:
+      - path: CPUUsage
+        type: xsd:unsignedInt
+        value: "11"
