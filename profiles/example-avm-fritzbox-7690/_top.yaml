@@ -1,0 +1,73 @@
+# AVM FRITZ!Box 7690, TR-181 (Device.*) profile.
+#
+# A Wi-Fi 7 gateway, and the only tri-band model in the fleet: it adds
+# a 6 GHz radio on top of 2.4 and 5, which is what makes it useful
+# beyond another vendor name. Anything that assumes two radios per
+# device, in scoring, spectrum views or channel planning, meets its
+# counterexample here.
+#
+# Modelled from public operator catalogues, not from a device capture.
+# The OUI is the documentation OUI (00005E) rather than an AVM
+# registration: a fabricated real-looking OUI in a public profile is
+# exactly the value someone would paste into a production mapping.
+
+deviceIdPaths:
+  manufacturer: Device.DeviceInfo.Manufacturer
+  oui:          Device.DeviceInfo.ManufacturerOUI
+  productClass: Device.DeviceInfo.ProductClass
+  serialNumber: Device.DeviceInfo.SerialNumber
+
+fleet:
+  count: 1
+  serialPattern: "FB76{cpe:hex:10}"
+  pools:
+    wan_ipv4:
+      type: ipv4
+      cidr: "100.64.0.0/10"
+    wan_ipv6:
+      type: ipv6
+      cidr: "2001:db8:5::/64"
+    delegated_prefix:
+      type: ipv6prefix
+      super: "2001:db8:f000::/36"
+      sublen: 56
+
+periodicInformPaths:
+  interval: Device.ManagementServer.PeriodicInformInterval
+  enable:   Device.ManagementServer.PeriodicInformEnable
+
+informParameters:
+  bootstrap:
+    - Device.DeviceInfo.Manufacturer
+    - Device.DeviceInfo.ManufacturerOUI
+    - Device.DeviceInfo.ModelName
+    - Device.DeviceInfo.ProductClass
+    - Device.DeviceInfo.SerialNumber
+    - Device.DeviceInfo.HardwareVersion
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.ManagementServer.URL
+    - Device.ManagementServer.ParameterKey
+    - Device.IP.Interface.1.IPv4Address.1.IPAddress
+  boot:
+    - Device.DeviceInfo.UpTime
+  periodic:
+    # Identity repeats on every periodic Inform, not just bootstrap.
+    # Model and firmware reach the device row through identity
+    # enrichment, which reads the Inform's own parameter list, so a
+    # device whose bootstrap the ACS missed (restart, re-registration,
+    # a fleet that predates the profile) would otherwise carry a blank
+    # model for the rest of its life. Real CPEs report these every
+    # session for the same reason.
+    - Device.DeviceInfo.ModelName
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.DeviceInfo.UpTime
+    - Device.Ethernet.Interface.1.Stats.BytesSent
+    - Device.Ethernet.Interface.1.Stats.BytesReceived
+    - Device.Ethernet.Interface.1.Stats.ErrorsReceived
+    - Device.Ethernet.Interface.1.Stats.PacketsReceived
+  valueChange:
+    - Device.WiFi.AccessPoint.1.AssociatedDeviceNumberOfEntries
+    - Device.WiFi.AccessPoint.2.AssociatedDeviceNumberOfEntries
+    - Device.WiFi.AccessPoint.3.AssociatedDeviceNumberOfEntries
+  connectionRequest:
+    - Device.DeviceInfo.UpTime

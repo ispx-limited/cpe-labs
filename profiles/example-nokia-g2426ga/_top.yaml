@@ -1,0 +1,78 @@
+# Nokia G-2426G-A, TR-181 (Device.*) profile.
+#
+# An integrated GPON gateway: the optical termination is inside the box
+# rather than in a separate ONT, which is what makes it worth carrying
+# alongside the Ethernet-WAN models. The same unit appears under
+# several unrelated retail networks, so it is a good test that identity
+# matching keys on the device tuple and not on the operator.
+#
+# Modelled from public operator catalogues, not from a device capture.
+# The OUI is the documentation OUI (00005E) rather than a Nokia
+# registration: a fabricated real-looking OUI in a public profile is
+# exactly the value someone would paste into a production mapping.
+
+deviceIdPaths:
+  manufacturer: Device.DeviceInfo.Manufacturer
+  oui:          Device.DeviceInfo.ManufacturerOUI
+  productClass: Device.DeviceInfo.ProductClass
+  serialNumber: Device.DeviceInfo.SerialNumber
+
+fleet:
+  count: 1
+  # ALCL is the vendor id a Nokia/Alcatel ONT reports in its PON serial,
+  # followed by an 8-hex tail. The prefix has to differ from every other
+  # profile sharing the documentation OUI: identity is OUI plus serial,
+  # so two cohorts on one pattern would collapse into one population.
+  serialPattern: "ALCL{cpe:hex:8}"
+  pools:
+    wan_ipv4:
+      type: ipv4
+      cidr: "100.64.0.0/10"
+    wan_ipv6:
+      type: ipv6
+      cidr: "2001:db8:4::/64"
+    delegated_prefix:
+      type: ipv6prefix
+      super: "2001:db8:e000::/36"
+      sublen: 56
+
+periodicInformPaths:
+  interval: Device.ManagementServer.PeriodicInformInterval
+  enable:   Device.ManagementServer.PeriodicInformEnable
+
+informParameters:
+  bootstrap:
+    - Device.DeviceInfo.Manufacturer
+    - Device.DeviceInfo.ManufacturerOUI
+    - Device.DeviceInfo.ModelName
+    - Device.DeviceInfo.ProductClass
+    - Device.DeviceInfo.SerialNumber
+    - Device.DeviceInfo.HardwareVersion
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.ManagementServer.URL
+    - Device.ManagementServer.ParameterKey
+    - Device.IP.Interface.1.IPv4Address.1.IPAddress
+  boot:
+    - Device.DeviceInfo.UpTime
+  periodic:
+    # Identity repeats on every periodic Inform, not just bootstrap.
+    # Model and firmware reach the device row through identity
+    # enrichment, which reads the Inform's own parameter list, so a
+    # device whose bootstrap the ACS missed (restart, re-registration,
+    # a fleet that predates the profile) would otherwise carry a blank
+    # model for the rest of its life. Real CPEs report these every
+    # session for the same reason.
+    - Device.DeviceInfo.ModelName
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.DeviceInfo.UpTime
+    - Device.Ethernet.Interface.1.Stats.BytesSent
+    - Device.Ethernet.Interface.1.Stats.BytesReceived
+    - Device.Ethernet.Interface.1.Stats.ErrorsReceived
+    - Device.Ethernet.Interface.1.Stats.PacketsReceived
+    - Device.Optical.Interface.1.CurrentDownstreamRxPower
+  valueChange:
+    - Device.WiFi.AccessPoint.1.AssociatedDeviceNumberOfEntries
+    - Device.WiFi.AccessPoint.2.AssociatedDeviceNumberOfEntries
+    - Device.Optical.Interface.1.Status
+  connectionRequest:
+    - Device.DeviceInfo.UpTime

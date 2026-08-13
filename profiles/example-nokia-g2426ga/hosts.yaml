@@ -1,0 +1,67 @@
+# Device.Hosts.*: the LAN and Wi-Fi clients in the home. Six entries,
+# split across both radios and the wired ports, so per-subscriber
+# topology has more than one shape to draw.
+
+parameters:
+  - path: Device.Hosts.HostNumberOfEntries
+    type: xsd:unsignedInt
+    value: "6"
+
+objects:
+  - path: Device.Hosts.Host
+    instances: 6
+    parameters:
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: PhysAddress
+        value: "{cpe:mac:3}"
+      - path: IPAddress
+        value: "192.168.1.{i}0"
+      - path: HostName
+        value: "client-{i}-cpe{cpe:hex:4}"
+      - path: AddressSource
+        value: "DHCP"
+      - path: LeaseTimeRemaining
+        type: xsd:int
+        value: "86400"
+      - path: Layer3Interface
+        value: "Device.IP.Interface.1"
+      - path: Alias
+        value: "host-{i}"
+        writable: true
+      - path: IPv4AddressNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+      - path: IPv6AddressNumberOfEntries
+        type: xsd:unsignedInt
+        value: "0"
+
+groups:
+  # Layer1Interface is what separates a wired client from a 2.4 GHz one
+  # from a 5 GHz one on the topology view. Leaving every host on the
+  # same interface draws a home where nothing is on Wi-Fi.
+  - prefix: Device.Hosts.Host.1
+    parameters:
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.2"
+  - prefix: Device.Hosts.Host.2
+    parameters:
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.2"
+  - prefix: Device.Hosts.Host.3
+    parameters:
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.2"
+  - prefix: Device.Hosts.Host.4
+    parameters:
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.1"
+  - prefix: Device.Hosts.Host.5
+    parameters:
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.1"
+  - prefix: Device.Hosts.Host.6
+    parameters:
+      - path: Layer1Interface
+        value: "Device.Ethernet.Interface.2"

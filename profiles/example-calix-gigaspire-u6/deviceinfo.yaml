@@ -1,0 +1,53 @@
+groups:
+  - prefix: Device.DeviceInfo
+    parameters:
+      - path: Manufacturer
+        value: "Calix"
+      - path: ManufacturerOUI
+        value: "00005E"
+      - path: ModelName
+        value: "GigaSpire BLAST u6"
+      # The published operator catalogues name the u6 family without
+      # committing an exact submodel, so the device class carries the
+      # family rather than a code invented to look precise.
+      - path: ProductClass
+        value: "GigaSpire-BLAST-u6"
+      - path: Description
+        value: "Calix GigaSpire BLAST u6 carrier-managed Wi-Fi 6 system"
+      - path: SerialNumber
+        value: "BASE"
+      - path: HardwareVersion
+        value: "1.0"
+      - path: SoftwareVersion
+        value: "{cpe:rpick:24.3.1.0,24.3.1.0,24.3.1.0,24.2.4.0,24.2.4.0,23.4.9.0}"
+      - path: AdditionalSoftwareVersion
+        value: ""
+      - path: SpecVersion
+        value: "1.0"
+      - path: ProvisioningCode
+        value: ""
+        writable: true
+      - path: UpTime
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: uptime
+          interval: 30s
+      - path: DeviceLog
+        value: ""
+
+  - prefix: Device.DeviceInfo.MemoryStatus
+    parameters:
+      - path: Total
+        type: xsd:unsignedInt
+        value: "524288"
+      - path: Free
+        type: xsd:unsignedInt
+        value: "298000"
+
+  - prefix: Device.DeviceInfo.ProcessStatus
+    parameters:
+      - path: CPUUsage
+        type: xsd:unsignedInt
+        value: "16"

@@ -1,0 +1,50 @@
+groups:
+  - prefix: Device.DeviceInfo
+    parameters:
+      - path: Manufacturer
+        value: "Plume"
+      - path: ManufacturerOUI
+        value: "00005E"
+      - path: ModelName
+        value: "SuperPod AX"
+      - path: ProductClass
+        value: "PP403Z"
+      - path: Description
+        value: "Plume SuperPod AX mesh node"
+      - path: SerialNumber
+        value: "BASE"
+      - path: HardwareVersion
+        value: "1.0"
+      - path: SoftwareVersion
+        value: "{cpe:rpick:3.6.0,3.6.0,3.6.0,3.4.2,3.4.2,3.2.8}"
+      - path: AdditionalSoftwareVersion
+        value: ""
+      - path: SpecVersion
+        value: "1.0"
+      - path: ProvisioningCode
+        value: ""
+        writable: true
+      - path: UpTime
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: uptime
+          interval: 30s
+      - path: DeviceLog
+        value: ""
+
+  - prefix: Device.DeviceInfo.MemoryStatus
+    parameters:
+      - path: Total
+        type: xsd:unsignedInt
+        value: "262144"
+      - path: Free
+        type: xsd:unsignedInt
+        value: "163840"
+
+  - prefix: Device.DeviceInfo.ProcessStatus
+    parameters:
+      - path: CPUUsage
+        type: xsd:unsignedInt
+        value: "9"

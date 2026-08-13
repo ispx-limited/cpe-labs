@@ -1,0 +1,61 @@
+# InternetGatewayDevice.LANDevice.1.Hosts.*, DHCP-style host table.
+#
+# The objects: form declares the multi-instance table once: parent
+# path + instances + child parameters (relative paths). Loader
+# expands internally to the same {i}-templated rows the verbose
+# parameters-only form would produce, registers AddTable for the
+# parent so AddObject works, and supports {i} in child values.
+#
+# IPv6 on hosts is modeled in both shapes an ACS LAN-hosts telemetry profile
+# baseline queries: the legacy scalar Host.{i}.IPv6Address (older
+# TR-098 variants) on Host.1, and the modern instance-table form
+# Host.{i}.IPv6Address.{i}.IPAddress on Host.2. Real firmware exposes
+# one or the other; the flagship example exposes one of each so both
+# baseline query forms resolve against a single fleet.
+
+parameters:
+  - path: InternetGatewayDevice.LANDevice.1.Hosts.HostNumberOfEntries
+    type: xsd:unsignedInt
+    value: "5"
+
+objects:
+  - path: InternetGatewayDevice.LANDevice.1.Hosts.Host
+    instances: 5
+    parameters:
+      - path: IPAddress
+        value: "192.168.1.{i}0"
+      - path: MACAddress
+        value: "0A:1B:2C:00:01:0{i}"
+      - path: HostName
+        value: "host-{i}-cpe{cpe:hex:4}"
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: AddressSource
+        value: "DHCP"
+      - path: LeaseTimeRemaining
+        type: xsd:int
+        value: "86400"
+      - path: InterfaceType
+        value: "802.11"
+      - path: Layer2Interface
+        value: "InternetGatewayDevice.LANDevice.1.WLANConfiguration.1"
+      # Arris extension: last-activity timestamp, a string on real
+      # NVG firmware (not xsd:dateTime).
+      - path: X_00005E_LastActive
+        value: "2026-01-01T00:00:0{i}Z"
+
+  # Modern IPv6 instance-table form on Host.2 (EUI-64 from the host
+  # MAC inside the delegated /56's first subnet).
+  - path: InternetGatewayDevice.LANDevice.1.Hosts.Host.2.IPv6Address
+    instances: 1
+    parameters:
+      - path: IPAddress
+        value: "2001:db8:cafe:0:81b:2cff:fe00:102"
+
+groups:
+  # Legacy scalar IPv6 form on Host.1.
+  - prefix: InternetGatewayDevice.LANDevice.1.Hosts.Host.1
+    parameters:
+      - path: IPv6Address
+        value: "2001:db8:cafe:0:81b:2cff:fe00:101"

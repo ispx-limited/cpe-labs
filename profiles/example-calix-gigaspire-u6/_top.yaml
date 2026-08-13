@@ -1,0 +1,78 @@
+# Calix GigaSpire BLAST u6, TR-181 (Device.*) profile.
+#
+# A carrier-managed Wi-Fi 6 system, and the profile the USP cohort
+# runs: a directory profile gives a TR-369 agent a real data model
+# (WiFi, hosts, interfaces) instead of the bare identity a minimal
+# single-file profile produces, which is the difference between a USP
+# device that can be provisioned and one that can only be counted.
+#
+# The tree keeps Device.ManagementServer so the same profile can run as
+# either a CWMP cohort or a USP cohort, matching the convention the
+# minimal TR-181 example already sets. A real TR-369-only agent would
+# not expose that subtree, and provisioning rules scoped to USP must
+# not read canonical.mgmt.* for exactly that reason.
+#
+# Modelled from public operator catalogues, not from a device capture.
+# The published catalogues name the BLAST u6 family without committing
+# an exact submodel, so ProductClass carries the family name. The OUI
+# is the documentation OUI (00005E) rather than a Calix registration.
+
+deviceIdPaths:
+  manufacturer: Device.DeviceInfo.Manufacturer
+  oui:          Device.DeviceInfo.ManufacturerOUI
+  productClass: Device.DeviceInfo.ProductClass
+  serialNumber: Device.DeviceInfo.SerialNumber
+
+fleet:
+  count: 1
+  serialPattern: "CXNK{cpe:hex:8}"
+  pools:
+    wan_ipv4:
+      type: ipv4
+      cidr: "100.64.0.0/10"
+    wan_ipv6:
+      type: ipv6
+      cidr: "2001:db8:6::/64"
+    delegated_prefix:
+      type: ipv6prefix
+      super: "2001:db8:a000::/36"
+      sublen: 56
+
+periodicInformPaths:
+  interval: Device.ManagementServer.PeriodicInformInterval
+  enable:   Device.ManagementServer.PeriodicInformEnable
+
+informParameters:
+  bootstrap:
+    - Device.DeviceInfo.Manufacturer
+    - Device.DeviceInfo.ManufacturerOUI
+    - Device.DeviceInfo.ModelName
+    - Device.DeviceInfo.ProductClass
+    - Device.DeviceInfo.SerialNumber
+    - Device.DeviceInfo.HardwareVersion
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.ManagementServer.URL
+    - Device.ManagementServer.ParameterKey
+    - Device.IP.Interface.1.IPv4Address.1.IPAddress
+  boot:
+    - Device.DeviceInfo.UpTime
+  periodic:
+    # Identity repeats on every periodic Inform, not just bootstrap.
+    # Model and firmware reach the device row through identity
+    # enrichment, which reads the Inform's own parameter list, so a
+    # device whose bootstrap the ACS missed (restart, re-registration,
+    # a fleet that predates the profile) would otherwise carry a blank
+    # model for the rest of its life. Real CPEs report these every
+    # session for the same reason.
+    - Device.DeviceInfo.ModelName
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.DeviceInfo.UpTime
+    - Device.Ethernet.Interface.1.Stats.BytesSent
+    - Device.Ethernet.Interface.1.Stats.BytesReceived
+    - Device.Ethernet.Interface.1.Stats.ErrorsReceived
+    - Device.Ethernet.Interface.1.Stats.PacketsReceived
+  valueChange:
+    - Device.WiFi.AccessPoint.1.AssociatedDeviceNumberOfEntries
+    - Device.WiFi.AccessPoint.2.AssociatedDeviceNumberOfEntries
+  connectionRequest:
+    - Device.DeviceInfo.UpTime

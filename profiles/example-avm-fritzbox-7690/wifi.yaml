@@ -1,0 +1,282 @@
+# Device.WiFi.*: three Wi-Fi 7 radios (2.4 GHz, 5 GHz, 6 GHz).
+#
+# The tri-band shape is the point of this profile. Every other gateway
+# in the fleet has two radios, so anything that quietly assumes a pair
+# (scoring, spectrum views, channel planning, per-band rollups) has one
+# device class here that proves it.
+#
+# The associated-device table is the WiFi half of experience scoring:
+# SignalStrength feeds client_rssi and LastDataDownlinkRate feeds
+# phy_rate.
+
+parameters:
+  - path: Device.WiFi.RadioNumberOfEntries
+    type: xsd:unsignedInt
+    value: "3"
+  - path: Device.WiFi.SSIDNumberOfEntries
+    type: xsd:unsignedInt
+    value: "3"
+  - path: Device.WiFi.AccessPointNumberOfEntries
+    type: xsd:unsignedInt
+    value: "3"
+
+objects:
+  - path: Device.WiFi.Radio
+    instances: 3
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Alias
+        value: "WLAN_{i}"
+        writable: true
+      - path: Name
+        value: "wlan{i}"
+      - path: AutoChannelEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: AutoChannelSupported
+        type: xsd:boolean
+        value: "true"
+      - path: SupportedStandards
+        value: "b,g,n,ac,ax,be"
+      - path: TransmitPower
+        type: xsd:int
+        value: "100"
+        writable: true
+      - path: RegulatoryDomain
+        value: "DE"
+        writable: true
+
+  - path: Device.WiFi.SSID
+    instances: 3
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Name
+        value: "wlan{i}"
+      - path: SSID
+        value: "FRITZ!Box-{cpe:hex:4}"
+        writable: true
+      - path: BSSID
+        value: "{cpe:mac:3}"
+      - path: MACAddress
+        value: "{cpe:mac:3}"
+      - path: LowerLayers
+        value: "Device.WiFi.Radio.{i}"
+        writable: true
+
+  - path: Device.WiFi.AccessPoint
+    instances: 3
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: SSIDReference
+        value: "Device.WiFi.SSID.{i}"
+        writable: true
+      - path: SSIDAdvertisementEnabled
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: AssociatedDeviceNumberOfEntries
+        type: xsd:unsignedInt
+        value: "3"
+      - path: MaxAssociatedDevices
+        type: xsd:unsignedInt
+        value: "128"
+        writable: true
+
+  - path: Device.WiFi.AccessPoint.1.AssociatedDevice
+    instances: 3
+    parameters:
+      - path: MACAddress
+        value: "{cpe:mac:3}"
+      - path: AuthenticationState
+        type: xsd:boolean
+        value: "true"
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      # Rate is drawn per device, not animated: TR-181 types these as
+      # xsd:unsignedInt and the drift generator only targets signed
+      # gauges, so the standard type wins over the animation.
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:344000,344000,286000,229000,143000,72000}"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:286000,286000,229000,143000,108000,57000}"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-57"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -82
+          max: -40
+          stepMax: 4
+      - path: OperatingStandard
+        value: "{cpe:rpick:ax,ax,n,n,g}"
+      - path: AssociationTime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+
+  - path: Device.WiFi.AccessPoint.2.AssociatedDevice
+    instances: 3
+    parameters:
+      - path: MACAddress
+        value: "{cpe:mac:3}"
+      - path: AuthenticationState
+        type: xsd:boolean
+        value: "true"
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:2402000,2402000,1921000,1441000,960000,480000}"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:1921000,1921000,1441000,960000,720000,360000}"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-50"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -74
+          max: -35
+          stepMax: 4
+      - path: OperatingStandard
+        value: "{cpe:rpick:ax,ax,ac,ac,n}"
+      - path: AssociationTime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+
+  # 6 GHz: fast and short-ranged. The RSSI floor sits lower than the
+  # other bands because 6 GHz falls away faster through walls, which is
+  # the whole reason a tri-band home still needs the 2.4 GHz radio.
+  - path: Device.WiFi.AccessPoint.3.AssociatedDevice
+    instances: 3
+    parameters:
+      - path: MACAddress
+        value: "{cpe:mac:3}"
+      - path: AuthenticationState
+        type: xsd:boolean
+        value: "true"
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:2882000,2882000,2402000,1921000,1153000,576000}"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:2402000,2402000,1921000,1153000,864000,432000}"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-54"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -86
+          max: -38
+          stepMax: 5
+      - path: OperatingStandard
+        value: "{cpe:rpick:be,be,ax,ax}"
+      - path: AssociationTime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+
+groups:
+  - prefix: Device.WiFi.Radio.1
+    parameters:
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+      - path: SupportedFrequencyBands
+        value: "2.4GHz"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:1,6,11}"
+        writable: true
+      - path: OperatingChannelBandwidth
+        value: "20MHz"
+      - path: OperatingStandards
+        value: "b,g,n,ax,be"
+        writable: true
+
+  - prefix: Device.WiFi.Radio.2
+    parameters:
+      - path: OperatingFrequencyBand
+        value: "5GHz"
+      - path: SupportedFrequencyBands
+        value: "5GHz"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:36,40,44,48,36,40,44,48,52,100,116,132,149,153,157,161}"
+        writable: true
+      - path: OperatingChannelBandwidth
+        value: "{cpe:rpick:160MHz,80MHz,80MHz,80MHz,80MHz,40MHz}"
+      - path: OperatingStandards
+        value: "a,n,ac,ax,be"
+        writable: true
+
+  - prefix: Device.WiFi.Radio.3
+    parameters:
+      - path: OperatingFrequencyBand
+        value: "6GHz"
+      - path: SupportedFrequencyBands
+        value: "6GHz"
+      # 6 GHz preferred-scanning channels. A fleet that only ever picks
+      # channel 37 tells a spectrum view nothing, so the draw spans the
+      # PSC set an auto-channel implementation would actually choose.
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:37,53,69,85,101,117,133,149,165,181,197,213}"
+        writable: true
+      - path: OperatingChannelBandwidth
+        value: "{cpe:rpick:320MHz,160MHz,160MHz,160MHz,80MHz}"
+      - path: OperatingStandards
+        value: "ax,be"
+        writable: true
+
+  - prefix: Device.WiFi.AccessPoint.1.Security
+    parameters:
+      - path: ModeEnabled
+        value: "{cpe:rpick:WPA3-Personal-Transition,WPA3-Personal-Transition,WPA2-Personal}"
+        writable: true
+      - path: ModesSupported
+        value: "None,WPA2-Personal,WPA3-Personal,WPA3-Personal-Transition"
+
+  - prefix: Device.WiFi.AccessPoint.2.Security
+    parameters:
+      - path: ModeEnabled
+        value: "{cpe:rpick:WPA3-Personal-Transition,WPA3-Personal-Transition,WPA2-Personal}"
+        writable: true
+      - path: ModesSupported
+        value: "None,WPA2-Personal,WPA3-Personal,WPA3-Personal-Transition"
+
+  # 6 GHz has no WPA2 option: WPA3 is mandatory on the band, so a
+  # transition mode here would be wrong rather than merely unusual.
+  - prefix: Device.WiFi.AccessPoint.3.Security
+    parameters:
+      - path: ModeEnabled
+        value: "WPA3-Personal"
+        writable: true
+      - path: ModesSupported
+        value: "WPA3-Personal"

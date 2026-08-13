@@ -1,0 +1,56 @@
+# Device.Hosts.*: the clients this node is serving. Three, not the
+# gateway's six: a mesh node carries the devices in its room, and the
+# rest of the home stays on the gateway. The split is what makes a
+# per-subscriber topology view worth drawing at all.
+
+parameters:
+  - path: Device.Hosts.HostNumberOfEntries
+    type: xsd:unsignedInt
+    value: "3"
+
+objects:
+  - path: Device.Hosts.Host
+    instances: 3
+    parameters:
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: PhysAddress
+        value: "{cpe:mac:3}"
+      - path: IPAddress
+        value: "192.168.1.{i}0"
+      - path: HostName
+        value: "client-{i}-cpe{cpe:hex:4}"
+      - path: AddressSource
+        value: "DHCP"
+      - path: LeaseTimeRemaining
+        type: xsd:int
+        value: "86400"
+      - path: Layer3Interface
+        value: "Device.IP.Interface.1"
+      - path: Alias
+        value: "host-{i}"
+        writable: true
+      - path: IPv4AddressNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+      - path: IPv6AddressNumberOfEntries
+        type: xsd:unsignedInt
+        value: "0"
+
+groups:
+  # Layer1Interface is what separates a wired client from a 2.4 GHz one
+  # from a 5 GHz one on the topology view. Leaving every host on the
+  # same interface draws a home where nothing is on Wi-Fi.
+  - prefix: Device.Hosts.Host.1
+    parameters:
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.2"
+  - prefix: Device.Hosts.Host.2
+    parameters:
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.2"
+  - prefix: Device.Hosts.Host.3
+    parameters:
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.2"

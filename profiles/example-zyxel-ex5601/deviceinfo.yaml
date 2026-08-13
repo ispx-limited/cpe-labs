@@ -1,0 +1,56 @@
+groups:
+  - prefix: Device.DeviceInfo
+    parameters:
+      - path: Manufacturer
+        value: "Zyxel"
+      - path: ManufacturerOUI
+        value: "00005E"
+      - path: ModelName
+        value: "EX5601-T0"
+      - path: Description
+        value: "Zyxel EX5601-T0 Wi-Fi 6 fibre gateway"
+      - path: ProductClass
+        value: "EX5601-T0"
+      - path: SerialNumber
+        value: "BASE"
+      - path: HardwareVersion
+        value: "1.0"
+      # Firmware spreads across the cohort rather than sitting on one
+      # value. An ACS demo that shows a single version everywhere has
+      # nothing to upgrade: campaigns, canary cohorts and "which of my
+      # fleet is behind" all need a real distribution. Weighted so most
+      # devices are current and a long tail is not, which is what an
+      # installed base actually looks like.
+      - path: SoftwareVersion
+        value: "{cpe:rpick:V5.70(ACDZ.2)C0,V5.70(ACDZ.2)C0,V5.70(ACDZ.2)C0,V5.70(ACDZ.1)C0,V5.70(ACDZ.1)C0,V5.63(ACDZ.0)C0}"
+      - path: AdditionalSoftwareVersion
+        value: ""
+      - path: SpecVersion
+        value: "1.0"
+      - path: ProvisioningCode
+        value: ""
+        writable: true
+      - path: UpTime
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: uptime
+          interval: 30s
+      - path: DeviceLog
+        value: ""
+
+  - prefix: Device.DeviceInfo.MemoryStatus
+    parameters:
+      - path: Total
+        type: xsd:unsignedInt
+        value: "524288"
+      - path: Free
+        type: xsd:unsignedInt
+        value: "271360"
+
+  - prefix: Device.DeviceInfo.ProcessStatus
+    parameters:
+      - path: CPUUsage
+        type: xsd:unsignedInt
+        value: "14"
