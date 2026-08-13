@@ -1897,7 +1897,6 @@ func profileErrAt(source, paramPath string, cause error) error {
 		fmt.Errorf("%s: parameter %q: %w", source, paramPath, cause))
 }
 
-
 // samplePickPlaceholders replaces every {cpe:pick:a,b,c} and
 // {cpe:rpick:a,b,c} form with its first option so type validation can
 // run against a representative value. Unrelated placeholders and
