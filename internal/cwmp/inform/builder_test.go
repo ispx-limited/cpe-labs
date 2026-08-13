@@ -117,7 +117,12 @@ func TestBuildPopulatesDeviceID(t *testing.T) {
 	}
 }
 
-func TestBuildSelectsParameterListByFirstEvent(t *testing.T) {
+// A session delivering several events reports the union of their
+// parameter lists, in event order. Taking only the first event's list
+// dropped the bootstrap identity parameters on a first-ever boot,
+// which delivers BOOT and BOOTSTRAP together, and left every device
+// at the ACS with no model and no firmware version.
+func TestBuildUnionsParameterListsAcrossEvents(t *testing.T) {
 	t.Parallel()
 
 	tree := buildTree(t)
@@ -137,11 +142,53 @@ func TestBuildSelectsParameterListByFirstEvent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Parameters) != 2 {
-		t.Errorf("expected 2 parameters from bootstrap list, got %d", len(got.Parameters))
+	want := []string{
+		"Device.DeviceInfo.SerialNumber",
+		"Device.ManagementServer.URL",
+		"Device.DeviceInfo.UpTime",
 	}
-	if got.Parameters[0].Name != "Device.DeviceInfo.SerialNumber" {
-		t.Errorf("first parameter = %s", got.Parameters[0].Name)
+	if len(got.Parameters) != len(want) {
+		t.Fatalf("got %d parameters, want %d (the union of both lists)", len(got.Parameters), len(want))
+	}
+	for i, name := range want {
+		if got.Parameters[i].Name != name {
+			t.Errorf("parameter[%d] = %s, want %s", i, got.Parameters[i].Name, name)
+		}
+	}
+}
+
+// The real shape of a first-ever boot: BOOT arrives first, so the
+// bootstrap identity parameters must survive an earlier event that
+// carries its own list.
+func TestBuildBootAndBootstrapKeepsIdentityParameters(t *testing.T) {
+	t.Parallel()
+
+	tree := buildTree(t)
+	b, _ := inform.NewBuilder(tree, inform.BuilderOptions{
+		Clock:         fixedClock,
+		DeviceIDPaths: testDeviceIDPaths,
+		ParameterLists: map[string][]string{
+			inform.EventBoot:      {"Device.DeviceInfo.UpTime"},
+			inform.EventBootstrap: {"Device.DeviceInfo.SerialNumber", "Device.DeviceInfo.UpTime"},
+		},
+	})
+
+	got, err := b.Build([]inform.Event{
+		{EventCode: inform.EventBoot},
+		{EventCode: inform.EventBootstrap},
+	}, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := make([]string, len(got.Parameters))
+	for i, p := range got.Parameters {
+		names[i] = p.Name
+	}
+	if len(names) != 2 {
+		t.Fatalf("got %v, want the deduplicated union of both lists", names)
+	}
+	if names[0] != "Device.DeviceInfo.UpTime" || names[1] != "Device.DeviceInfo.SerialNumber" {
+		t.Errorf("got %v, want UpTime then SerialNumber", names)
 	}
 }
 
