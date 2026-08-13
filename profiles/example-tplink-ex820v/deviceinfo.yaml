@@ -2,21 +2,24 @@ groups:
   - prefix: Device.DeviceInfo
     parameters:
       - path: Manufacturer
-        value: "Plume"
+        value: "TP-Link"
       - path: ManufacturerOUI
         value: "00005E"
       - path: ModelName
-        value: "SuperPod AX"
-      - path: ProductClass
-        value: "PP403Z"
+        value: "EX820v"
       - path: Description
-        value: "Plume SuperPod AX mesh node"
+        value: "TP-Link EX820v multi-gig service-provider gateway with voice"
+      - path: ProductClass
+        value: "EX820v"
       - path: SerialNumber
         value: "BASE"
       - path: HardwareVersion
         value: "1.0"
+      # Firmware spreads across the cohort, weighted current with a
+      # tail: a fleet on a single build has nothing to upgrade, and
+      # campaigns and canary cohorts need a real distribution.
       - path: SoftwareVersion
-        value: "{cpe:rpick:3.6.0,3.6.0,3.6.0,3.4.2,3.4.2,3.2.8}"
+        value: "{cpe:rpick:1.2.0-0.9.1,1.2.0-0.9.1,1.2.0-0.9.1,1.1.4-0.9.1,1.1.4-0.9.1,1.0.9-0.8.1}"
       - path: AdditionalSoftwareVersion
         value: ""
       - path: SpecVersion
@@ -38,13 +41,13 @@ groups:
     parameters:
       - path: Total
         type: xsd:unsignedInt
-        value: "262144"
+        value: "524288"
       - path: Free
         type: xsd:unsignedInt
-        value: "163840"
+        value: "246784"
 
   - prefix: Device.DeviceInfo.ProcessStatus
     parameters:
       - path: CPUUsage
         type: xsd:unsignedInt
-        value: "9"
+        value: "17"

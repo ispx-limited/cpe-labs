@@ -1,0 +1,139 @@
+# Device.Services.VoiceService.* (TR-104): two analogue lines behind a
+# SIP client.
+#
+# This is the only profile in the set that exposes voice. Without one,
+# every voice surface an ACS offers (line state, directory number, SIP
+# registration) renders empty on every device in the fleet, and an
+# operator has no way to tell "this fleet has no voice" from "voice is
+# not being collected".
+#
+# Line 1 is provisioned and registered; line 2 exists and is disabled,
+# which is what a two-port gateway on a single-line package actually
+# looks like and gives the UI a populated row and an empty one to
+# distinguish.
+
+parameters:
+  - path: Device.Services.VoiceServiceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+
+groups:
+  - prefix: Device.Services.VoiceService.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Alias
+        value: "VOICE1"
+        writable: true
+
+  - prefix: Device.Services.VoiceService.1.Capabilities
+    parameters:
+      - path: MaxLineCount
+        type: xsd:unsignedInt
+        value: "2"
+      - path: MaxSessionCount
+        type: xsd:unsignedInt
+        value: "2"
+      - path: SignalingProtocols
+        value: "SIP"
+
+  - prefix: Device.Services.VoiceService.1.CallControl
+    parameters:
+      - path: LineNumberOfEntries
+        type: xsd:unsignedInt
+        value: "2"
+
+  - prefix: Device.Services.VoiceService.1.CallControl.Line.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      # Registered on most devices, with a minority failing: a fleet
+      # where every line is Up cannot demonstrate finding the ones that
+      # are not, which is the only reason an operator looks here.
+      - path: Status
+        value: "{cpe:rpick:Up,Up,Up,Up,Up,Up,Up,Up,Registering,Disabled,Error}"
+      - path: DirectoryNumber
+        value: "441632{cpe:hex:6}"
+        writable: true
+      - path: Alias
+        value: "LINE1"
+        writable: true
+
+  - prefix: Device.Services.VoiceService.1.CallControl.Line.2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Status
+        value: "Disabled"
+      - path: DirectoryNumber
+        value: ""
+        writable: true
+      - path: Alias
+        value: "LINE2"
+        writable: true
+
+  - prefix: Device.Services.VoiceService.1.SIP
+    parameters:
+      - path: ClientNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+      - path: NetworkNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+
+  - prefix: Device.Services.VoiceService.1.SIP.Client.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      # AuthUserName is writable because provisioning scripts set SIP
+      # credentials; the password is write-only in practice and reads
+      # back empty, which is what a real gateway does rather than
+      # handing an ACS the secret back.
+      - path: AuthUserName
+        value: "441632{cpe:hex:6}"
+        writable: true
+      - path: AuthPassword
+        value: ""
+        writable: true
+      - path: RegisterURI
+        value: "sip:441632{cpe:hex:6}@voice.example"
+        writable: true
+      - path: Alias
+        value: "SIPCLIENT1"
+        writable: true
+
+  - prefix: Device.Services.VoiceService.1.SIP.Network.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: ProxyServer
+        value: "sip.voice.example"
+        writable: true
+      - path: ProxyServerPort
+        type: xsd:unsignedInt
+        value: "5060"
+        writable: true
+      - path: RegistrarServer
+        value: "sip.voice.example"
+        writable: true
+      - path: RegistrarServerPort
+        type: xsd:unsignedInt
+        value: "5060"
+        writable: true
+      - path: UserAgentDomain
+        value: "voice.example"
+        writable: true
