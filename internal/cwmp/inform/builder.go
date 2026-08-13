@@ -122,15 +122,34 @@ func (b *Builder) readDeviceID() (DeviceID, error) {
 	return d, nil
 }
 
-// collectParameters picks the first event whose code is a key in
-// b.parameterLists and reads each named path from the tree. Returns
-// nil (an empty list) when no event matches.
+// collectParameters unions the configured parameter list of every
+// event in the session and reads each named path from the tree.
+// Returns nil (an empty list) when no event matches.
+//
+// The union matters on exactly one session per device. A first-ever
+// boot delivers "1 BOOT" and "0 BOOTSTRAP" together (TR-069 §3.7.1.5),
+// and this used to take the first event carrying a list and stop, so
+// BOOT won and the bootstrap list was discarded. That list is the one
+// naming Manufacturer, ModelName and SoftwareVersion, and bootstrap is
+// the only event that ever carries them, so every simulated device
+// reached the ACS with no model and no firmware version. An ACS reads
+// identity from the Inform's own parameter list, so whole fleets sat
+// with blank model and firmware for their entire life, and waiting
+// never fixed it because the next Inform is a periodic that does not
+// carry identity either.
+//
+// Order is preserved and duplicates dropped: a path named under two
+// events appears once, in the position its first event gives it.
 func (b *Builder) collectParameters(events []Event) ([]Parameter, error) {
 	var paths []string
+	seen := make(map[string]struct{})
 	for _, e := range events {
-		if list, ok := b.parameterLists[e.EventCode]; ok {
-			paths = list
-			break
+		for _, p := range b.parameterLists[e.EventCode] {
+			if _, dup := seen[p]; dup {
+				continue
+			}
+			seen[p] = struct{}{}
+			paths = append(paths, p)
 		}
 	}
 	if len(paths) == 0 {
