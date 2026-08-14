@@ -130,6 +130,67 @@ objects:
         value: "WAN_ADDRESS"
         writable: true
 
+  # ---- LAN side: IP.Interface.1.IPv6Address.1 / IPv6Prefix.1 ----
+  #
+  # Interface.1 has advertised IPv6AddressNumberOfEntries=1 and
+  # IPv6PrefixNumberOfEntries=1 since this profile shipped, without
+  # either table existing. An ACS walks the subtree the count promises
+  # and gets fault 9005 back on every session: measured on a demo fleet
+  # as 1,922 faults in ten minutes from the Sagemcom cohorts alone. A
+  # count that overstates its table is the same defect as omitting the
+  # table outright.
+  #
+  # The LAN address is the delegated prefix's ::1, which is what a
+  # gateway assigns its own bridge.
+  - path: Device.IP.Interface.1.IPv6Address
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: IPAddressStatus
+        value: "Preferred"
+      - path: IPAddress
+        value: "{delegated_prefix}1"
+        writable: true
+      - path: Origin
+        value: "Static"
+        writable: true
+      - path: Anycast
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Alias
+        value: "LAN_ADDRESS_V6"
+        writable: true
+
+  - path: Device.IP.Interface.1.IPv6Prefix
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: PrefixStatus
+        value: "Preferred"
+      - path: Prefix
+        value: "{delegated_prefix}"
+        writable: true
+      - path: Origin
+        value: "Child"
+        writable: true
+      - path: StaticType
+        value: "Inapplicable"
+        writable: true
+      - path: Alias
+        value: "LAN_PREFIX_V6"
+        writable: true
+
   # ---- WAN side: IP.Interface.2.IPv6Address.1 (per-CPE) ----
   - path: Device.IP.Interface.2.IPv6Address
     instances: 1
