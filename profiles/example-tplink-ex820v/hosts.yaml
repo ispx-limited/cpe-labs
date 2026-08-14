@@ -1,16 +1,15 @@
-# Device.Hosts.*: the clients this node is serving. Three, not the
-# gateway's six: a mesh node carries the devices in its room, and the
-# rest of the home stays on the gateway. The split is what makes a
-# per-subscriber topology view worth drawing at all.
+# Device.Hosts.*: the LAN and Wi-Fi clients in the home. Six entries,
+# split across both radios and the wired ports, so per-subscriber
+# topology has more than one shape to draw.
 
 parameters:
   - path: Device.Hosts.HostNumberOfEntries
     type: xsd:unsignedInt
-    value: "3"
+    value: "6"
 
 objects:
   - path: Device.Hosts.Host
-    instances: 3
+    instances: 6
     parameters:
       - path: Active
         type: xsd:boolean
@@ -54,3 +53,15 @@ groups:
     parameters:
       - path: Layer1Interface
         value: "Device.WiFi.SSID.2"
+  - prefix: Device.Hosts.Host.4
+    parameters:
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.1"
+  - prefix: Device.Hosts.Host.5
+    parameters:
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.1"
+  - prefix: Device.Hosts.Host.6
+    parameters:
+      - path: Layer1Interface
+        value: "Device.Ethernet.Interface.2"

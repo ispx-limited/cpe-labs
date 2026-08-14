@@ -1,7 +1,6 @@
-# Device.WiFi.*: two Wi-Fi 6 radios on a mesh node. It advertises the
-# same SSID as the gateway it backhauls to, which is the entire point
-# of a mesh: a client roams between them without noticing. Fewer
-# stations than a gateway, because a node serves the room it is in.
+# Device.WiFi.*: two Wi-Fi 6 radios (2.4 GHz and 5 GHz), one SSID and
+# one AccessPoint each, with associated stations under
+# AccessPoint.{i}.AssociatedDevice.{i}.
 #
 # The associated-device table is the WiFi half of experience scoring:
 # SignalStrength feeds the client_rssi component and
@@ -64,7 +63,7 @@ objects:
       - path: Name
         value: "wlan{i}"
       - path: SSID
-        value: "Home-{cpe:hex:4}"
+        value: "TP-Link-{cpe:hex:4}"
         writable: true
       - path: BSSID
         value: "{cpe:mac:3}"
@@ -92,15 +91,15 @@ objects:
         writable: true
       - path: AssociatedDeviceNumberOfEntries
         type: xsd:unsignedInt
-        value: "2"
+        value: "3"
       - path: MaxAssociatedDevices
         type: xsd:unsignedInt
-        value: "32"
+        value: "64"
         writable: true
 
   # ---- 2.4 GHz stations ----
   - path: Device.WiFi.AccessPoint.1.AssociatedDevice
-    instances: 2
+    instances: 3
     parameters:
       - path: MACAddress
         value: "{cpe:mac:3}"
@@ -140,7 +139,7 @@ objects:
   # ---- 5 GHz stations: closer to the AP and materially faster, which
   # is what makes the per-band split worth showing at all ----
   - path: Device.WiFi.AccessPoint.2.AssociatedDevice
-    instances: 2
+    instances: 3
     parameters:
       - path: MACAddress
         value: "{cpe:mac:3}"

@@ -1,20 +1,23 @@
-# Plume SuperPod AX (PP403Z), TR-181 (Device.*) profile.
+# TP-Link EX820v, TR-181 (Device.*) profile.
 #
-# A mesh node, not a gateway, and that is the reason it is here. Every
-# other profile in the fleet terminates a WAN; this one hangs off a
-# gateway over a backhaul link and serves clients in a room the main
-# router does not reach. A fleet made only of gateways never exercises
-# the extender half of the vocabulary, and per-subscriber topology has
-# nothing to draw but a star with one node.
+# A multi-gig service-provider gateway with voice. The "v" is the point
+# of carrying it: it is the only profile in the set that exposes
+# Device.Services.VoiceService, so a fleet built from these exercises
+# the TR-104 vocabulary (line state, directory number, SIP
+# registration) instead of leaving every voice surface empty.
 #
-# It has two Ethernet ports and no four-port LAN switch, no PPP, and no
-# optical termination. Interface.1 is the backhaul rather than a WAN,
-# which is why its stats still matter: a mesh node with a degraded
-# backhaul is one of the more common real causes of a bad-looking home.
+# It also replaces a managed-mesh model that did not belong in a
+# TR-069 fleet at all. Some residential Wi-Fi systems are managed
+# entirely through the vendor's own cloud platform and never speak
+# CWMP or USP, so simulating one as a TR-069 CPE would be a fiction
+# any operator running that hardware would spot immediately. This is a
+# service-provider gateway, which is exactly the class of device an ACS
+# does manage.
 #
 # Modelled from public operator catalogues, not from a device capture.
-# The OUI is the documentation OUI (00005E) rather than a Plume
-# registration.
+# The OUI is the documentation OUI (00005E) rather than a TP-Link
+# registration: a fabricated real-looking OUI in a public profile is
+# exactly the value someone would paste into a production mapping.
 
 deviceIdPaths:
   manufacturer: Device.DeviceInfo.Manufacturer
@@ -24,14 +27,18 @@ deviceIdPaths:
 
 fleet:
   count: 1
-  serialPattern: "PP403{cpe:ALNUM:9}"
+  serialPattern: "TPL{cpe:ALNUM:9}"
   pools:
     wan_ipv4:
       type: ipv4
       cidr: "100.64.0.0/10"
     wan_ipv6:
       type: ipv6
-      cidr: "2001:db8:7::/64"
+      cidr: "2001:db8:8::/64"
+    delegated_prefix:
+      type: ipv6prefix
+      super: "2001:db8:9000::/36"
+      sublen: 56
 
 periodicInformPaths:
   interval: Device.ManagementServer.PeriodicInformInterval
@@ -48,16 +55,15 @@ informParameters:
     - Device.DeviceInfo.SoftwareVersion
     - Device.ManagementServer.URL
     - Device.ManagementServer.ParameterKey
+    - Device.IP.Interface.1.IPv4Address.1.IPAddress
   boot:
     - Device.DeviceInfo.UpTime
   periodic:
     # Identity repeats on every periodic Inform, not just bootstrap.
     # Model and firmware reach the device row through identity
     # enrichment, which reads the Inform's own parameter list, so a
-    # device whose bootstrap the ACS missed (restart, re-registration,
-    # a fleet that predates the profile) would otherwise carry a blank
-    # model for the rest of its life. Real CPEs report these every
-    # session for the same reason.
+    # device whose bootstrap the ACS missed would otherwise carry a
+    # blank model for the rest of its life.
     - Device.DeviceInfo.ModelName
     - Device.DeviceInfo.SoftwareVersion
     - Device.DeviceInfo.UpTime
@@ -68,5 +74,6 @@ informParameters:
   valueChange:
     - Device.WiFi.AccessPoint.1.AssociatedDeviceNumberOfEntries
     - Device.WiFi.AccessPoint.2.AssociatedDeviceNumberOfEntries
+    - Device.Services.VoiceService.1.CallControl.Line.1.Status
   connectionRequest:
     - Device.DeviceInfo.UpTime
