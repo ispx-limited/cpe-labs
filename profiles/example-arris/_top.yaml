@@ -35,9 +35,16 @@ fleet:
       cidr: "2001:db8:1::/64"
     voice_ipv4:
       type: ipv4
-      cidr: "198.18.0.0/15"            # PPPoE voice/mgmt session WAN IP
-                                        # (RFC 2544 benchmark range,
-                                        # 131k addresses)
+      # Voice/mgmt session WAN IP. A /12, not the RFC 2544 /15: pools
+      # are sized for the whole fleet rather than one shard, and a
+      # cohort placed past offset 131071 dies at startup with "pool
+      # cannot reach instance". That is not hypothetical: this profile
+      # only ever worked because every manifest happened to place its
+      # ARRIS cohorts at low offsets, and the first cohort put above
+      # the line exited immediately. These values are reported to the
+      # ACS as parameter data and never bound to an interface, so the
+      # range only has to be large and unambiguous.
+      cidr: "172.16.0.0/12"
     delegated_prefix:
       type: ipv6prefix
       # A /36 operator block, not /48: /56 per home gives 2^20
