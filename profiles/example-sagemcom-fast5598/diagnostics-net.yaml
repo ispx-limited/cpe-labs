@@ -1,0 +1,207 @@
+# The TR-181 network diagnostics: ping, traceroute and DNS lookup
+# under Device.IP.Diagnostics and Device.DNS.Diagnostics.
+#
+# Same design as the ARRIS profile's TR-098 file: state machines are
+# `diagnostics` entries, result values are ordinary parameters with
+# drift so repeated runs vary, and the Host an ACS writes echoes back
+# on collect while the canned hops stay canned. TR-181 adds what the
+# IGD tree never had: ProtocolVersion on ping and traceroute, and the
+# NSLookup Timeout and NumberOfRepetitions the spec defines.
+
+parameters:
+  # ---- IPPingDiagnostics ----
+  - path: Device.IP.Diagnostics.IPPing.DiagnosticsState
+    value: "None"
+    writable: true
+  - path: Device.IP.Diagnostics.IPPing.Host
+    value: ""
+    writable: true
+  - path: Device.IP.Diagnostics.IPPing.Interface
+    value: ""
+    writable: true
+  - path: Device.IP.Diagnostics.IPPing.NumberOfRepetitions
+    type: xsd:unsignedInt
+    value: "4"
+    writable: true
+  - path: Device.IP.Diagnostics.IPPing.Timeout
+    type: xsd:unsignedInt
+    value: "1000"
+    writable: true
+  - path: Device.IP.Diagnostics.IPPing.DataBlockSize
+    type: xsd:unsignedInt
+    value: "56"
+    writable: true
+  - path: Device.IP.Diagnostics.IPPing.DSCP
+    type: xsd:unsignedInt
+    value: "0"
+    writable: true
+  - path: Device.IP.Diagnostics.IPPing.ProtocolVersion
+    value: "Any"
+    writable: true
+  - path: Device.IP.Diagnostics.IPPing.SuccessCount
+    type: xsd:unsignedInt
+    value: "4"
+  - path: Device.IP.Diagnostics.IPPing.FailureCount
+    type: xsd:unsignedInt
+    value: "0"
+  - path: Device.IP.Diagnostics.IPPing.AverageResponseTime
+    type: xsd:int
+    value: "12"
+    writable: true
+    generator:
+      type: drift
+      interval: 30s
+      min: 8
+      max: 24
+      stepMax: 3
+  - path: Device.IP.Diagnostics.IPPing.MinimumResponseTime
+    type: xsd:int
+    value: "9"
+    writable: true
+    generator:
+      type: drift
+      interval: 30s
+      min: 6
+      max: 14
+      stepMax: 2
+  - path: Device.IP.Diagnostics.IPPing.MaximumResponseTime
+    type: xsd:int
+    value: "18"
+    writable: true
+    generator:
+      type: drift
+      interval: 30s
+      min: 14
+      max: 40
+      stepMax: 4
+
+  # ---- TraceRouteDiagnostics ----
+  - path: Device.IP.Diagnostics.TraceRoute.DiagnosticsState
+    value: "None"
+    writable: true
+  - path: Device.IP.Diagnostics.TraceRoute.Host
+    value: ""
+    writable: true
+  - path: Device.IP.Diagnostics.TraceRoute.Interface
+    value: ""
+    writable: true
+  - path: Device.IP.Diagnostics.TraceRoute.NumberOfTries
+    type: xsd:unsignedInt
+    value: "3"
+    writable: true
+  - path: Device.IP.Diagnostics.TraceRoute.Timeout
+    type: xsd:unsignedInt
+    value: "5000"
+    writable: true
+  - path: Device.IP.Diagnostics.TraceRoute.DataBlockSize
+    type: xsd:unsignedInt
+    value: "38"
+    writable: true
+  - path: Device.IP.Diagnostics.TraceRoute.DSCP
+    type: xsd:unsignedInt
+    value: "0"
+    writable: true
+  - path: Device.IP.Diagnostics.TraceRoute.ProtocolVersion
+    value: "Any"
+    writable: true
+  - path: Device.IP.Diagnostics.TraceRoute.MaxHopCount
+    type: xsd:unsignedInt
+    value: "30"
+    writable: true
+  - path: Device.IP.Diagnostics.TraceRoute.ResponseTime
+    type: xsd:int
+    value: "460"
+    writable: true
+    generator:
+      type: drift
+      interval: 30s
+      min: 300
+      max: 900
+      stepMax: 60
+  - path: Device.IP.Diagnostics.TraceRoute.RouteHopsNumberOfEntries
+    type: xsd:unsignedInt
+    value: "0"
+
+  # ---- NSLookupDiagnostics ----
+  #
+  # No Timeout and no NumberOfRepetitions: the live NVG578LX does not
+  # implement them (the spec has them), and the point of this profile
+  # is the hardware, not the document.
+  - path: Device.DNS.Diagnostics.NSLookupDiagnostics.DiagnosticsState
+    value: "None"
+    writable: true
+  - path: Device.DNS.Diagnostics.NSLookupDiagnostics.HostName
+    value: ""
+    writable: true
+  - path: Device.DNS.Diagnostics.NSLookupDiagnostics.DNSServer
+    value: ""
+    writable: true
+  - path: Device.DNS.Diagnostics.NSLookupDiagnostics.Interface
+    value: ""
+    writable: true
+  - path: Device.DNS.Diagnostics.NSLookupDiagnostics.Timeout
+    type: xsd:unsignedInt
+    value: "5000"
+    writable: true
+  - path: Device.DNS.Diagnostics.NSLookupDiagnostics.NumberOfRepetitions
+    type: xsd:unsignedInt
+    value: "1"
+    writable: true
+  - path: Device.DNS.Diagnostics.NSLookupDiagnostics.SuccessCount
+    type: xsd:unsignedInt
+    value: "1"
+  - path: Device.DNS.Diagnostics.NSLookupDiagnostics.ResultNumberOfEntries
+    type: xsd:unsignedInt
+    value: "0"
+
+objects:
+  # Six hops out through the same shape the real capture shows: LAN
+  # gateway, carrier hops, destination. Per-hop values vary per CPE so
+  # a fleet's traceroutes are not one traceroute repeated.
+  - path: Device.IP.Diagnostics.TraceRoute.RouteHops
+    instances: 6
+    parameters:
+      - path: Host
+        value: "hop-{i}.sim.example"
+      - path: HostAddress
+        value: ""
+      - path: ErrorCode
+        type: xsd:unsignedInt
+        value: "0"
+      - path: RTTimes
+        value: "{cpe:pick:11.2,12.8,14.1,9.7,16.3},{cpe:pick:12.0,13.1,14.9,10.2,17.0},{cpe:pick:11.7,12.5,15.2,10.8,16.1}"
+
+  - path: Device.DNS.Diagnostics.NSLookupDiagnostics.Result
+    instances: 1
+    parameters:
+      - path: Status
+        value: "Success"
+      - path: AnswerType
+        value: "NonAuthoritative"
+      - path: HostNameReturned
+        value: ""
+      - path: IPAddresses
+        value: "{cpe:ipv4:100.64.0.0/10}"
+      - path: DNSServerIP
+        value: "192.168.1.1"
+      - path: ResponseTime
+        type: xsd:unsignedInt
+        value: "40"
+
+diagnostics:
+  - statePath: Device.IP.Diagnostics.IPPing.DiagnosticsState
+    trigger: Requested
+    complete: Complete
+    duration: 4s
+  - statePath: Device.IP.Diagnostics.TraceRoute.DiagnosticsState
+    trigger: Requested
+    complete: Complete
+    duration: 8s
+    countPath: Device.IP.Diagnostics.TraceRoute.RouteHopsNumberOfEntries
+    resultCount: 6
+  - statePath: Device.DNS.Diagnostics.NSLookupDiagnostics.DiagnosticsState
+    trigger: Requested
+    complete: Complete
+    duration: 4s
+    countPath: Device.DNS.Diagnostics.NSLookupDiagnostics.ResultNumberOfEntries
+    resultCount: 1
