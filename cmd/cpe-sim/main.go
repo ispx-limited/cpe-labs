@@ -38,6 +38,7 @@ import (
 	"github.com/ispx-limited/cpe-labs/internal/cwmp/scheduler"
 	"github.com/ispx-limited/cpe-labs/internal/cwmp/transfer"
 	"github.com/ispx-limited/cpe-labs/internal/cwmp/transport"
+	"github.com/ispx-limited/cpe-labs/internal/diagnostics"
 	"github.com/ispx-limited/cpe-labs/internal/generators"
 	"github.com/ispx-limited/cpe-labs/internal/paramtree"
 	"github.com/ispx-limited/cpe-labs/internal/version"
@@ -1039,6 +1040,10 @@ func buildCPEStack(cfg cpeconfig.Config, template *paramtree.Profile, in cpeStac
 		}
 
 		hasScheduler = !prof.PeriodicInformPaths.IsZero()
+		// Triggered diagnostics ride the same write callback the value
+		// -change notifier uses: nothing runs until an ACS writes a
+		// trigger, so a profile without diagnostics pays nothing.
+		diagRunner := diagnostics.New(prof.Tree, prof.Diagnostics)
 		valueChange := func(path string) {
 			tracker.RecordValueChange(path)
 			if hasScheduler &&
@@ -1073,7 +1078,14 @@ func buildCPEStack(cfg cpeconfig.Config, template *paramtree.Profile, in cpeStac
 				handlers.NewGetParameterValues(prof.Tree),
 				handlers.NewGetParameterNames(prof.Tree),
 				handlers.NewGetParameterAttributes(prof.Tree),
-				handlers.NewSetParameterValues(prof.Tree, valueChange),
+				// Diagnostics ride onSet, not valueChange: valueChange
+				// only fires for parameters carrying active notification,
+				// and an ACS triggers a diagnostic by writing a parameter
+				// nobody has set notification on. Background context
+				// because a run outlives the session that started it.
+				handlers.NewSetParameterValuesWithHook(prof.Tree, valueChange, func(path string) {
+					diagRunner.OnWrite(context.Background(), path)
+				}),
 				handlers.NewSetParameterAttributes(prof.Tree),
 				handlers.NewAddObject(prof.Tree),
 				handlers.NewDeleteObject(prof.Tree),

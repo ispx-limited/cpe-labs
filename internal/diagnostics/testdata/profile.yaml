@@ -1,0 +1,8 @@
+parameters:
+  - path: Device.WiFi.NeighboringWiFiDiagnostic.DiagnosticsState
+    value: "None"
+    writable: true
+  - path: Device.WiFi.NeighboringWiFiDiagnostic.ResultNumberOfEntries
+    type: xsd:unsignedInt
+    value: "0"
+    writable: true

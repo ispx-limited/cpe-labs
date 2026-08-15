@@ -25,6 +25,7 @@ fleet:                # fleet count + offset + pools + serial pattern
 connectionRequest:    # CR listener auth + throttle
 transfer:             # Download / Upload TransferComplete defaults + faults + firmware
 eventSchedule:        # Wall-clock latency for Reboot / FactoryReset / boot, and the boot ramp
+diagnostics:          # triggered diagnostics: ACS writes a trigger, CPE completes later
 ```
 
 Every block is optional except `deviceIdPaths` and at least one of `parameters` / `objects` / `groups` (you need to mount the four DeviceID leaves).
@@ -340,6 +341,33 @@ eventSchedule:
 All four fields are optional. Zero / unset preserves the simulator's existing immediate behavior (RPC handlers run their effect synchronously; the bootstrap Inform fires the moment the process starts). Negative values reject at load time.
 
 `rebootDelay > 0` or `factoryResetDelay > 0` keeps the process alive long enough for the deferred Inform to fire (daemon mode). `bootDelay` and `bootRamp` alone preserve one-shot mode (the deferred bootstraps fire, then the process exits).
+
+## `diagnostics`
+
+Triggered diagnostics: the parameter an ACS writes to start work, and the state it reads to learn the work finished. Every other animation in a profile is time-driven; this one does nothing until an ACS asks.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `statePath` | string, required | The leaf an ACS writes to start the run and polls to see it finish. Must exist in the tree. |
+| `trigger` | string | The value that starts a run. Defaults to `Requested`, which is how TR-069 spells it across the standard diagnostics. |
+| `complete` | string | The terminal value written when the run finishes. Defaults to `Complete`. Vendors differ here, which is why it is config. |
+| `duration` | duration | How long the run takes. Defaults to `5s`. A sweep that completes instantly is the one shape a real device never has, and an ACS that polls has to see the intermediate state. |
+| `countPath` | string | Leaf holding the number of result rows. Written on completion and left alone otherwise, so a device that was never asked reports zero. Must exist in the tree. |
+| `resultCount` | int | The value written to `countPath`. Must match the number of result rows the profile declares; the loader checks it. |
+
+```yaml
+diagnostics:
+  - statePath: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.DiagnosticsState
+    trigger: Requested
+    complete: Complete
+    duration: 6s
+    countPath: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.ResultNumberOfEntries
+    resultCount: 8
+```
+
+The write is observed on every `SetParameterValues` that changes the parameter, whether or not it carries active notification: an ACS triggers a diagnostic by writing a leaf nobody subscribed to.
+
+A second trigger arriving mid-run restarts the run rather than starting a parallel one, which is what a real CPE does with its single radio. Two diagnostics declaring the same `statePath` reject at load time, and so does a `statePath` or `countPath` that is not in the tree: a misspelled path would otherwise present as a device that never completes, which is indistinguishable from the firmware fault the simulator exists to rule out.
 
 ## Strict load-time validation
 

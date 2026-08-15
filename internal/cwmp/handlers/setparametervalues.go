@@ -14,7 +14,16 @@ import (
 
 // spvHandler implements SetParameterValues.
 type spvHandler struct {
-	tree        *paramtree.Tree
+	tree *paramtree.Tree
+	// onSet fires for EVERY parameter this RPC actually changed,
+	// regardless of notification attributes. valueChange below is the
+	// TR-069 value-change notification path and is gated on the
+	// parameter carrying active notification, which is correct for
+	// Informs and wrong for anything that needs to observe a write.
+	// A triggered diagnostic is the motivating case: an ACS writes
+	// "Requested" to a parameter nobody has set notification on, and
+	// the CPE still has to act on it.
+	onSet       func(path string)
 	valueChange func(path string)
 }
 
@@ -27,6 +36,14 @@ type spvHandler struct {
 // nil to disable value-change tracking.
 func NewSetParameterValues(tree *paramtree.Tree, valueChange func(path string)) cwmp.Handler {
 	return &spvHandler{tree: tree, valueChange: valueChange}
+}
+
+// NewSetParameterValuesWithHook is NewSetParameterValues plus onSet,
+// which fires for every changed parameter whether or not it carries
+// notification. Separate constructor so existing callers keep the
+// two-argument form.
+func NewSetParameterValuesWithHook(tree *paramtree.Tree, valueChange, onSet func(path string)) cwmp.Handler {
+	return &spvHandler{tree: tree, valueChange: valueChange, onSet: onSet}
 }
 
 func (h *spvHandler) Method() string { return "SetParameterValues" }
@@ -53,6 +70,12 @@ func (h *spvHandler) Handle(_ context.Context, req xml.TokenReader, w io.Writer)
 	results, err := h.tree.SetBatch(prepared)
 	if err != nil {
 		return mapSetBatchError(err)
+	}
+
+	for _, r := range results {
+		if r.Changed && h.onSet != nil {
+			h.onSet(r.Path)
+		}
 	}
 
 	if h.valueChange != nil {
