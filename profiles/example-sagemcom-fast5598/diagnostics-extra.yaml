@@ -177,10 +177,15 @@ objects:
       - path: PacketSuccess
         type: xsd:boolean
         value: "true"
+      # One shared send instant and a per-instance receive offset:
+      # {i:N} zero-padding is a serialPattern form the value engine
+      # does not expand, which the first run proved by collecting the
+      # braces verbatim. The estimator only needs consecutive RTT
+      # deltas, and per-instance pick supplies those.
       - path: PacketSendTime
-        value: "2026-08-15T12:00:{i:2}.000Z"
+        value: "2026-08-15T12:00:00.000Z"
       - path: PacketReceiveTime
-        value: "2026-08-15T12:00:{i:2}.{cpe:pick:009,014,011,018,010,012,016,008,013,015}Z"
+        value: "2026-08-15T12:00:00.{cpe:pick:009,014,011,018,010,012,016,008,013,015}Z"
       - path: TestGenSN
         type: xsd:unsignedInt
         value: "{i}"
