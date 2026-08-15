@@ -1,0 +1,61 @@
+# The second wave on the TR-098 ARRIS sim: the vendor channel scan and
+# the self test.
+#
+# ChannelDiagnostics is the tree the channel_scan capability's first
+# implementation reads: per-channel APCount plus the chipset's own
+# ChannelScore, captured shape from a live NVG578LX. Thirteen 2.4 GHz
+# rows with the score worst where the AP count is highest, because a
+# scan whose scores do not correlate with occupancy would let a channel
+# planner pass tests against noise.
+
+parameters:
+  - path: InternetGatewayDevice.SelfTestDiagnostics.DiagnosticsState
+    value: "None"
+    writable: true
+  - path: InternetGatewayDevice.SelfTestDiagnostics.Results
+    value: "flash: ok; wifi0: ok; wifi1: ok; voice: not fitted"
+
+  - path: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.ChannelDiagnostics.DiagnosticsState
+    value: "None"
+    writable: true
+  - path: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.ChannelDiagnostics.TimeStamp
+    value: "2026-08-15T12:00:00Z"
+  - path: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.ChannelDiagnostics.Radio
+    value: ""
+    writable: true
+  - path: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.ChannelDiagnostics.Mode
+    value: "Full"
+    writable: true
+  - path: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.ChannelDiagnostics.ResultNumberOfEntries
+    type: xsd:unsignedInt
+    value: "0"
+
+objects:
+  - path: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.ChannelDiagnostics.Result
+    instances: 13
+    parameters:
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "{i}"
+      - path: Radio
+        value: "wifi0"
+      - path: APCount
+        type: xsd:unsignedInt
+        value: "{cpe:pick:6,3,2,1,17,4,2,3,5,2,5,1,2}"
+      - path: ChannelScore
+        type: xsd:int
+        value: "{cpe:pick:41,55,61,66,12,52,63,58,45,62,44,68,64}"
+        writable: true
+        generator: {type: drift, interval: 60s, min: 5, max: 95, stepMax: 6}
+
+diagnostics:
+  - statePath: InternetGatewayDevice.SelfTestDiagnostics.DiagnosticsState
+    trigger: Requested
+    complete: Complete
+    duration: 10s
+  - statePath: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.ChannelDiagnostics.DiagnosticsState
+    trigger: Requested
+    complete: Complete
+    duration: 12s
+    countPath: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.ChannelDiagnostics.ResultNumberOfEntries
+    resultCount: 13

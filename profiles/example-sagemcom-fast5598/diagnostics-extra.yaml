@@ -1,0 +1,210 @@
+# The second diagnostics wave on the TR-181 sim: self test, server
+# selection, UDP echo with per-packet results, credential check and
+# the TR-471 capacity metrics. Same design as diagnostics-net.yaml:
+# state machines are diagnostics entries, results are parameters, and
+# the canned values exercise the trigger contract, the wait, the
+# collect and the normalizer, which is what an ACS integration needs.
+
+parameters:
+  # ---- SelfTestDiagnostics ----
+  - path: Device.SelfTestDiagnostics.DiagnosticsState
+    value: "None"
+    writable: true
+  - path: Device.SelfTestDiagnostics.Results
+    value: "memory: ok; flash: ok; radio0: ok; radio1: ok; voice: ok"
+
+  # ---- ServerSelectionDiagnostics ----
+  - path: Device.IP.Diagnostics.ServerSelectionDiagnostics.DiagnosticsState
+    value: "None"
+    writable: true
+  - path: Device.IP.Diagnostics.ServerSelectionDiagnostics.Interface
+    value: ""
+    writable: true
+  - path: Device.IP.Diagnostics.ServerSelectionDiagnostics.ProtocolVersion
+    value: "Any"
+    writable: true
+  - path: Device.IP.Diagnostics.ServerSelectionDiagnostics.Protocol
+    value: "ICMP"
+    writable: true
+  - path: Device.IP.Diagnostics.ServerSelectionDiagnostics.HostList
+    value: ""
+    writable: true
+  - path: Device.IP.Diagnostics.ServerSelectionDiagnostics.NumberOfRepetitions
+    type: xsd:unsignedInt
+    value: "3"
+    writable: true
+  - path: Device.IP.Diagnostics.ServerSelectionDiagnostics.Timeout
+    type: xsd:unsignedInt
+    value: "1000"
+    writable: true
+  - path: Device.IP.Diagnostics.ServerSelectionDiagnostics.FastestHost
+    value: "speedtest-lon.sim.example"
+  - path: Device.IP.Diagnostics.ServerSelectionDiagnostics.MinimumResponseTime
+    type: xsd:int
+    value: "8"
+    writable: true
+    generator: {type: drift, interval: 30s, min: 4, max: 15, stepMax: 2}
+  - path: Device.IP.Diagnostics.ServerSelectionDiagnostics.AverageResponseTime
+    type: xsd:int
+    value: "12"
+    writable: true
+    generator: {type: drift, interval: 30s, min: 8, max: 25, stepMax: 3}
+  - path: Device.IP.Diagnostics.ServerSelectionDiagnostics.MaximumResponseTime
+    type: xsd:int
+    value: "19"
+    writable: true
+    generator: {type: drift, interval: 30s, min: 15, max: 45, stepMax: 4}
+
+  # ---- UDPEchoDiagnostics ----
+  - path: Device.IP.Diagnostics.UDPEchoDiagnostics.DiagnosticsState
+    value: "None"
+    writable: true
+  - path: Device.IP.Diagnostics.UDPEchoDiagnostics.Host
+    value: ""
+    writable: true
+  - path: Device.IP.Diagnostics.UDPEchoDiagnostics.Port
+    type: xsd:unsignedInt
+    value: "7"
+    writable: true
+  - path: Device.IP.Diagnostics.UDPEchoDiagnostics.ProtocolVersion
+    value: "Any"
+    writable: true
+  - path: Device.IP.Diagnostics.UDPEchoDiagnostics.NumberOfRepetitions
+    type: xsd:unsignedInt
+    value: "20"
+    writable: true
+  - path: Device.IP.Diagnostics.UDPEchoDiagnostics.Timeout
+    type: xsd:unsignedInt
+    value: "1000"
+    writable: true
+  - path: Device.IP.Diagnostics.UDPEchoDiagnostics.DataBlockSize
+    type: xsd:unsignedInt
+    value: "64"
+    writable: true
+  - path: Device.IP.Diagnostics.UDPEchoDiagnostics.InterTransmissionTime
+    type: xsd:unsignedInt
+    value: "100"
+    writable: true
+  - path: Device.IP.Diagnostics.UDPEchoDiagnostics.EnableIndividualPacketResults
+    type: xsd:boolean
+    value: "false"
+    writable: true
+  - path: Device.IP.Diagnostics.UDPEchoDiagnostics.SuccessCount
+    type: xsd:unsignedInt
+    value: "20"
+  - path: Device.IP.Diagnostics.UDPEchoDiagnostics.FailureCount
+    type: xsd:unsignedInt
+    value: "0"
+  - path: Device.IP.Diagnostics.UDPEchoDiagnostics.MinimumResponseTime
+    type: xsd:int
+    value: "7"
+    writable: true
+    generator: {type: drift, interval: 30s, min: 4, max: 12, stepMax: 2}
+  - path: Device.IP.Diagnostics.UDPEchoDiagnostics.AverageResponseTime
+    type: xsd:int
+    value: "11"
+    writable: true
+    generator: {type: drift, interval: 30s, min: 8, max: 20, stepMax: 2}
+  - path: Device.IP.Diagnostics.UDPEchoDiagnostics.MaximumResponseTime
+    type: xsd:int
+    value: "23"
+    writable: true
+    generator: {type: drift, interval: 30s, min: 15, max: 45, stepMax: 4}
+  - path: Device.IP.Diagnostics.UDPEchoDiagnostics.IndividualPacketResultNumberOfEntries
+    type: xsd:unsignedInt
+    value: "0"
+
+  # ---- CheckCredentialsDiagnostics ----
+  #
+  # The sim accepts one canned pair and rejects everything else? No: a
+  # passive tree cannot compare, so the diagnostic always completes and
+  # the state carries success. What the ACS side proves here is the
+  # sealed path: the password reaches the CPE as an SPV and never
+  # appears in a run row, a task payload or a log.
+  - path: Device.Users.CheckCredentialsDiagnostics.DiagnosticsState
+    value: "None"
+    writable: true
+  - path: Device.Users.CheckCredentialsDiagnostics.Username
+    value: ""
+    writable: true
+  - path: Device.Users.CheckCredentialsDiagnostics.Password
+    value: ""
+    writable: true
+
+  # ---- IPLayerCapacityMetrics ----
+  - path: Device.IP.Diagnostics.IPLayerCapacityMetrics.DiagnosticsState
+    value: "None"
+    writable: true
+  - path: Device.IP.Diagnostics.IPLayerCapacityMetrics.Host
+    value: ""
+    writable: true
+  - path: Device.IP.Diagnostics.IPLayerCapacityMetrics.Role
+    value: "Receiver"
+    writable: true
+  - path: Device.IP.Diagnostics.IPLayerCapacityMetrics.TestType
+    value: "Downstream"
+    writable: true
+  - path: Device.IP.Diagnostics.IPLayerCapacityMetrics.MaxIPLayerCapacity
+    type: xsd:int
+    value: "941"
+    writable: true
+    generator: {type: drift, interval: 60s, min: 880, max: 949, stepMax: 10}
+  - path: Device.IP.Diagnostics.IPLayerCapacityMetrics.TimeOfMax
+    value: "2026-08-15T12:00:00Z"
+  - path: Device.IP.Diagnostics.IPLayerCapacityMetrics.LossRatioAtMax
+    value: "0.0002"
+  - path: Device.IP.Diagnostics.IPLayerCapacityMetrics.RTTRangeAtMax
+    type: xsd:int
+    value: "9"
+    writable: true
+    generator: {type: drift, interval: 60s, min: 4, max: 22, stepMax: 3}
+  - path: Device.IP.Diagnostics.IPLayerCapacityMetrics.PDVRangeAtMax
+    type: xsd:int
+    value: "3"
+    writable: true
+    generator: {type: drift, interval: 60s, min: 1, max: 9, stepMax: 2}
+  - path: Device.IP.Diagnostics.IPLayerCapacityMetrics.MinOnewayDelayAtMax
+    type: xsd:int
+    value: "4"
+
+objects:
+  # Twenty echo packets with 100 ms spacing and jittering RTTs baked
+  # into the receive timestamps, so the normalizer's jitter estimator
+  # has something real to chew on.
+  - path: Device.IP.Diagnostics.UDPEchoDiagnostics.IndividualPacketResult
+    instances: 20
+    parameters:
+      - path: PacketSuccess
+        type: xsd:boolean
+        value: "true"
+      - path: PacketSendTime
+        value: "2026-08-15T12:00:{i:2}.000Z"
+      - path: PacketReceiveTime
+        value: "2026-08-15T12:00:{i:2}.{cpe:pick:009,014,011,018,010,012,016,008,013,015}Z"
+      - path: TestGenSN
+        type: xsd:unsignedInt
+        value: "{i}"
+
+diagnostics:
+  - statePath: Device.SelfTestDiagnostics.DiagnosticsState
+    trigger: Requested
+    complete: Complete
+    duration: 10s
+  - statePath: Device.IP.Diagnostics.ServerSelectionDiagnostics.DiagnosticsState
+    trigger: Requested
+    complete: Complete
+    duration: 6s
+  - statePath: Device.IP.Diagnostics.UDPEchoDiagnostics.DiagnosticsState
+    trigger: Requested
+    complete: Complete
+    duration: 5s
+    countPath: Device.IP.Diagnostics.UDPEchoDiagnostics.IndividualPacketResultNumberOfEntries
+    resultCount: 20
+  - statePath: Device.Users.CheckCredentialsDiagnostics.DiagnosticsState
+    trigger: Requested
+    complete: Complete
+    duration: 3s
+  - statePath: Device.IP.Diagnostics.IPLayerCapacityMetrics.DiagnosticsState
+    trigger: Requested
+    complete: Complete
+    duration: 20s
