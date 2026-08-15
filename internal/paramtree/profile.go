@@ -40,6 +40,7 @@ type Profile struct {
 	Generators          []GeneratorConfig
 	Fleet               FleetConfig
 	EventSchedule       EventScheduleConfig
+	Diagnostics         []DiagnosticConfig
 }
 
 // FleetConfig describes how many simulated CPEs to spawn from this
@@ -513,6 +514,7 @@ func LoadProfileFromReader(r io.Reader, path string) (*Profile, error) {
 		PeriodicInformPaths: mc.PeriodicInformPaths,
 		ACSCredentialPaths:  mc.ACSCredentialPaths,
 		Generators:          mc.Generators,
+		Diagnostics:         mc.Diagnostics,
 		Fleet:               mc.Fleet,
 		EventSchedule:       mc.EventSchedule,
 	}, nil
@@ -534,6 +536,7 @@ type profile struct {
 	Generators          []rawGenerator          `yaml:"generators"`
 	Fleet               *rawFleet               `yaml:"fleet"`
 	EventSchedule       *rawEventSchedule       `yaml:"eventSchedule"`
+	Diagnostics         []rawDiagnostic         `yaml:"diagnostics"`
 }
 
 // rawObject is one TR-069/TR-098 multi-instance object. Path names the
@@ -848,6 +851,7 @@ func loadProfileDir(dir string) (*Profile, error) {
 		PeriodicInformPaths: mc.PeriodicInformPaths,
 		ACSCredentialPaths:  mc.ACSCredentialPaths,
 		Generators:          mc.Generators,
+		Diagnostics:         mc.Diagnostics,
 		Fleet:               mc.Fleet,
 		EventSchedule:       mc.EventSchedule,
 	}, nil
@@ -879,6 +883,7 @@ type mergedConfig struct {
 	Generators          []GeneratorConfig
 	Fleet               FleetConfig
 	EventSchedule       EventScheduleConfig
+	Diagnostics         []DiagnosticConfig
 }
 
 // mergeFiles applies all files' parameters to tree, accumulates
@@ -1294,6 +1299,8 @@ func mergeFiles(tree *Tree, files []*loadedFile) (mergedConfig, error) {
 	// expand to one entry per materialized instance.
 	var generators []GeneratorConfig
 	genSourceByPath := make(map[string]string)
+	var diagnostics []DiagnosticConfig
+	diagSourceByPath := make(map[string]string)
 	for _, lf := range files {
 		for i, raw := range lf.prof.Generators {
 			where := fmt.Sprintf("%s: generators[%d] (path=%q)", lf.path, i, raw.Path)
@@ -1311,6 +1318,24 @@ func mergeFiles(tree *Tree, files []*loadedFile) (mergedConfig, error) {
 			}
 			generators = append(generators, gen)
 			genSourceByPath[raw.Path] = lf.path
+		}
+
+		// Diagnostics. Validated against the tree here, with the same
+		// duplicate-state-path rule generators get for their target:
+		// two diagnostics racing one state leaf would make a run's
+		// outcome depend on which fired last.
+		for _, rawDiag := range lf.prof.Diagnostics {
+			where := fmt.Sprintf("%s: diagnostic %q", lf.path, rawDiag.StatePath)
+			if prevSrc, dup := diagSourceByPath[rawDiag.StatePath]; dup {
+				return mergedConfig{}, cpeerr.Wrap("paramtree.LoadProfile", cpeerr.KindInvalidArgument,
+					fmt.Errorf("%s: duplicate diagnostic statePath; already declared in %s", where, prevSrc))
+			}
+			diag, dErr := parseDiagnostic(tree, rawDiag, where)
+			if dErr != nil {
+				return mergedConfig{}, cpeerr.Wrap("paramtree.LoadProfile", cpeerr.KindInvalidArgument, dErr)
+			}
+			diagnostics = append(diagnostics, diag)
+			diagSourceByPath[rawDiag.StatePath] = lf.path
 		}
 	}
 
@@ -1437,6 +1462,7 @@ func mergeFiles(tree *Tree, files []*loadedFile) (mergedConfig, error) {
 		Generators:          generators,
 		Fleet:               fleetCfg,
 		EventSchedule:       eventScheduleCfg,
+		Diagnostics:         diagnostics,
 	}, nil
 }
 

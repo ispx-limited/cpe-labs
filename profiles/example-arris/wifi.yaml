@@ -201,6 +201,45 @@ objects:
         type: xsd:unsignedInt
         value: "76"
 
+
+  # ---- X_0000C5_Wireless.NeighboringWiFiDiagnostic ----
+  #
+  # The vendor site survey, modelled on a live NVG578LX capture: 88
+  # neighbours across both bands, SignalStrength a true dBm figure, and
+  # Bandwidth the literal string "Auto" rather than a width in MHz.
+  #
+  # Eight rows, not eighty. The table exists so an ACS can exercise the
+  # trigger-and-collect contract, and eight is enough to produce a
+  # channel histogram with a clear winner while keeping a 100k fleet's
+  # parameter count sane.
+  #
+  # The channel draw is weighted the way real air is: 2.4 GHz bunches
+  # hard on 1, 6 and 11 because those are the only non-overlapping
+  # channels, and the strongest neighbours sit on 6. A uniform draw
+  # would make every home look equally contended and the overlap view
+  # would have nothing to point at.
+  - path: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.Result
+    instances: 8
+    parameters:
+      - path: BSSID
+        value: "{cpe:mac:3}"
+      - path: SSID
+        value: "neighbour-{cpe:hex:4}-{i}"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-70"
+        writable: true
+        generator:
+          type: drift
+          interval: 120s
+          min: -92
+          max: -24
+          stepMax: 3
+      - path: Bandwidth
+        value: "Auto"
+      - path: Radio
+        value: "InternetGatewayDevice.LANDevice.1.WLANConfiguration.1"
+
   # ---- X_ARRIS_COM_NeighboringWiFi.{i} on the 2.4 GHz radio ----
   - path: InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.X_ARRIS_COM_NeighboringWiFi
     instances: 4
@@ -341,6 +380,72 @@ objects:
 # (groups, not a templated table) because the gateway and extender nodes
 # differ structurally (Type, MAC) and clients map to specific hosts.
 groups:
+
+  # Channel and band per row, declared rather than drawn.
+  #
+  # A per-row draw let a device end up with eight 2.4 GHz neighbours
+  # and nothing on 5 GHz, which is possible in the real world but makes
+  # a fleet where some devices simply have no 5 GHz chart. Declaring
+  # them fixes the shape every device shows while keeping the
+  # distribution honest: 2.4 GHz bunches on 1, 6 and 11 because those
+  # are the only non-overlapping channels, and channel 6 is crowded
+  # because it is the one most consumer gear defaults to.
+  - prefix: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.Result.1
+    parameters:
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "6"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.Result.2
+    parameters:
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "6"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.Result.3
+    parameters:
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "6"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.Result.4
+    parameters:
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "1"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.Result.5
+    parameters:
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "11"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.Result.6
+    parameters:
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "36"
+      - path: OperatingFrequencyBand
+        value: "5GHz"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.Result.7
+    parameters:
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "44"
+      - path: OperatingFrequencyBand
+        value: "5GHz"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.Result.8
+    parameters:
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "100"
+      - path: OperatingFrequencyBand
+        value: "5GHz"
   # Mesh ESS identity (telemetry: HNC.ESS.1.ESSName).
   - prefix: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.HNC.ESS.1
     parameters:
@@ -489,3 +594,29 @@ groups:
       - path: TxPHYRate
         type: xsd:unsignedInt
         value: "433"
+
+parameters:
+  - path: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.DiagnosticsState
+    value: "None"
+    writable: true
+  - path: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.ResultNumberOfEntries
+    type: xsd:unsignedInt
+    value: "0"
+    writable: true
+  - path: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.Radio
+    value: ""
+    writable: true
+
+# The trigger contract, matching the hardware: an ACS writes
+# "Requested", the sweep takes a few seconds because the radio goes off
+# channel per channel, then the state lands on "Complete" and the count
+# appears. Before that first write the count is zero, which is what
+# tells an ACS the difference between air it has measured and air it
+# has not.
+diagnostics:
+  - statePath: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.DiagnosticsState
+    trigger: Requested
+    complete: Complete
+    duration: 6s
+    countPath: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.ResultNumberOfEntries
+    resultCount: 8
