@@ -2,7 +2,11 @@
 # Arris exposes a single WANDevice with one WANConnectionDevice
 # carrying two L3 connections, mirroring real NVG firmware which
 # pre-creates both connection flavors:
-#   WANIPConnection.1  is the primary data path (DHCP), Connected
+#   WANIPConnection.2  is the primary data path (DHCP), Connected. On
+#                        real NVG firmware the routed connection sits at
+#                        instance 2, not 1 (a live NVG578LX export shows
+#                        only .2 for IPv4), and the ACS-writable
+#                        PortMapping table hangs under it.
 #   WANPPPConnection.1 is a PPPoE session for the voice/management VLAN,
 #                        Connected, with an occasional scripted redial
 #                        (enum generator on ConnectionStatus) so ACS
@@ -87,7 +91,7 @@ groups:
 
   # Per-connection Ethernet counters (TR-098 WANIPConnection.{i}.Stats).
   # An ACS WAN telemetry profile GPVs the four Ethernet* counters.
-  - prefix: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Stats
+  - prefix: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.2.Stats
     parameters:
       - path: EthernetBytesSent
         type: xsd:unsignedInt
@@ -159,6 +163,61 @@ groups:
           step: 2
           jitter: 1.0
 
+  # WANIPConnection.2, the routed data path, + X_ARRIS_COM_* IPv6
+  # vendor extensions on the same instance. A concrete group rather
+  # than an objects entry: on real firmware the instance number is 2
+  # and only 2, and the NVG does not accept AddObject here.
+  - prefix: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: ConnectionStatus
+        value: "Connected"
+      - path: ConnectionType
+        value: "IP_Routed"
+        writable: true
+      - path: AddressingType
+        value: "DHCP"
+        writable: true
+      - path: ExternalIPAddress
+        value: "{wan_ipv4}"
+      - path: SubnetMask
+        value: "255.255.255.0"
+      - path: DefaultGateway
+        value: "203.0.113.1"
+      - path: DNSServers
+        value: "8.8.8.8,8.8.4.4"
+      - path: MACAddress
+        value: "00:00:C5:{cpe:mac:3}"
+      - path: NATEnabled
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Uptime
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: uptime
+          interval: 30s
+      - path: LastConnectionError
+        value: "ERROR_NONE"
+      - path: X_ARRIS_COM_IPv6Address
+        value: "{wan_ipv6}"
+      - path: X_ARRIS_COM_DelegatedPrefix
+        value: "{delegated_prefix}"
+      - path: X_ARRIS_COM_IPv6Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      # Advertises the PortMapping table size; the simulator keeps it
+      # in step with AddObject and DeleteObject.
+      - path: PortMappingNumberOfEntries
+        type: xsd:unsignedInt
+        value: "0"
+
   # PPPoE session counters. Voice/mgmt VLAN traffic is small compared
   # to the data path, so the steps model roughly 100 kbit/s of RTP.
   - prefix: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANPPPConnection.1.Stats
@@ -208,56 +267,7 @@ groups:
           step: 1500
           jitter: 0.3
 
-# WANIPConnection.{i} (single-active-instance table) + X_ARRIS_COM_*
-# IPv6 vendor extensions on the same instance.
 objects:
-  - path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection
-    instances: 1
-    parameters:
-      - path: Enable
-        type: xsd:boolean
-        value: "true"
-        writable: true
-      - path: ConnectionStatus
-        value: "Connected"
-      - path: ConnectionType
-        value: "IP_Routed"
-        writable: true
-      - path: AddressingType
-        value: "DHCP"
-        writable: true
-      - path: ExternalIPAddress
-        value: "{wan_ipv4}"
-      - path: SubnetMask
-        value: "255.255.255.0"
-      - path: DefaultGateway
-        value: "203.0.113.1"
-      - path: DNSServers
-        value: "8.8.8.8,8.8.4.4"
-      - path: MACAddress
-        value: "00:00:C5:{cpe:mac:3}"
-      - path: NATEnabled
-        type: xsd:boolean
-        value: "true"
-        writable: true
-      - path: Uptime
-        type: xsd:unsignedInt
-        value: "0"
-        writable: true
-        generator:
-          type: uptime
-          interval: 30s
-      - path: LastConnectionError
-        value: "ERROR_NONE"
-      - path: X_ARRIS_COM_IPv6Address
-        value: "{wan_ipv6}"
-      - path: X_ARRIS_COM_DelegatedPrefix
-        value: "{delegated_prefix}"
-      - path: X_ARRIS_COM_IPv6Enable
-        type: xsd:boolean
-        value: "true"
-        writable: true
-
   # WANPPPConnection.{i}: PPPoE session for the voice/management VLAN.
   # ConnectionStatus mostly sits at Connected but cycles through one
   # scripted redial (Disconnecting -> Disconnected -> Connecting) every
@@ -317,4 +327,51 @@ objects:
         writable: true
       - path: PPPoEServiceName
         value: "voice"
+        writable: true
+
+  # NAT port forwards. Empty at boot, exactly as the real gateway
+  # ships: instances exist only after an ACS AddObject. Leaf set and
+  # defaults are from a live create on an NVG578LX (9.5.0h4d131),
+  # including the X_0000C5_ mirrors the firmware maintains.
+  - path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.2.PortMapping
+    instances: 0
+    parameters:
+      - path: PortMappingEnabled
+        type: xsd:boolean
+        value: "0"
+        writable: true
+      - path: PortMappingLeaseDuration
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: RemoteHost
+        value: ""
+        writable: true
+      - path: ExternalPort
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: ExternalPortEndRange
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: InternalPort
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: PortMappingProtocol
+        value: "TCP"
+        writable: true
+      - path: InternalClient
+        value: ""
+        writable: true
+      - path: X_0000C5_InternalIPAddress
+        value: ""
+        writable: true
+      - path: PortMappingDescription
+        value: ""
+        writable: true
+      - path: X_0000C5_LeaseTimeConfigured
+        type: xsd:unsignedInt
+        value: "0"
         writable: true

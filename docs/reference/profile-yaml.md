@@ -70,10 +70,12 @@ parameters:
 
 Sugar over the verbose form. Declare the parent path once, list the children, set `instances: N`. The loader expands to `{i}`-templated leaves and registers AddTable so `AddObject` works.
 
+When a sibling leaf named `<Table>NumberOfEntries` is declared next to the table (`Device.NAT.PortMappingNumberOfEntries` beside `Device.NAT.PortMapping`), the simulator keeps it in step with `AddObject` and `DeleteObject`. Both data model families name their counters this way, and a frozen counter is how an ACS notices a simulator is lying.
+
 | Field | Type | Notes |
 | --- | --- | --- |
 | `path` | string | Parent path *without* trailing `{i}`. |
-| `instances` | int | Number of instances to materialize. |
+| `instances` | int | Number of instances to materialize. `0` declares the table empty: no instances exist until a runtime `AddObject`, the way a port-mapping table ships on a real gateway. |
 | `parameters` | list | Each entry has the same fields as a top-level parameter, but `path` is relative to the parent. |
 
 ```yaml

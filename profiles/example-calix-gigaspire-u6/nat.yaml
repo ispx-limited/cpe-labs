@@ -1,0 +1,69 @@
+# Device.NAT.*, address translation.
+# The port-mapping table ships empty, exactly as the real gateway does:
+# instances exist only after a controller Add. Leaf set follows
+# TR-181 2.20.1 Device.NAT.PortMapping.{i}. The WAN data path is
+# Device.IP.Interface.2 (see ethernet.yaml), which is what Interface defaults
+# to on created mappings.
+
+parameters:
+  - path: Device.NAT.InterfaceSettingNumberOfEntries
+    type: xsd:unsignedInt
+    value: "0"
+  - path: Device.NAT.PortMappingNumberOfEntries
+    type: xsd:unsignedInt
+    value: "0"
+  - path: Device.NAT.MaxNumberOfPortMappings
+    type: xsd:unsignedInt
+    value: "64"
+
+objects:
+  - path: Device.NAT.PortMapping
+    instances: 0
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Status
+        value: "Disabled"
+      - path: Alias
+        value: ""
+        writable: true
+      - path: Interface
+        value: "Device.IP.Interface.2"
+        writable: true
+      - path: AllInterfaces
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: LeaseDuration
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: RemainingLeaseTime
+        type: xsd:unsignedInt
+        value: "0"
+      - path: RemoteHost
+        value: ""
+        writable: true
+      - path: ExternalPort
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: ExternalPortEndRange
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: InternalPort
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: Protocol
+        value: "TCP"
+        writable: true
+      - path: InternalClient
+        value: ""
+        writable: true
+      - path: Description
+        value: ""
+        writable: true

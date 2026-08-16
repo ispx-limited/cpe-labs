@@ -1612,3 +1612,49 @@ eventSchedule:
 		t.Errorf("error should name the field: %v", err)
 	}
 }
+
+func TestLoadProfileEmptyTable(t *testing.T) {
+	t.Parallel()
+
+	// instances: 0 declares the table with no instances, the way a
+	// port-mapping table ships on a real gateway. AddObject is the only
+	// way it grows.
+	tree, err := loadProfileFromString(t, `
+parameters:
+  - path: Device.NAT.PortMappingNumberOfEntries
+    type: xsd:unsignedInt
+    value: "0"
+objects:
+  - path: Device.NAT.PortMapping
+    instances: 0
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: ExternalPort
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+`)
+	if err != nil {
+		t.Fatalf("LoadProfile: %v", err)
+	}
+	if _, err := tree.Get("Device.NAT.PortMapping.1.Enable"); err == nil {
+		t.Fatal("expected no materialized instances")
+	}
+	instance, err := tree.AddObject("Device.NAT.PortMapping")
+	if err != nil {
+		t.Fatalf("AddObject on empty table: %v", err)
+	}
+	if instance != 1 {
+		t.Errorf("first instance = %d, want 1", instance)
+	}
+	v, err := tree.Get("Device.NAT.PortMappingNumberOfEntries")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.Raw != "1" {
+		t.Errorf("counter = %q, want 1", v.Raw)
+	}
+}

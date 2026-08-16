@@ -84,8 +84,8 @@ informParameters:
     - InternetGatewayDevice.DeviceInfo.SoftwareVersion
     - InternetGatewayDevice.ManagementServer.URL
     - InternetGatewayDevice.ManagementServer.ParameterKey
-    - InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.AddressingType
-    - InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ExternalIPAddress
+    - InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.2.AddressingType
+    - InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.2.ExternalIPAddress
   boot:
     - InternetGatewayDevice.DeviceInfo.UpTime
   # Periodic carries the moving counters + uptime so the ACS dashboard
