@@ -1,0 +1,99 @@
+# InternetGatewayDevice.Services.VoiceService.*, TR-104 issue 1 voice.
+# Two FXS lines on one SIP profile, the layout NVG firmware exposes.
+# Line 1 carries scripted call activity: CallState cycles through a
+# short call (Ringing, InCall, Disconnecting) inside a mostly-Idle
+# rotation, so ACS voice views see registration state and live call
+# state with shape. Line 2 is registered and quiet.
+#
+# Writable on Status/CallState is a sim affordance for the generators,
+# same convention the WAN ConnectionStatus enum uses.
+
+parameters:
+  - path: InternetGatewayDevice.Services.VoiceServiceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+  - path: InternetGatewayDevice.Services.VoiceService.1.VoiceProfileNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+
+groups:
+  - prefix: InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1
+    parameters:
+      - path: Enable
+        value: "Enabled"
+        writable: true
+      - path: NumberOfLines
+        type: xsd:unsignedInt
+        value: "2"
+      - path: SIP.RegistrarServer
+        value: "sip.voice.example.net"
+        writable: true
+      - path: SIP.RegistrarServerPort
+        type: xsd:unsignedInt
+        value: "5060"
+        writable: true
+      - path: SIP.ProxyServer
+        value: "sip.voice.example.net"
+        writable: true
+      - path: SIP.UserAgentDomain
+        value: "voice.example.net"
+        writable: true
+
+  - prefix: InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.1
+    parameters:
+      - path: Enable
+        value: "Enabled"
+        writable: true
+      - path: Status
+        value: "Up"
+        writable: true
+      - path: DirectoryNumber
+        value: "0161555{cpe:pick:2101,2103,2105,2107,2109}"
+        writable: true
+      - path: CallState
+        value: "Idle"
+        writable: true
+        generator:
+          type: enum
+          interval: 30s
+          mode: cycle
+          values:
+            - "Idle"
+            - "Idle"
+            - "Idle"
+            - "Idle"
+            - "Idle"
+            - "Idle"
+            - "Ringing"
+            - "InCall"
+            - "InCall"
+            - "InCall"
+            - "InCall"
+            - "Disconnecting"
+      - path: SIP.AuthUserName
+        value: "line1-cpe{cpe:hex:4}"
+        writable: true
+      - path: SIP.AuthPassword
+        value: ""
+        writable: true
+
+  - prefix: InternetGatewayDevice.Services.VoiceService.1.VoiceProfile.1.Line.2
+    parameters:
+      - path: Enable
+        value: "Enabled"
+        writable: true
+      - path: Status
+        value: "Up"
+        writable: true
+      - path: DirectoryNumber
+        value: "0161555{cpe:pick:2102,2104,2106,2108,2110}"
+        writable: true
+      - path: CallState
+        value: "Idle"
+        writable: true
+      - path: SIP.AuthUserName
+        value: "line2-cpe{cpe:hex:4}"
+        writable: true
+      - path: SIP.AuthPassword
+        value: ""
+        writable: true
