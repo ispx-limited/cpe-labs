@@ -722,9 +722,13 @@ func (t *Tree) AddTable(parentPath string, template *Node) error {
 func (t *Tree) AddObject(parentPath string) (int, error) {
 	// Notify outside the lock; see Tree.Observe.
 	var created string
+	var counter *Change
 	defer func() {
 		if created != "" {
 			t.notify(Change{Path: created, Kind: ChangeObjectCreated})
+		}
+		if counter != nil {
+			t.notify(*counter)
 		}
 	}()
 
@@ -758,10 +762,53 @@ func (t *Tree) AddObject(parentPath string) (int, error) {
 		instance++
 	}
 	n.children[strconv.Itoa(instance)] = n.table.template.clone()
+	counter = t.syncEntryCount(segments, n)
 	if t.hasObservers() {
 		created = strings.TrimSuffix(parentPath, ".") + "." + strconv.Itoa(instance) + "."
 	}
 	return instance, nil
+}
+
+// syncEntryCount rewrites the sibling <Table>NumberOfEntries leaf after
+// an instance mutation, when the profile declares one. Both TR-098 and
+// TR-181 name the counter this way next to the table, and it is how a
+// real CPE advertises table size, so the simulator keeps it honest
+// rather than leaving the boot-time value frozen. Called with the tree
+// lock held; the returned change, if any, is notified by the caller
+// after the lock is released.
+func (t *Tree) syncEntryCount(tableSegs []string, table *Node) *Change {
+	if len(tableSegs) == 0 {
+		return nil
+	}
+	parent, err := t.lookup(tableSegs[:len(tableSegs)-1])
+	if err != nil {
+		return nil
+	}
+	name := tableSegs[len(tableSegs)-1] + "NumberOfEntries"
+	c, ok := parent.children[name]
+	if !ok || !c.isLeaf() {
+		return nil
+	}
+	count := 0
+	for k := range table.children {
+		if i, err := strconv.Atoi(k); err == nil && i > 0 {
+			count++
+		}
+	}
+	raw := strconv.Itoa(count)
+	if c.leaf.Raw == raw {
+		return nil
+	}
+	old := *c.leaf
+	c.leaf.Raw = raw
+	if !t.hasObservers() {
+		return nil
+	}
+	path := joinPath(tableSegs[:len(tableSegs)-1])
+	if path != "" {
+		path += "."
+	}
+	return &Change{Path: path + name, Old: old, New: *c.leaf, Kind: ChangeValue}
 }
 
 // DeleteObject removes the instance sub-tree at path. path must name
@@ -771,9 +818,13 @@ func (t *Tree) AddObject(parentPath string) (int, error) {
 // exist.
 func (t *Tree) DeleteObject(path string) error {
 	var deleted string
+	var counter *Change
 	defer func() {
 		if deleted != "" {
 			t.notify(Change{Path: deleted, Kind: ChangeObjectDeleted})
+		}
+		if counter != nil {
+			t.notify(*counter)
 		}
 	}()
 
@@ -810,6 +861,7 @@ func (t *Tree) DeleteObject(path string) error {
 			fmt.Errorf("instance %s of %s not found", last, joinPath(parentSegs)))
 	}
 	delete(parent.children, last)
+	counter = t.syncEntryCount(parentSegs, parent)
 	if t.hasObservers() {
 		deleted = path
 	}

@@ -217,3 +217,45 @@ func TestDeleteObjectRootRejected(t *testing.T) {
 		t.Fatal("expected error deleting root")
 	}
 }
+
+func TestAddObjectSyncsNumberOfEntries(t *testing.T) {
+	t.Parallel()
+
+	tree := paramtree.New()
+	template := paramtree.NewBranch()
+	must(t, template.Attach("ExternalPort", paramtree.NewLeaf(paramtree.Value{
+		Type: paramtree.TypeUnsignedInt, Raw: "0", Writable: true,
+	})))
+	must(t, tree.Mount("Device.NAT.PortMappingNumberOfEntries",
+		paramtree.NewLeaf(paramtree.Value{Type: paramtree.TypeUnsignedInt, Raw: "0"})))
+	must(t, tree.AddTable("Device.NAT.PortMapping", template))
+
+	if _, err := tree.AddObject("Device.NAT.PortMapping"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tree.AddObject("Device.NAT.PortMapping"); err != nil {
+		t.Fatal(err)
+	}
+	v, err := tree.Get("Device.NAT.PortMappingNumberOfEntries")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.Raw != "2" {
+		t.Errorf("counter after two adds = %q, want 2", v.Raw)
+	}
+
+	must(t, tree.DeleteObject("Device.NAT.PortMapping.1"))
+	v, _ = tree.Get("Device.NAT.PortMappingNumberOfEntries")
+	if v.Raw != "1" {
+		t.Errorf("counter after delete = %q, want 1", v.Raw)
+	}
+}
+
+func TestAddObjectWithoutCounterLeafIsFine(t *testing.T) {
+	t.Parallel()
+
+	tree := buildTableTree(t)
+	if _, err := tree.AddObject("Device.WiFi.AccessPoint"); err != nil {
+		t.Fatal(err)
+	}
+}

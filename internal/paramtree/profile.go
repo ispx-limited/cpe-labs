@@ -719,6 +719,9 @@ type profileParam struct {
 	Value     string
 	Writable  bool
 	Instances int
+	// InstancesSet distinguishes an explicit `instances: 0` (an empty
+	// table) from the key being absent (an error on a {i} path).
+	InstancesSet bool
 	// Source file path for cross-file error messages (in directory mode).
 	Source string
 }
@@ -742,6 +745,7 @@ func applyDefaults(raw rawProfileParam, source string) profileParam {
 	}
 	if raw.Instances != nil {
 		p.Instances = *raw.Instances
+		p.InstancesSet = true
 	}
 	return p
 }
@@ -1632,7 +1636,9 @@ func validateGenerator(tree *Tree, where string, raw rawGenerator) (GeneratorCon
 // Validation:
 //   - object Path required, must NOT contain {i} (instances appended automatically)
 //   - object Path must not have a trailing "."
-//   - object Instances must be >= 1
+//   - object Instances must be >= 0 (0 declares the table empty, so a
+//     runtime AddObject is its only source of instances; port-mapping
+//     tables ship this way on real gateways)
 //   - object must declare at least one child
 //   - child Path required, must NOT contain {i} (already templated by the wrapper)
 //   - child must not declare its own Instances (would conflict with the object's)
@@ -1649,8 +1655,8 @@ func expandObjects(objects []rawObject, source string) ([]rawProfileParam, error
 		if strings.HasSuffix(obj.Path, ".") {
 			return nil, fmt.Errorf("%s: path must not end with '.'", where)
 		}
-		if obj.Instances < 1 {
-			return nil, fmt.Errorf("%s: instances must be >= 1, got %d", where, obj.Instances)
+		if obj.Instances < 0 {
+			return nil, fmt.Errorf("%s: instances must be >= 0, got %d", where, obj.Instances)
 		}
 		if len(obj.Parameters) == 0 {
 			return nil, fmt.Errorf("%s: at least one child parameter required", where)
@@ -1739,9 +1745,9 @@ func applyRows(tree *Tree, rows []profileParam) error {
 			return profileErrAt(row.Source, row.Path, err)
 		}
 		if hasI {
-			if row.Instances < 1 {
+			if !row.InstancesSet || row.Instances < 0 {
 				return profileErrAt(row.Source, row.Path,
-					fmt.Errorf("path uses {i}; instances must be >= 1, got %d", row.Instances))
+					fmt.Errorf("path uses {i}; instances must be declared and >= 0 (0 declares the table empty)"))
 			}
 		} else if row.Instances != 0 {
 			return profileErrAt(row.Source, row.Path,
@@ -1781,7 +1787,9 @@ func applyRows(tree *Tree, rows []profileParam) error {
 	mountedFrom := map[string]string{} // path -> source file
 	for i := range rows {
 		row := &rows[i]
-		if row.Instances > 0 {
+		// A template row stays a template even at instances: 0 (an empty
+		// table); only its AddTable registration in pass 4 applies.
+		if row.Instances > 0 || strings.Contains(row.Path, "{i}") {
 			continue
 		}
 		if prevSrc, exists := mountedFrom[row.Path]; exists {
