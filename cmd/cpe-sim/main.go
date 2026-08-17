@@ -1153,6 +1153,30 @@ func buildCPEStack(cfg cpeconfig.Config, template *paramtree.Profile, in cpeStac
 			}
 		}
 
+		// Notification attributes apply to device-internal writes too: a
+		// generator changing a watched parameter is exactly what 4 VALUE
+		// CHANGE exists for. Passive (1) queues the path for the next
+		// inform; active (2) also opens a session now, the way real
+		// firmware does. ACS-initiated SPV writes are recorded by their
+		// own hook above; the tracker dedups, so the overlap is harmless.
+		prof.Tree.Observe(func(ch paramtree.Change) {
+			if ch.Kind != paramtree.ChangeValue {
+				return
+			}
+			attrs, aerr := prof.Tree.GetAttributes(ch.Path)
+			if aerr != nil || attrs.Notification == 0 {
+				return
+			}
+			valueChange(ch.Path)
+			if attrs.Notification == 2 {
+				go func() {
+					if _, serr := runner.request(context.Background(), cwmp.TriggerValueChange); serr != nil {
+						in.logger.Debug("value-change session failed", "cpe_id", in.id, "err", serr)
+					}
+				}()
+			}
+		})
+
 		// CR listener registration (per-CPE path when count > 1). The URL
 		// itself is published by publishCRURLs once the listener has bound.
 		if in.listener != nil {

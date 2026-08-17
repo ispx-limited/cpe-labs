@@ -404,3 +404,16 @@ func TestNextSessionEventsRetryDrainsPendingFirst(t *testing.T) {
 		t.Errorf("got %v, want [M Reboot, 0 BOOTSTRAP]", got)
 	}
 }
+
+func TestRecordValueChangeDedups(t *testing.T) {
+	tr := cwmp.NewEventTracker(nil)
+	tr.RecordValueChange("Device.X.CallState")
+	tr.RecordValueChange("Device.X.CallState")
+	tr.RecordValueChange("Device.X.Other")
+
+	lists := tr.SessionParameterLists()
+	got := lists[inform.EventValueChange]
+	if len(got) != 2 {
+		t.Fatalf("pending paths = %v, want the duplicate collapsed", got)
+	}
+}

@@ -245,13 +245,20 @@ func (t *EventTracker) requeueEvent(e inform.Event) {
 
 // RecordValueChange queues a parameter path for the next VALUE CHANGE
 // session. Multiple calls accumulate; empty paths are silently
-// ignored.
+// ignored, and a path already pending stays queued once, so a write
+// hook and a tree observer both reporting the same change cannot
+// double it in the Inform's parameter list.
 func (t *EventTracker) RecordValueChange(path string) {
 	if path == "" {
 		return
 	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	for _, p := range t.pendingValueChanges {
+		if p == path {
+			return
+		}
+	}
 	t.pendingValueChanges = append(t.pendingValueChanges, path)
 }
 
