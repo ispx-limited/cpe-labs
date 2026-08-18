@@ -59,6 +59,7 @@ nav:
       - Firmware Upgrades: guides/firmware.md
       - Pointing at an ACS: guides/acs-integration.md
       - USP Agent (TR-369): guides/usp.md
+      - icwmp Real Client (TR-069): guides/icwmp.md
       - Docker: guides/docker.md
   - Reference:
       - CLI / Env / YAML: reference/cli.md
