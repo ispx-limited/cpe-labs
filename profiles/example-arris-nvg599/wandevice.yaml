@@ -1,0 +1,130 @@
+# InternetGatewayDevice.WANDevice.*, the DHCP WAN and its counters.
+
+parameters:
+  - path: InternetGatewayDevice.WANDeviceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+  - path: InternetGatewayDevice.WANDevice.1.WANConnectionNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+  - path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnectionNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+
+groups:
+  - prefix: InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig
+    parameters:
+      - path: WANAccessType
+        value: "Ethernet"
+      - path: Layer1UpstreamMaxBitRate
+        type: xsd:unsignedInt
+        value: "1000000000"
+      - path: Layer1DownstreamMaxBitRate
+        type: xsd:unsignedInt
+        value: "1000000000"
+      - path: PhysicalLinkStatus
+        value: "Up"
+      - path: TotalBytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 9000000
+          jitter: 0.2
+      - path: TotalBytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 21000000
+          jitter: 0.2
+      - path: TotalPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 6500
+          jitter: 0.3
+      - path: TotalPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 13000
+          jitter: 0.3
+
+  - prefix: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: ConnectionStatus
+        value: "Connected"
+      - path: ConnectionType
+        value: "IP_Routed"
+        writable: true
+      - path: Name
+        value: "wan0"
+      - path: AddressingType
+        value: "DHCP"
+        writable: true
+      - path: ExternalIPAddress
+        value: "{wan_ipv4}"
+        writable: true
+      - path: SubnetMask
+        value: "255.255.255.0"
+        writable: true
+      - path: DNSServers
+        value: "1.1.1.1,1.0.0.1"
+        writable: true
+      - path: MACAddress
+        value: "00:00:C5:{cpe:mac:3}"
+      - path: Uptime
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: uptime
+          interval: 30s
+
+  - prefix: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.Stats
+    parameters:
+      - path: EthernetBytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 9000000
+          jitter: 0.2
+      - path: EthernetBytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 21000000
+          jitter: 0.2

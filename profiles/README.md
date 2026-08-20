@@ -53,6 +53,8 @@ The same schema works as JSON (`gopkg.in/yaml.v3` accepts JSON natively). Use wh
 - `example-tr098-genieacs-sim.yaml`: TR-098 (`InternetGatewayDevice.*`) layout matching the structure of [genieacs-sim](https://github.com/zaidka/genieacs-sim)'s reference data model
 - `example-arris/`: TR-098 residential gateway as a multi-file directory profile, with WAN and WiFi counters, associated-device tables and vendor extensions
 - `example-sagemcom-fast5598/`: TR-181 residential gateway, same shape in the modern data model
+- `example-sagemcom-fast5280/`: TR-181 residential gateway reporting the firmware build named in this router's public vulnerability record, for exercising an ACS's compliance and inventory handling against a real match
+- `example-arris-nvg599/`: TR-098 residential gateway reporting the firmware build named in the 2017 SharknAT&To research, which never received a CVE. The counterpart to the 5280: one exercises matching against public CVE feeds, the other against a notice an operator has to record themselves
 - `scale-tr098/`: a generic TR-098 gateway sized for 150k to 200k CPE runs. Same parameter and generator class as the vendor examples, with a 300 second inform interval, a real firmware fetch, an 8-character serial tail and no address pools. See [Running a large fleet](../docs/guides/large-fleets.md).
 
 ## Out of scope (v0)

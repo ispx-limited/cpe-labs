@@ -1,0 +1,38 @@
+groups:
+  - prefix: InternetGatewayDevice.ManagementServer
+    parameters:
+      - path: URL
+        value: "http://acs.example/cwmp"
+        writable: true
+      - path: Username
+        value: "cpe"
+        writable: true
+      - path: Password
+        value: ""
+        writable: true
+      - path: PeriodicInformEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: PeriodicInformInterval
+        type: xsd:unsignedInt
+        value: "300"
+        writable: true
+      - path: PeriodicInformTime
+        type: xsd:dateTime
+        value: "1970-01-01T00:00:00Z"
+        writable: true
+      - path: ParameterKey
+        value: ""
+      - path: ConnectionRequestURL
+        value: "http://192.0.2.1:7547/"
+      - path: ConnectionRequestUsername
+        value: "acs"
+        writable: true
+      - path: ConnectionRequestPassword
+        value: ""
+        writable: true
+      - path: UpgradesManaged
+        type: xsd:boolean
+        value: "true"
+        writable: true

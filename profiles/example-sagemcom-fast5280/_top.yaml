@@ -1,0 +1,68 @@
+# Sagemcom F@ST 5280, TR-181 (Device.*) profile.
+#
+# The firmware string matters on this one. 1.150.61 is the build named
+# in the public vulnerability record for this router, so a fleet of
+# these is a fleet an ACS should be able to identify as affected. Point
+# a compliance or inventory feature at it and you get a real match
+# rather than a synthetic one, and changing SoftwareVersion below to a
+# later build is the other half of that test: the match should clear.
+#
+# Everything else is an ordinary residential gateway: a PPPoE WAN, four
+# LAN ports, two radios and a host table.
+
+deviceIdPaths:
+  manufacturer: Device.DeviceInfo.Manufacturer
+  oui:          Device.DeviceInfo.ManufacturerOUI
+  productClass: Device.DeviceInfo.ProductClass
+  serialNumber: Device.DeviceInfo.SerialNumber
+
+fleet:
+  count: 1
+  # Same factory-prefix plus date-code plus random-tail shape as the
+  # other Sagemcom profile, with its own prefix so a mixed fleet never
+  # mints a serial that collides with a 5598.
+  serialPattern: "XV2118{cpe:ALNUM:8}"
+  pools:
+    wan_ipv4:
+      type: ipv4
+      cidr: "100.64.0.0/10"
+    wan_ipv6:
+      type: ipv6
+      cidr: "2001:db8:5::/64"
+    delegated_prefix:
+      type: ipv6prefix
+      super: "2001:db8:c000::/36"
+      sublen: 56
+
+periodicInformPaths:
+  interval: Device.ManagementServer.PeriodicInformInterval
+  enable:   Device.ManagementServer.PeriodicInformEnable
+
+informParameters:
+  bootstrap:
+    - Device.DeviceInfo.Manufacturer
+    - Device.DeviceInfo.ManufacturerOUI
+    - Device.DeviceInfo.ModelName
+    - Device.DeviceInfo.ProductClass
+    - Device.DeviceInfo.SerialNumber
+    - Device.DeviceInfo.HardwareVersion
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.ManagementServer.URL
+    - Device.ManagementServer.ParameterKey
+    - Device.PPP.Interface.1.Status
+    - Device.IP.Interface.2.IPv4Address.1.IPAddress
+  boot:
+    - Device.DeviceInfo.UpTime
+  periodic:
+    - Device.DeviceInfo.UpTime
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.Ethernet.Interface.1.Stats.BytesSent
+    - Device.Ethernet.Interface.1.Stats.BytesReceived
+    - Device.WiFi.SSID.1.Stats.BytesSent
+    - Device.WiFi.SSID.1.Stats.BytesReceived
+  valueChange:
+    - Device.WiFi.AccessPoint.1.AssociatedDeviceNumberOfEntries
+    - Device.WiFi.SSID.1.Status
+    - Device.WiFi.SSID.2.Status
+  connectionRequest:
+    - Device.DeviceInfo.UpTime

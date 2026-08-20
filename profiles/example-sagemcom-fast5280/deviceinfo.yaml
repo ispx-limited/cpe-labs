@@ -1,0 +1,90 @@
+groups:
+  - prefix: Device.DeviceInfo
+    parameters:
+      - path: Manufacturer
+        value: "Sagemcom"
+      - path: ManufacturerOUI
+        value: "ECFC2F"
+      - path: ModelName
+        value: "FAST5280"
+      - path: Description
+        value: "Sagemcom F@ST 5280 residential gateway"
+      - path: ProductClass
+        value: "FAST5280"
+      - path: SerialNumber
+        value: "BASE"
+      - path: HardwareVersion
+        value: "1.0"
+      # The build the public vulnerability record for this router names.
+      # Set it to a later version to watch an ACS clear the match.
+      - path: SoftwareVersion
+        value: "1.150.61"
+      - path: AdditionalSoftwareVersion
+        value: ""
+      - path: SpecVersion
+        value: "1.0"
+      - path: ProvisioningCode
+        value: ""
+        writable: true
+      - path: UpTime
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: uptime
+          interval: 1s
+      - path: DeviceLog
+        value: ""
+
+  - prefix: Device.DeviceInfo.MemoryStatus
+    parameters:
+      - path: Total
+        type: xsd:unsignedInt
+        value: "262144"
+      - path: Free
+        type: xsd:unsignedInt
+        value: "131072"
+
+  - prefix: Device.DeviceInfo.ProcessStatus
+    parameters:
+      - path: CPUUsage
+        type: xsd:unsignedInt
+        value: "14"
+      - path: ProcessNumberOfEntries
+        type: xsd:unsignedInt
+        value: "84"
+
+  - prefix: Device.DeviceInfo.TemperatureStatus
+    parameters:
+      - path: TemperatureSensorNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+
+objects:
+  - path: Device.DeviceInfo.TemperatureStatus.TemperatureSensor
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: Name
+        value: "cpu"
+      - path: Value
+        type: xsd:int
+        value: "58"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: 45
+          max: 74
+          stepMax: 2
+      - path: MinValue
+        type: xsd:int
+        value: "42"
+      - path: MaxValue
+        type: xsd:int
+        value: "80"

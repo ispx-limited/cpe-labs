@@ -1640,7 +1640,7 @@ objects:
 	if err != nil {
 		t.Fatalf("LoadProfile: %v", err)
 	}
-	if _, err := tree.Get("Device.NAT.PortMapping.1.Enable"); err == nil {
+	if _, getErr := tree.Get("Device.NAT.PortMapping.1.Enable"); getErr == nil {
 		t.Fatal("expected no materialized instances")
 	}
 	instance, err := tree.AddObject("Device.NAT.PortMapping")
