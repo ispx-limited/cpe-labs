@@ -1,0 +1,75 @@
+# ARRIS NVG599, TR-098 (InternetGatewayDevice.*) profile.
+#
+# The firmware string is the point of this one. 9.2.2h0d83 is the build
+# named in the 2017 SharknAT&To disclosure against the NVG589 and
+# NVG599, which found SSH enabled by default with hardcoded
+# credentials and, on the NVG599 specifically, a caserver on port
+# 49955 reachable as user "tech" with no password.
+#
+# No CVE was ever assigned to those findings, which is why this device
+# is useful to simulate: an ACS that only reconciles against public CVE
+# feeds will report a fleet of these as clean. Testing that an operator
+# can record a vendor notice themselves, and have it match, needs a
+# device the notice actually applies to.
+#
+# Same OUI and family as the NVG578LX profile alongside it. Serial
+# prefix differs so a mixed fleet cannot mint a colliding identity.
+
+deviceIdPaths:
+  manufacturer: InternetGatewayDevice.DeviceInfo.Manufacturer
+  oui:          InternetGatewayDevice.DeviceInfo.ManufacturerOUI
+  productClass: InternetGatewayDevice.DeviceInfo.ProductClass
+  serialNumber: InternetGatewayDevice.DeviceInfo.SerialNumber
+
+fleet:
+  count: 1
+  serialPattern: "MG1745{cpe:ALNUM:6}"
+  pools:
+    wan_ipv4:
+      type: ipv4
+      cidr: "100.64.0.0/10"
+    wan_ipv6:
+      type: ipv6
+      cidr: "2001:db8:6::/64"
+    lan_ipv4:
+      type: ipv4
+      cidr: "10.0.0.0/8"
+
+periodicInformPaths:
+  interval: InternetGatewayDevice.ManagementServer.PeriodicInformInterval
+  enable:   InternetGatewayDevice.ManagementServer.PeriodicInformEnable
+  time:     InternetGatewayDevice.ManagementServer.PeriodicInformTime
+
+acsCredentialPaths:
+  username: InternetGatewayDevice.ManagementServer.Username
+  password: InternetGatewayDevice.ManagementServer.Password
+
+informParameters:
+  bootstrap:
+    - InternetGatewayDevice.DeviceInfo.Manufacturer
+    - InternetGatewayDevice.DeviceInfo.ManufacturerOUI
+    - InternetGatewayDevice.DeviceInfo.ModelName
+    - InternetGatewayDevice.DeviceInfo.ProductClass
+    - InternetGatewayDevice.DeviceInfo.SerialNumber
+    - InternetGatewayDevice.DeviceInfo.HardwareVersion
+    - InternetGatewayDevice.DeviceInfo.SoftwareVersion
+    - InternetGatewayDevice.ManagementServer.URL
+    - InternetGatewayDevice.ManagementServer.ParameterKey
+    - InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ExternalIPAddress
+  boot:
+    - InternetGatewayDevice.DeviceInfo.UpTime
+  # SoftwareVersion rides the periodic Inform as well as bootstrap, so
+  # an ACS keying on firmware sees an upgrade without waiting for a
+  # reboot.
+  periodic:
+    - InternetGatewayDevice.DeviceInfo.UpTime
+    - InternetGatewayDevice.DeviceInfo.SoftwareVersion
+    - InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.TotalBytesSent
+    - InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig.TotalBytesReceived
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalBytesSent
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalBytesReceived
+  valueChange:
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.TotalAssociations
+    - InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.Status
+  connectionRequest:
+    - InternetGatewayDevice.DeviceInfo.UpTime

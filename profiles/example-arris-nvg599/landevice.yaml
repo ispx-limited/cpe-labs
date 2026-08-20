@@ -1,0 +1,130 @@
+# InternetGatewayDevice.LANDevice.*, the LAN side and its two radios.
+
+parameters:
+  - path: InternetGatewayDevice.LANDeviceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+  - path: InternetGatewayDevice.LANDevice.1.WLANConfigurationNumberOfEntries
+    type: xsd:unsignedInt
+    value: "2"
+  - path: InternetGatewayDevice.LANDevice.1.Hosts.HostNumberOfEntries
+    type: xsd:unsignedInt
+    value: "4"
+
+groups:
+  - prefix: InternetGatewayDevice.LANDevice.1.LANHostConfigManagement
+    parameters:
+      - path: DHCPServerEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: MinAddress
+        value: "192.168.1.64"
+        writable: true
+      - path: MaxAddress
+        value: "192.168.1.253"
+        writable: true
+      - path: SubnetMask
+        value: "255.255.255.0"
+        writable: true
+      - path: IPRouters
+        value: "192.168.1.254"
+        writable: true
+      - path: DHCPLeaseTime
+        type: xsd:int
+        value: "86400"
+        writable: true
+
+objects:
+  - path: InternetGatewayDevice.LANDevice.1.WLANConfiguration
+    instances: 2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: SSID
+        value: "ATT{cpe:hex:4}-{i}"
+        writable: true
+      - path: BSSID
+        value: "00:00:C5:{cpe:mac:3}"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "6"
+        writable: true
+      - path: AutoChannelEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Standard
+        value: "n"
+        writable: true
+      - path: BeaconType
+        value: "11i"
+        writable: true
+      - path: TotalAssociations
+        type: xsd:unsignedInt
+        value: "2"
+      - path: TotalBytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 5000000
+          jitter: 0.25
+      - path: TotalBytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 2500000
+          jitter: 0.25
+
+  - path: InternetGatewayDevice.LANDevice.1.WLANConfiguration.1.AssociatedDevice
+    instances: 2
+    parameters:
+      - path: AssociatedDeviceMACAddress
+        value: "5C:51:4F:00:20:0{i}"
+      - path: AssociatedDeviceAuthenticationState
+        type: xsd:boolean
+        value: "true"
+      - path: X_0000C5_SignalStrength
+        type: xsd:int
+        value: "-56"
+        writable: true
+        generator:
+          type: drift
+          interval: 45s
+          min: -75
+          max: -45
+          stepMax: 3
+
+  - path: InternetGatewayDevice.LANDevice.1.Hosts.Host
+    instances: 4
+    parameters:
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: MACAddress
+        value: "5C:51:4F:00:21:0{i}"
+      - path: IPAddress
+        value: "192.168.1.{i}0"
+      - path: HostName
+        value: "client-{i}-cpe{cpe:hex:4}"
+      - path: AddressSource
+        value: "DHCP"
+      - path: LeaseTimeRemaining
+        type: xsd:int
+        value: "86400"
+      - path: InterfaceType
+        value: "802.11"

@@ -1,0 +1,46 @@
+groups:
+  - prefix: InternetGatewayDevice.DeviceInfo
+    parameters:
+      - path: Manufacturer
+        value: "ARRIS"
+      - path: ManufacturerOUI
+        value: "0000C5"
+      - path: ModelName
+        value: "NVG599"
+      - path: Description
+        value: "ARRIS NVG599 residential gateway"
+      - path: ProductClass
+        value: "NVG599"
+      - path: SerialNumber
+        value: "BASE"
+      - path: HardwareVersion
+        value: "1.0"
+      # The build named in the 2017 disclosure. Set it to a later
+      # version to watch an ACS clear a recorded advisory.
+      - path: SoftwareVersion
+        value: "9.2.2h0d83"
+      - path: AdditionalSoftwareVersion
+        value: ""
+      - path: SpecVersion
+        value: "1.1"
+      - path: ProvisioningCode
+        value: ""
+        writable: true
+      - path: UpTime
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: uptime
+          interval: 30s
+      - path: DeviceLog
+        value: ""
+
+  - prefix: InternetGatewayDevice.DeviceInfo.MemoryStatus
+    parameters:
+      - path: Total
+        type: xsd:unsignedInt
+        value: "262144"
+      - path: Free
+        type: xsd:unsignedInt
+        value: "104857"
