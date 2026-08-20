@@ -1,0 +1,114 @@
+# Device.Ethernet.*, physical ports + L2 stats.
+# Five entries: WAN at instance 1, four LAN ports behind it.
+
+parameters:
+  - path: Device.Ethernet.InterfaceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "5"
+  - path: Device.Ethernet.LinkNumberOfEntries
+    type: xsd:unsignedInt
+    value: "5"
+
+objects:
+  - path: Device.Ethernet.Interface
+    instances: 5
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Alias
+        value: "PHY{i}"
+        writable: true
+      - path: Name
+        value: "eth{i}"
+      - path: LastChange
+        type: xsd:unsignedInt
+        value: "0"
+      - path: LowerLayers
+        value: ""
+        writable: true
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: MACAddress
+        value: "EC:FC:2F:{cpe:hex:2}:10:0{i}"
+      - path: MaxBitRate
+        type: xsd:int
+        value: "1000"
+        writable: true
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "1000"
+      - path: DuplexMode
+        value: "Auto"
+        writable: true
+      - path: EEEEnable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: EEECapability
+        type: xsd:boolean
+        value: "false"
+
+groups:
+  - prefix: Device.Ethernet.Interface.1.Stats
+    parameters:
+      - path: BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 10000000
+          jitter: 0.2
+      - path: BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 20000000
+          jitter: 0.2
+      - path: PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 7000
+          jitter: 0.3
+      - path: PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 14000
+          jitter: 0.3
+      - path: ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: DiscardPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: DiscardPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
