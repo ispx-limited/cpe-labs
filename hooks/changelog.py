@@ -12,6 +12,7 @@ from pathlib import Path
 
 PAGE = "changelog.md"
 
+TITLE = re.compile(r"\A\s*# [^\n]*\n")
 LINKED_HEADING = re.compile(r"^(#{1,6}) \[([^\]]+)\]\([^)]*\)", re.M)
 TRAILING_REFS = re.compile(r"(?:\s+\(\[[^\]]+\]\([^)]*\)\))+\s*$", re.M)
 CLOSES_REFS = re.compile(r",? closes \[#\d+\]\([^)]*\)")
@@ -22,7 +23,8 @@ def on_page_markdown(markdown, page, config, files):
     if page.file.src_uri != PAGE:
         return markdown
     changelog = Path(config.config_file_path).parent / "CHANGELOG.md"
-    body = changelog.read_text(encoding="utf-8")
+    # The page already has a title from the nav; the file's H1 would repeat it.
+    body = TITLE.sub("", changelog.read_text(encoding="utf-8"))
     body = LINKED_HEADING.sub(r"\1 \2", body)
     body = TRAILING_REFS.sub("", body)
     body = CLOSES_REFS.sub("", body)
