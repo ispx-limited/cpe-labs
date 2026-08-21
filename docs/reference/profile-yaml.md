@@ -27,6 +27,7 @@ transfer:             # Download / Upload TransferComplete defaults + faults + f
 softwareModules:      # TR-157 software module lifecycle (ChangeDUState, InstallDU())
 eventSchedule:        # Wall-clock latency for Reboot / FactoryReset / boot, and the boot ramp
 diagnostics:          # triggered diagnostics: ACS writes a trigger, CPE completes later
+faults:               # uplink outage, triggered out of band
 ```
 
 Every block is optional except `deviceIdPaths` and at least one of `parameters` / `objects` / `groups` (you need to mount the four DeviceID leaves).
@@ -382,6 +383,42 @@ eventSchedule:
 All four fields are optional. Zero / unset preserves the simulator's existing immediate behavior (RPC handlers run their effect synchronously; the bootstrap Inform fires the moment the process starts). Negative values reject at load time.
 
 `rebootDelay > 0` or `factoryResetDelay > 0` keeps the process alive long enough for the deferred Inform to fire (daemon mode). `bootDelay` and `bootRamp` alone preserve one-shot mode (the deferred bootstraps fire, then the process exits).
+
+## `faults`
+
+Failures a CPE can be made to suffer. One kind today, `faults.link`.
+
+### `faults.link`
+
+A WAN outage: the uplink goes away for a window, and the management plane has to find out the way it would in the field. Nothing happens until the process is sent `SIGUSR1`, so a profile can carry the block and never use it.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `interface` | string, required | The interface object whose `Status` the outage drives, with or without a trailing dot. Its `Status` leaf must exist; `LastChange` is written when the profile declares it and skipped when it does not. |
+| `duration` | duration | How long the link stays down. Defaults to `2m`. |
+| `instances` | string | Inclusive band of fleet instances the outage covers, `"400001-400200"` or a single `"7"`, in the absolute index space `fleet.offset` shifts. Omitted darkens every CPE in the process. |
+| `reboot` | bool | Whether the CPE announces a reboot when the link returns. Defaults to false. |
+
+```yaml
+faults:
+  link:
+    interface: Device.IP.Interface.1
+    duration: 2m
+    instances: "400001-400200"
+    reboot: false
+```
+
+```
+kill -USR1 $(pidof cpe-sim)      # or: docker kill -s USR1 <container>
+```
+
+The outage is not a disconnect. An agent that closed its session politely would tell the broker the session was over, and a controller would know within milliseconds; a CPE whose WAN has failed sends no DISCONNECT, no FIN and no RST, so the far end only finds out when the keepalive lapses. The simulator reproduces that: the socket is severed on the agent side and deliberately left open, every reconnect attempt fails for the length of the window, and the broker times the session out on its own. Set `duration` longer than a keepalive and a half or the outage is never visible at all.
+
+When the link returns, the agent reconnects and reports the transition it could not send while it was away: `Status` went `Down`, and `LastChange` says for how long. That report is what distinguishes a cut uplink from a power cut. A CPE that lost power has no account to give, which is why `reboot` defaults to false: the device comes back with the uptime it left with, and a controller comparing the two can tell which happened.
+
+`instances` is what gives an outage somewhere to be. A fault that darkens a whole fleet at once is a fleet-wide event; darkening a contiguous band darkens the homes a deterministic profile placed together, which is what a street or a cabinet looks like from the outside.
+
+Both protocols go with the link. A dual-stack CPE stops informing over CWMP for the same window, because one dead WAN takes both.
 
 ## `diagnostics`
 

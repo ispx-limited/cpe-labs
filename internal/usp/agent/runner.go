@@ -54,6 +54,11 @@ type Runner struct {
 	// cancelObserver detaches the tree observer that drives subscription
 	// notifies, so a stopped agent stops pushing.
 	cancelObserver func()
+
+	// notifier is the same object the tree observer runs, kept so a
+	// caller can re-offer a change the agent could not deliver when it
+	// happened. Assigned once, before Run starts observing.
+	notifier *notifier
 }
 
 // NewRunner validates config and returns a runner.
@@ -97,6 +102,7 @@ func (r *Runner) Run(ctx context.Context) error {
 			send:   r.send,
 			nextID: r.nextMsgID,
 		}
+		r.notifier = n
 		r.cancelObserver = r.cfg.Tree.Observe(n.handleChange)
 		defer r.cancelObserver()
 	}
@@ -190,6 +196,27 @@ func (r *Runner) boot(cause, commandKey string, firmwareUpdated bool) error {
 		"firmware_updated", firmwareUpdated,
 		"boot_parameters", len(r.cfg.BootParameters))
 	return nil
+}
+
+// ReportValueChange offers a parameter to the subscription notifier as
+// though it had just changed, delivering it to whichever subscriptions
+// match.
+//
+// It exists for the one case where a change and its report cannot
+// happen together: the agent's MTP was gone at the moment the value
+// moved. A CPE that loses its uplink watches its WAN interface go down
+// with no way to say so, and tells the controller once it can reach it
+// again. Nothing else should use this; every ordinary write is reported
+// by the tree observer at the time it happens.
+func (r *Runner) ReportValueChange(path, value string) {
+	if r.notifier == nil {
+		return
+	}
+	r.notifier.handleChange(paramtree.Change{
+		Path: path,
+		New:  paramtree.Value{Raw: value},
+		Kind: paramtree.ChangeValue,
+	})
 }
 
 // collectBootParameters reads the configured boot paths out of the tree,

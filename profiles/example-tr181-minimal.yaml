@@ -235,6 +235,16 @@ parameters:
 
   # ---- IP interface (IPv4Address rides bootstrap; BytesSent is the
   #      counter-generator target reported on periodic) ----
+  #
+  # Status and LastChange are the pair a controller watches to learn a
+  # WAN went away and came back: TR-181 counts LastChange in seconds
+  # since the interface entered its current state, so the two together
+  # date a link event nobody was connected to see.
+  - path: Device.IP.Interface.1.Status
+    value: "Up"
+  - path: Device.IP.Interface.1.LastChange
+    type: xsd:unsignedInt
+    value: "0"
   - path: Device.IP.Interface.1.IPv4Address
     value: "192.0.2.10"
     writable: true

@@ -102,3 +102,15 @@ informParameters:
     - Device.WiFi.AccessPoint.2.AssociatedDeviceNumberOfEntries
   connectionRequest:
     - Device.DeviceInfo.UpTime
+
+# faults.link is the uplink outage: SIGUSR1 takes the WAN away for the
+# window below, without the broker being told, so a controller has to
+# notice from its own keepalive the way it would on a real cut. Nothing
+# happens until the process is signalled. reboot stays false because a
+# cut uplink does not restart a router, and a controller comparing the
+# uptime either side of the outage is entitled to see that.
+faults:
+  link:
+    interface: Device.IP.Interface.1
+    duration: 2m
+    reboot: false

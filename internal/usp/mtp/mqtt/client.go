@@ -21,8 +21,10 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	paho "github.com/eclipse/paho.mqtt.golang"
@@ -61,6 +63,11 @@ type Client struct {
 	client paho.Client
 	log    *slog.Logger
 
+	// link is the simulated uplink. Always up unless a link fault
+	// takes it away; see link.go for why an outage is not a
+	// Disconnect.
+	link link
+
 	mu       sync.Mutex
 	onRecord func(payload []byte)
 	// replyTo is the controller topic learned from an inbound reply-to
@@ -96,15 +103,34 @@ func EnableLibraryLogging(log *slog.Logger) {
 	paho.WARN = slogWriter{log: log, level: slog.LevelWarn}
 }
 
+// outages counts the agents in this process whose uplink is currently
+// cut. While it is above zero the library's own logging is dropped.
+//
+// Everything paho has to say during a simulated outage is a consequence
+// of that outage: the read that failed, and one refused reconnect every
+// retry interval until the link returns. A thousand agents dark for two
+// minutes is tens of thousands of lines saying so, and a fleet host has
+// been taken down by exactly that before, its logging pipeline saturated
+// by per-failure warnings until the daemon itself was too slow to use.
+// The outage is already reported once per CPE when it starts and once
+// when it ends, which is the whole of the information.
+var outages atomic.Int32
+
 type slogWriter struct {
 	log   *slog.Logger
 	level slog.Level
 }
 
 func (w slogWriter) Println(v ...any) {
+	if outages.Load() > 0 {
+		return
+	}
 	w.log.Log(context.Background(), w.level, "usp/mqtt lib: "+fmt.Sprint(v...))
 }
 func (w slogWriter) Printf(format string, v ...any) {
+	if outages.Load() > 0 {
+		return
+	}
 	w.log.Log(context.Background(), w.level, "usp/mqtt lib: "+fmt.Sprintf(format, v...))
 }
 
@@ -162,7 +188,19 @@ func (c *Client) Connect(ctx context.Context) error {
 		SetOnConnectHandler(c.onConnect).
 		SetConnectionLostHandler(func(_ paho.Client, err error) {
 			c.log.Warn("usp/mqtt: connection lost", "endpoint_id", c.cfg.EndpointID, "err", err.Error())
-		})
+		}).
+		// The library's reconnect backoff doubles up to this ceiling,
+		// which defaults to ten minutes. That is a sensible ceiling for
+		// a long-lived application and a poor one for a simulator: a
+		// fleet that has just watched its broker come back should
+		// rejoin in seconds, not sometime within the next ten minutes,
+		// or every measurement taken after a restart is really a
+		// measurement of the backoff.
+		SetMaxReconnectInterval(c.cfg.ConnectRetry).
+		// Dial through the simulated uplink so a link fault can cut the
+		// session without the broker being told and refuse every retry
+		// until the fault ends.
+		SetCustomOpenConnectionFn(c.openConnection)
 
 	c.client = paho.NewClient(opts)
 
@@ -176,6 +214,25 @@ func (c *Client) Connect(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// openConnection dials the broker, unless the simulated uplink is down,
+// in which case it fails the way a CPE with no route does. The socket
+// is wrapped so a fault can cut it locally; see link.go.
+func (c *Client) openConnection(uri *url.URL, opts paho.ClientOptions) (net.Conn, error) {
+	if c.link.isDown() {
+		return nil, ErrLinkDown
+	}
+	timeout := opts.ConnectTimeout
+	if timeout <= 0 {
+		timeout = 30 * time.Second
+	}
+	conn, err := net.DialTimeout("tcp", uri.Host, timeout)
+	if err != nil {
+		return nil, err
+	}
+	c.link.hold(conn)
+	return &severableConn{Conn: conn, link: &c.link}, nil
 }
 
 // onConnect subscribes on every successful connect, including reconnects: a
@@ -247,6 +304,17 @@ func indexOf(s, sub string) int {
 // The published topic carries our own reply-to suffix so the controller knows
 // which topic to answer on, which is the other half of R-MQTT.24.
 func (c *Client) Publish(payload []byte) error {
+	// Checked before the library's own state, and separately from it:
+	// while a link fault is in effect the library is reconnecting, and
+	// a reconnecting client accepts publishes and holds them until it
+	// is back. That is the right behaviour for an application and the
+	// wrong one here. A CPE with no uplink does not deliver a message
+	// late, it never delivers it, and a fault that quietly queued two
+	// minutes of notifications would flush them all on restoration and
+	// hide the outage it exists to demonstrate.
+	if c.link.isDown() {
+		return ErrLinkDown
+	}
 	if c.client == nil || !c.client.IsConnected() {
 		return fmt.Errorf("usp/mqtt: not connected")
 	}

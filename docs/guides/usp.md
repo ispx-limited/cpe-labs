@@ -244,6 +244,43 @@ mode the CR listener serves the CWMP side only, on its own port with Basic or
 Digest auth. The two paths coexist because they answer different protocols rather
 than competing to wake the same device.
 
+## Losing the uplink
+
+A CPE whose WAN fails cannot tell anyone. That is the whole difficulty of the
+event, and it is what `faults.link` reproduces: `SIGUSR1` takes the agent's
+uplink away for a window, without the broker being told, so the session goes
+stale and the broker reports the loss on its own keepalive rather than on a
+DISCONNECT that no real outage would send.
+
+```yaml
+faults:
+  link:
+    interface: Device.IP.Interface.1
+    duration: 2m
+```
+
+```
+docker kill -s USR1 <container>
+```
+
+Timing follows from the broker, not from the agent. MQTT gives a session a
+keepalive and a half before it is stale, so with the default 60 second
+keepalive an outage becomes visible about ninety seconds in, and a `duration`
+shorter than that is an outage nobody ever sees. While the link is down every
+reconnect attempt fails, which is what a CPE with no route spends an outage
+doing.
+
+When the link returns the agent rejoins and reports what it could not report at
+the time: the WAN interface was `Down`, and `LastChange` says for how long.
+Subscribe to those paths (`ValueChange` on `Device.IP.Interface.{i}.Status`) and
+the account arrives as the first notification after the reconnect. Nothing
+announces a reboot unless the profile asks for one, which is the difference a
+controller reads to tell a cut uplink from a power cut.
+
+See [`faults.link`](../reference/profile-yaml.md#faultslink) for the full field
+set, including the instance band that darkens one slice of a cohort rather than
+all of it.
+
 ## Determinism across protocols
 
 `--seed=N` covers both stacks. The per-CPE RNG drives generator jitter and

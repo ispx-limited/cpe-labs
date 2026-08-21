@@ -202,6 +202,14 @@ groups:
         value: "Up"
       - path: Name
         value: "wan"
+      # TR-181 counts LastChange in seconds since the interface entered
+      # its current state, so a WAN that has just come back reads near
+      # zero and one that has been stable for a week reads a week. It is
+      # what a controller subtracts to date a link event it was not
+      # around to see.
+      - path: LastChange
+        type: xsd:unsignedInt
+        value: "0"
       - path: LowerLayers
         value: "Device.Ethernet.Interface.1"
         writable: true

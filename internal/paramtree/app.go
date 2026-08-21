@@ -88,6 +88,7 @@ func LoadAppManifest(r io.Reader, source string) (*AppManifest, error) {
 		"eventSchedule":       lf.prof.EventSchedule != nil,
 		"diagnostics":         len(lf.prof.Diagnostics) > 0,
 		"softwareModules":     lf.prof.SoftwareModules != nil,
+		"faults":              lf.prof.Faults != nil,
 	} {
 		if present {
 			return nil, invalid(fmt.Errorf("%s: %s is a profile block, not valid in an app manifest", source, key))
