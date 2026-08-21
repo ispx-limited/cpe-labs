@@ -304,18 +304,30 @@ func (r *Runner) notifyOperationComplete(objPath, commandName, commandKey string
 // Exported because the events themselves are domain knowledge: the firmware
 // sequence in cmd/cpe-sim owns TransferComplete!, the agent owns delivery.
 func (r *Runner) NotifyEvent(objPath, eventName string, params map[string]string) {
+	_, _ = r.deliverEvent(objPath, eventName, params)
+}
+
+// deliverEvent is NotifyEvent reporting how it went: how many
+// subscriptions took the event, and the last send failure. The bulk data
+// collector retains a report that reached nobody, so it needs to tell
+// "no subscriber yet" from "the MTP is down", and both from success.
+func (r *Runner) deliverEvent(objPath, eventName string, params map[string]string) (delivered int, err error) {
 	target := objPath + eventName
 	for _, sub := range SubscriptionTable(r.cfg.Tree) {
 		if !sub.Enable || sub.NotifType != NotifTypeEvent || !sub.Matches(target) {
 			continue
 		}
 		msg := NewEventNotify(r.nextMsgID("event"), sub.ID, objPath, eventName, params)
-		if err := r.send(msg); err != nil {
+		if sendErr := r.send(msg); sendErr != nil {
 			r.log.Warn("usp/agent: event notify failed",
 				"endpoint_id", r.cfg.Identity.EndpointID,
-				"event", target, "err", err.Error())
+				"event", target, "err", sendErr.Error())
+			err = sendErr
+			continue
 		}
+		delivered++
 	}
+	return delivered, err
 }
 
 // DisconnectTransport and ConnectTransport expose the MTP session lifecycle
