@@ -14,6 +14,9 @@ theme:
 plugins:
   - search
 
+hooks:
+  - hooks/changelog.py
+
 markdown_extensions:
   admonition:
   codehilite:
@@ -64,3 +67,4 @@ nav:
   - Reference:
       - CLI / Env / YAML: reference/cli.md
       - Profile YAML: reference/profile-yaml.md
+  - Changelog: changelog.md

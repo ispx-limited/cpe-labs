@@ -26,3 +26,4 @@ Thumbs.db
 
 # mkdocs build output
 /site/
+__pycache__/
