@@ -17,8 +17,6 @@ objects:
         type: xsd:boolean
         value: "true"
         writable: true
-      - path: Status
-        value: "Up"
       - path: Alias
         value: "PHY{i}"
         writable: true
@@ -39,9 +37,6 @@ objects:
         type: xsd:int
         value: "1000"
         writable: true
-      - path: CurrentBitRate
-        type: xsd:unsignedInt
-        value: "1000"
       - path: DuplexMode
         value: "Auto"
         writable: true
@@ -53,7 +48,52 @@ objects:
         type: xsd:boolean
         value: "false"
 
+# Link state is declared per port rather than in the table above: the
+# loader rejects a group that redeclares a path a table already
+# materialized, so a value that differs per port cannot be a table
+# default with an override. One WAN and two LAN ports carry a link;
+# the other two sit empty, which is what most homes look like.
 groups:
+  - prefix: Device.Ethernet.Interface.1
+    parameters:
+      - path: Status
+        value: "Up"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "1000"
+
+  - prefix: Device.Ethernet.Interface.2
+    parameters:
+      - path: Status
+        value: "Up"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "1000"
+
+  - prefix: Device.Ethernet.Interface.3
+    parameters:
+      - path: Status
+        value: "Up"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "1000"
+
+  - prefix: Device.Ethernet.Interface.4
+    parameters:
+      - path: Status
+        value: "Down"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.Ethernet.Interface.5
+    parameters:
+      - path: Status
+        value: "Down"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "0"
+
   - prefix: Device.Ethernet.Interface.1.Stats
     parameters:
       - path: BytesSent
