@@ -69,6 +69,11 @@ informParameters:
     - Device.ManagementServer.ParameterKey
     - Device.IP.Interface.1.IPv4Address.1.IPAddress
   boot:
+    # SoftwareVersion is a forced Inform parameter (TR-069 Annex A),
+    # and it is the boot after a firmware Download where it matters:
+    # without it the ACS learns the new build on the next periodic
+    # Inform, up to an interval later.
+    - Device.DeviceInfo.SoftwareVersion
     - Device.DeviceInfo.UpTime
   periodic:
     # Identity repeats on every periodic Inform, not just bootstrap.

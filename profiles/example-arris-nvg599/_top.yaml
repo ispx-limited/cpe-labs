@@ -69,6 +69,11 @@ informParameters:
     - InternetGatewayDevice.ManagementServer.ParameterKey
     - InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ExternalIPAddress
   boot:
+    # SoftwareVersion is a forced Inform parameter (TR-069 Annex A),
+    # and it is the boot after a firmware Download where it matters:
+    # without it the ACS learns the new build on the next periodic
+    # Inform, up to an interval later.
+    - InternetGatewayDevice.DeviceInfo.SoftwareVersion
     - InternetGatewayDevice.DeviceInfo.UpTime
   # SoftwareVersion rides the periodic Inform as well as bootstrap, so
   # an ACS keying on firmware sees an upgrade without waiting for a
