@@ -9,6 +9,7 @@ name: release-please
 on:
   push:
     branches: [main]
+  workflow_dispatch: {} # refresh the Release PR after a commit override
 
 permissions:
   contents: write
