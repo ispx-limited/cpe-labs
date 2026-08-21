@@ -44,6 +44,18 @@ acsCredentialPaths:
   username: InternetGatewayDevice.ManagementServer.Username
   password: InternetGatewayDevice.ManagementServer.Password
 
+# A Download with FileType "1 Firmware Upgrade Image" is applied for
+# real: the image is fetched, its declared version written to
+# versionPath after a dark window, and announced in a boot session. An
+# ACS campaign against this profile therefore changes what the device
+# reports, which is what a compliance finding or a catalogue count is
+# read against.
+transfer:
+  firmware:
+    versionPath: InternetGatewayDevice.DeviceInfo.SoftwareVersion
+    applyDelay: 60s
+    fetch: true
+
 informParameters:
   bootstrap:
     - InternetGatewayDevice.DeviceInfo.Manufacturer
