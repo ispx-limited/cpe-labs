@@ -45,35 +45,61 @@ func HandleSet(tree *paramtree.Tree, msgID string, req *usp.Set) *usp.Msg {
 
 	for _, obj := range req.GetUpdateObjs() {
 		objPath := obj.GetObjPath()
-		updated := map[string]string{}
-		var paramErrs []*usp.SetResp_ParameterError
-		requiredFailed := false
-		var requiredErr *usp.SetResp_ParameterError
+		result := &usp.SetResp_UpdatedObjectResult{RequestedPath: objPath}
 
-		for _, setting := range obj.GetParamSettings() {
-			full := objPath + setting.GetParam()
-			code, msg := applyOne(tree, full, setting.GetValue())
-			if code == 0 {
-				updated[setting.GetParam()] = setting.GetValue()
-				continue
+		// A search path applies the same settings to every object it
+		// resolves to, one UpdatedInstanceResult each (TR-369 7.5.2). A path
+		// that resolves to nothing fails the object: there is nothing to
+		// report as updated.
+		targets := ExpandSearchPath(tree, objPath)
+		if len(targets) == 0 {
+			result.OperStatus = &usp.SetResp_UpdatedObjectResult_OperationStatus{
+				OperStatus: &usp.SetResp_UpdatedObjectResult_OperationStatus_OperFailure{
+					OperFailure: &usp.SetResp_UpdatedObjectResult_OperationStatus_OperationFailure{
+						ErrCode: ErrCodeObjectDoesNotExist,
+						ErrMsg:  fmt.Sprintf("path %q does not resolve to an object", objPath),
+					},
+				},
 			}
-			pe := &usp.SetResp_ParameterError{
-				Param:   setting.GetParam(),
-				ErrCode: code,
-				ErrMsg:  msg,
-			}
-			if setting.GetRequired() {
-				// A required failure invalidates the object: stop applying and
-				// report the object as failed rather than half-written.
-				requiredFailed = true
-				requiredErr = pe
-				break
-			}
-			paramErrs = append(paramErrs, pe)
+			results = append(results, result)
+			continue
 		}
 
-		result := &usp.SetResp_UpdatedObjectResult{RequestedPath: objPath}
-		if requiredFailed {
+		var instResults []*usp.SetResp_UpdatedInstanceResult
+		var requiredErr *usp.SetResp_ParameterError
+		for _, target := range targets {
+			updated := map[string]string{}
+			var paramErrs []*usp.SetResp_ParameterError
+			for _, setting := range obj.GetParamSettings() {
+				code, msg := applyOne(tree, target+setting.GetParam(), setting.GetValue())
+				if code == 0 {
+					updated[setting.GetParam()] = setting.GetValue()
+					continue
+				}
+				pe := &usp.SetResp_ParameterError{
+					Param:   setting.GetParam(),
+					ErrCode: code,
+					ErrMsg:  msg,
+				}
+				if setting.GetRequired() {
+					// A required failure invalidates the object: stop applying and
+					// report the object as failed rather than half-written.
+					requiredErr = pe
+					break
+				}
+				paramErrs = append(paramErrs, pe)
+			}
+			if requiredErr != nil {
+				break
+			}
+			instResults = append(instResults, &usp.SetResp_UpdatedInstanceResult{
+				AffectedPath:  target,
+				UpdatedParams: updated,
+				ParamErrs:     paramErrs,
+			})
+		}
+
+		if requiredErr != nil {
 			result.OperStatus = &usp.SetResp_UpdatedObjectResult_OperationStatus{
 				OperStatus: &usp.SetResp_UpdatedObjectResult_OperationStatus_OperFailure{
 					OperFailure: &usp.SetResp_UpdatedObjectResult_OperationStatus_OperationFailure{
@@ -87,11 +113,7 @@ func HandleSet(tree *paramtree.Tree, msgID string, req *usp.Set) *usp.Msg {
 			result.OperStatus = &usp.SetResp_UpdatedObjectResult_OperationStatus{
 				OperStatus: &usp.SetResp_UpdatedObjectResult_OperationStatus_OperSuccess{
 					OperSuccess: &usp.SetResp_UpdatedObjectResult_OperationStatus_OperationSuccess{
-						UpdatedInstResults: []*usp.SetResp_UpdatedInstanceResult{{
-							AffectedPath:  objPath,
-							UpdatedParams: updated,
-							ParamErrs:     paramErrs,
-						}},
+						UpdatedInstResults: instResults,
 					},
 				},
 			}
@@ -138,7 +160,31 @@ func HandleAdd(tree *paramtree.Tree, msgID string, req *usp.Add) *usp.Msg {
 		objPath := obj.GetObjPath()
 		result := &usp.AddResp_CreatedObjectResult{RequestedPath: objPath}
 
-		instance, err := tree.AddObject(objPath)
+		// A search path names the table through an instance it cannot number
+		// yet: "Device.BulkData.Profile.[Alias==\"x\"].Parameter." is how a
+		// controller fills a row it created earlier in the same message. It
+		// has to resolve to exactly one table, because one CreateObject
+		// produces one instantiated path.
+		tables := ExpandSearchPath(tree, objPath)
+		if len(tables) != 1 {
+			msg := fmt.Sprintf("path %q does not resolve to an object", objPath)
+			if len(tables) > 1 {
+				msg = fmt.Sprintf("path %q resolves to %d objects, Add needs exactly one", objPath, len(tables))
+			}
+			result.OperStatus = &usp.AddResp_CreatedObjectResult_OperationStatus{
+				OperStatus: &usp.AddResp_CreatedObjectResult_OperationStatus_OperFailure{
+					OperFailure: &usp.AddResp_CreatedObjectResult_OperationStatus_OperationFailure{
+						ErrCode: ErrCodeObjectDoesNotExist,
+						ErrMsg:  msg,
+					},
+				},
+			}
+			results = append(results, result)
+			continue
+		}
+		tablePath := tables[0]
+
+		instance, err := tree.AddObject(tablePath)
 		if err != nil {
 			result.OperStatus = &usp.AddResp_CreatedObjectResult_OperationStatus{
 				OperStatus: &usp.AddResp_CreatedObjectResult_OperationStatus_OperFailure{
@@ -152,7 +198,7 @@ func HandleAdd(tree *paramtree.Tree, msgID string, req *usp.Add) *usp.Msg {
 			continue
 		}
 
-		instancePath := strings.TrimSuffix(objPath, ".") + "." + strconv.Itoa(instance) + "."
+		instancePath := strings.TrimSuffix(tablePath, ".") + "." + strconv.Itoa(instance) + "."
 
 		// Apply the initial parameter values the controller supplied. These are
 		// leaf names relative to the new instance, not full paths.
@@ -234,12 +280,30 @@ func HandleDelete(tree *paramtree.Tree, msgID string, req *usp.Delete) *usp.Msg 
 
 	for _, path := range req.GetObjPaths() {
 		result := &usp.DeleteResp_DeletedObjectResult{RequestedPath: path}
-		if err := tree.DeleteObject(path); err != nil {
+
+		// A search path deletes every instance it resolves to; a concrete
+		// path that does not exist is the one failure, because a controller
+		// that asked for a specific row to go deserves to hear it was never
+		// there.
+		targets := ExpandSearchPath(tree, path)
+		var affected []string
+		var failure error
+		for _, target := range targets {
+			if err := tree.DeleteObject(target); err != nil {
+				failure = err
+				continue
+			}
+			affected = append(affected, target)
+		}
+		if len(affected) == 0 {
+			if failure == nil {
+				failure = fmt.Errorf("path %q does not resolve to an object", path)
+			}
 			result.OperStatus = &usp.DeleteResp_DeletedObjectResult_OperationStatus{
 				OperStatus: &usp.DeleteResp_DeletedObjectResult_OperationStatus_OperFailure{
 					OperFailure: &usp.DeleteResp_DeletedObjectResult_OperationStatus_OperationFailure{
 						ErrCode: ErrCodeObjectDoesNotExist,
-						ErrMsg:  err.Error(),
+						ErrMsg:  failure.Error(),
 					},
 				},
 			}
@@ -249,7 +313,7 @@ func HandleDelete(tree *paramtree.Tree, msgID string, req *usp.Delete) *usp.Msg 
 		result.OperStatus = &usp.DeleteResp_DeletedObjectResult_OperationStatus{
 			OperStatus: &usp.DeleteResp_DeletedObjectResult_OperationStatus_OperSuccess{
 				OperSuccess: &usp.DeleteResp_DeletedObjectResult_OperationStatus_OperationSuccess{
-					AffectedPaths: []string{path},
+					AffectedPaths: affected,
 				},
 			},
 		}
@@ -589,34 +653,47 @@ func (e *CommandError) Error() string { return e.Msg }
 // a subscription, so an agent that treats "*" as a literal segment answers
 // "invalid path" and subscription setup never gets off the ground.
 //
-// Expression-based search paths (the "[Alias==\"x\"]" form) are not handled
-// here; a path carrying one is returned unchanged and will resolve or fail on
-// its literal spelling, which is honest about what is supported.
+// An expression segment ("[Alias==\"x\"]", TR-369 7.5.1 search expressions)
+// stands for the instances whose parameters satisfy every term. It is what
+// lets a controller name a row by a unique key it chose itself, before it
+// has learned the instance number the agent assigned: an Add that creates
+// "Device.BulkData.Profile." with an Alias and, in the same message, fills
+// "Device.BulkData.Profile.[Alias==\"x\"].Parameter." depends on it. Terms
+// are "Key==value" or "Key!=value", quoted or not, joined with "&&".
 func ExpandSearchPath(tree *paramtree.Tree, path string) []string {
-	if !strings.Contains(path, "*") {
+	if !strings.ContainsAny(path, "*[") {
 		return []string{path}
 	}
 
 	trailingDot := strings.HasSuffix(path, ".")
-	segments := strings.Split(strings.TrimSuffix(path, "."), ".")
+	segments := splitSearchPath(strings.TrimSuffix(path, "."))
 
 	// Grow the set of concrete prefixes one segment at a time. A literal
-	// segment appends to every prefix; a "*" fans each prefix out across the
-	// instances that exist under it.
+	// segment appends to every prefix; a "*" or an expression fans each
+	// prefix out across the instances that exist under it.
 	prefixes := []string{""}
 	for _, seg := range segments {
 		var next []string
 		for _, prefix := range prefixes {
-			if seg != "*" {
-				if prefix == "" {
-					next = append(next, seg)
-				} else {
-					next = append(next, prefix+"."+seg)
+			switch {
+			case seg == "*":
+				for _, inst := range childInstanceNames(tree, prefix+".") {
+					next = append(next, prefix+"."+inst)
 				}
-				continue
-			}
-			for _, inst := range childInstanceNames(tree, prefix+".") {
-				next = append(next, prefix+"."+inst)
+			case strings.HasPrefix(seg, "["):
+				terms, ok := parseSearchExpression(seg)
+				if !ok {
+					return nil
+				}
+				for _, inst := range childInstanceNames(tree, prefix+".") {
+					if terms.match(tree, prefix+"."+inst+".") {
+						next = append(next, prefix+"."+inst)
+					}
+				}
+			case prefix == "":
+				next = append(next, seg)
+			default:
+				next = append(next, prefix+"."+seg)
 			}
 		}
 		prefixes = next
@@ -649,4 +726,94 @@ func childInstanceNames(tree *paramtree.Tree, tablePath string) []string {
 		}
 	}
 	return out
+}
+
+// splitSearchPath splits a path on "." while keeping an expression segment
+// whole, since the value inside "[Reference==\"Device.X.Y\"]" carries dots
+// of its own.
+func splitSearchPath(path string) []string {
+	var segs []string
+	var cur strings.Builder
+	depth := 0
+	for _, r := range path {
+		switch {
+		case r == '[':
+			depth++
+			cur.WriteRune(r)
+		case r == ']':
+			if depth > 0 {
+				depth--
+			}
+			cur.WriteRune(r)
+		case r == '.' && depth == 0:
+			segs = append(segs, cur.String())
+			cur.Reset()
+		default:
+			cur.WriteRune(r)
+		}
+	}
+	segs = append(segs, cur.String())
+	return segs
+}
+
+// searchTerm is one comparison inside an expression segment.
+type searchTerm struct {
+	key   string
+	value string
+	equal bool
+}
+
+type searchTerms []searchTerm
+
+// parseSearchExpression reads "[Key==\"value\"&&Other!=x]". Anything it does
+// not understand reports false, and the caller resolves the path to nothing:
+// a controller should learn that its expression went unrecognised rather
+// than have it silently match every instance.
+func parseSearchExpression(seg string) (searchTerms, bool) {
+	if !strings.HasPrefix(seg, "[") || !strings.HasSuffix(seg, "]") {
+		return nil, false
+	}
+	body := seg[1 : len(seg)-1]
+	if strings.TrimSpace(body) == "" {
+		return nil, false
+	}
+	var terms searchTerms
+	for _, raw := range strings.Split(body, "&&") {
+		raw = strings.TrimSpace(raw)
+		equal := true
+		op := strings.Index(raw, "==")
+		if op < 0 {
+			op = strings.Index(raw, "!=")
+			equal = false
+		}
+		if op <= 0 {
+			return nil, false
+		}
+		key := strings.TrimSpace(raw[:op])
+		value := strings.TrimSpace(raw[op+2:])
+		if len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"' {
+			value = value[1 : len(value)-1]
+		}
+		if key == "" {
+			return nil, false
+		}
+		terms = append(terms, searchTerm{key: key, value: value, equal: equal})
+	}
+	return terms, true
+}
+
+// match reports whether the instance at instPath satisfies every term. A
+// key the instance does not carry never matches, on either operator: an
+// absent parameter is not "not equal", it is not there.
+func (terms searchTerms) match(tree *paramtree.Tree, instPath string) bool {
+	for _, t := range terms {
+		v, err := tree.Get(instPath + t.key)
+		if err != nil {
+			return false
+		}
+		if (v.Raw == t.value) != t.equal {
+			return false
+		}
+	}
+	return true
 }

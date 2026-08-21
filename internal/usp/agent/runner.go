@@ -101,6 +101,17 @@ func (r *Runner) Run(ctx context.Context) error {
 		defer r.cancelObserver()
 	}
 
+	// Device.BulkData likewise: the capability parameters a controller
+	// surveys and the Profile table it writes sampled-telemetry profiles
+	// into. The collector that pushes their reports runs for the life of
+	// the agent.
+	if err := EnsureBulkData(r.cfg.Tree); err != nil {
+		r.log.Warn("usp/agent: could not mount Device.BulkData, bulk data reports are disabled",
+			"err", err.Error())
+	} else {
+		go r.runBulkData(ctx)
+	}
+
 	if err := r.cfg.Transport.Connect(ctx); err != nil {
 		return err
 	}

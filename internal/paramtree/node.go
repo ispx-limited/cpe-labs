@@ -32,6 +32,16 @@ func NewLeaf(v Value) *Node {
 	return &Node{leaf: &v}
 }
 
+// NewTable returns an interior node declared as a multi-instance table
+// whose instances clone template. AddTable declares a table by path on a
+// mounted tree; a table nested inside another table's template has no
+// path until AddObject clones the template, so it has to be declared on
+// the node itself. Device.BulkData.Profile.{i}.Parameter.{i}. is the
+// case: every Profile instance carries its own Parameter table.
+func NewTable(template *Node) *Node {
+	return &Node{children: make(map[string]*Node), table: &tableMeta{template: template}}
+}
+
 // Attach binds child as the named segment under n. Reports an error
 // if the segment is already taken or if n is a leaf.
 func (n *Node) Attach(segment string, child *Node) error {

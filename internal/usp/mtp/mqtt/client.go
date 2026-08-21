@@ -259,12 +259,28 @@ func (c *Client) Publish(payload []byte) error {
 	topic := base + "/reply-to=" + url.QueryEscape(AgentTopic(c.cfg.EndpointID))
 
 	token := c.client.Publish(topic, 1, false, payload)
-	<-tokenDone(token)
+	if !token.WaitTimeout(publishTimeout) {
+		// The library keeps the QoS 1 message and resends it when the
+		// session comes back, so the record is not lost by returning
+		// here. What the caller needs is the answer now: a notify that
+		// cannot be acknowledged is a failed delivery, which is the signal
+		// the bulk data collector retains a report on. Waiting for the
+		// acknowledgement instead blocked the caller for as long as the
+		// broker was away, and a report collected while blocked was never
+		// taken.
+		return fmt.Errorf("usp/mqtt: publish to %s: no acknowledgement within %s", topic, publishTimeout)
+	}
 	if err := token.Error(); err != nil {
 		return fmt.Errorf("usp/mqtt: publish to %s: %w", topic, err)
 	}
 	return nil
 }
+
+// publishTimeout bounds how long Publish waits for the broker's PUBACK.
+// Keepalive detection of a dead session takes a keepalive interval plus
+// the ping timeout, which is longer than any caller should sit on a send;
+// a broker that has not acknowledged in ten seconds is not going to.
+const publishTimeout = 10 * time.Second
 
 // Disconnect closes the session, waiting briefly for in-flight publishes.
 func (c *Client) Disconnect() {

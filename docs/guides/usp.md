@@ -95,9 +95,9 @@ later is transport work rather than a change to the Agent.
 
 | Message | Notes |
 | --- | --- |
-| Get | Exact paths, partial paths (trailing `.`) returning a whole subtree, and `*` search paths per TR-369 7.5.1 |
-| Set | Required and optional parameter settings, with read-only parameters refused |
-| Add / Delete | Instance creation and removal in multi-instance tables, reporting the instantiated path and its unique keys |
+| Get | Exact paths, partial paths (trailing `.`) returning a whole subtree, and search paths per TR-369 7.5.1: `*` for any instance, `[Alias=="x"]` for the instances whose parameters match |
+| Set | Required and optional parameter settings, with read-only parameters refused. A search path applies the settings to every instance it resolves to |
+| Add / Delete | Instance creation and removal in multi-instance tables, reporting the instantiated path and its unique keys. An Add may address the table through an expression, which is how a controller fills a row it created earlier in the same message without knowing its instance number |
 | GetInstances | Instance enumeration, optionally first-level-only |
 | GetSupportedDM | The supported object and parameter model, with per-parameter access (read-only or read-write). `return_commands`, `return_events` and `return_unique_key_sets` are accepted but return nothing yet |
 | Operate | `Device.Reboot()` and `Device.FactoryReset()` synchronously. `Device.DeviceInfo.FirmwareImage.{i}.Download()` and `Activate()` asynchronously: the agent creates a `Device.LocalAgent.Request.{i}.` row, answers `OperateResp` with its path, and reports the outcome in an `OperationComplete` notify. See [Firmware Upgrades](firmware.md) |
@@ -173,6 +173,63 @@ covers `TransferComplete!`.
 
 The `Periodic` notify type is not implemented yet. A Controller that installs
 it gets a subscription it can read back, but the Agent will not fire on it.
+
+## Bulk data reports
+
+Sampled telemetry rides the same subscription machinery. TR-157 Annex A bulk
+data collection is carried in the data model as `Device.BulkData.`, and TR-181
+2.13 added the USP delivery: a profile with `Protocol` `USPEventNotif` pushes
+each report as the `Push!` event on `Device.BulkData.Profile.{i}.`, which a
+Controller receives through an ordinary `Event` subscription. It is the
+mechanism for "these forty parameters every sixty seconds". A `ValueChange` on
+a byte counter is a notification storm, and `Periodic` carries no values.
+
+Every Agent mounts `Device.BulkData.` at start, the same way it mounts
+`Device.LocalAgent.`: the read-only capability parameters a Controller surveys
+(`Protocols` is `USPEventNotif`, `EncodingTypes` is `JSON`,
+`MinReportingInterval` is 1 so a test can run at one second,
+`ParameterWildCardSupported` is true) and an empty `Profile.{i}.` table
+carrying the full TR-181 parameter set, `JSONEncoding.` and the nested
+`Parameter.{i}.` table. A profile that declares its own `Device.BulkData.`
+keeps it.
+
+A Controller configures a report in one `Add`:
+
+```
+Device.BulkData.Profile.                       Alias=herder:wan, Enable=true,
+                                               Protocol=USPEventNotif, EncodingType=JSON,
+                                               ReportingInterval=60
+Device.BulkData.Profile.[Alias=="herder:wan"].Parameter.
+                                               Name=Device.Ethernet.Interface.1.Stats.BytesSent,
+                                               Reference=Device.Ethernet.Interface.1.Stats.BytesSent
+```
+
+and subscribes to `Device.BulkData.Profile.*.Push!` with an `Event`
+subscription. From then on the Agent collects the profile's parameters every
+`ReportingInterval` seconds (on the `TimeReference` boundaries when one is
+set) and delivers the report in the event's `Data` argument:
+
+```json
+{"Report":[{"CollectionTime":1755777600,"Device":{"Ethernet":{"Interface":{"1":{"Stats":{"BytesSent":"1834592811"}}}}}}]}
+```
+
+`JSONEncoding.ReportFormat` picks `ObjectHierarchy` (the default above) or
+`NameValuePair`, where each parameter is keyed by its `Name` (or its path);
+`JSONEncoding.ReportTimestamp` picks `Unix-Epoch`, `ISO-8601` or `None`. A
+`Reference` may be an exact path, a partial path, or a search path, and one
+that resolves to nothing is left out of the report rather than failing it,
+which is what a real device does with a path it no longer has.
+
+A report that cannot be delivered, because the MTP is down or no Controller
+has subscribed to the profile's `Push!` yet, is retained and sent ahead of the
+next one, up to `NumberOfRetainedFailedReports` (`-1` is capped at 100). With
+the default of 0 the report is dropped and logged as lost. That is the fault
+path to test a Controller against: disconnect the broker for a few intervals
+and the next `Push!` carries the backlog, oldest first.
+
+Profiles on the `HTTP`, `Streaming` or `File` transports, or in an encoding
+other than `JSON`, are read back as configured but never deliver; the Agent
+logs once why.
 
 ## No Connection Request
 
