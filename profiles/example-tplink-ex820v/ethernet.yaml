@@ -23,8 +23,6 @@ objects:
         type: xsd:boolean
         value: "true"
         writable: true
-      - path: Status
-        value: "Up"
       - path: Alias
         value: "PHY{i}"
         writable: true
@@ -46,6 +44,8 @@ objects:
 groups:
   - prefix: Device.Ethernet.Interface.1
     parameters:
+      - path: Status
+        value: "Up"
       - path: Name
         value: "wan"
       - path: Upstream
@@ -61,6 +61,8 @@ groups:
 
   - prefix: Device.Ethernet.Interface.2
     parameters:
+      - path: Status
+        value: "Up"
       - path: Name
         value: "lan1"
       - path: Upstream
@@ -76,6 +78,8 @@ groups:
 
   - prefix: Device.Ethernet.Interface.3
     parameters:
+      - path: Status
+        value: "Up"
       - path: Name
         value: "lan2"
       - path: Upstream
@@ -91,6 +95,8 @@ groups:
 
   - prefix: Device.Ethernet.Interface.4
     parameters:
+      - path: Status
+        value: "Down"
       - path: Name
         value: "lan3"
       - path: Upstream
@@ -102,10 +108,12 @@ groups:
         writable: true
       - path: CurrentBitRate
         type: xsd:unsignedInt
-        value: "1000"
+        value: "0"
 
   - prefix: Device.Ethernet.Interface.5
     parameters:
+      - path: Status
+        value: "Down"
       - path: Name
         value: "lan4"
       - path: Upstream
@@ -117,7 +125,7 @@ groups:
         writable: true
       - path: CurrentBitRate
         type: xsd:unsignedInt
-        value: "1000"
+        value: "0"
 
   - prefix: Device.Ethernet.Interface.1.Stats
     parameters:

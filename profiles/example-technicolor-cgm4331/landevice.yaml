@@ -6,7 +6,32 @@ parameters:
     type: xsd:unsignedInt
     value: "1"
 
+# Link state per port, outside the table: the loader rejects a group
+# that redeclares a materialized path, so a per-port value cannot be a
+# table default with an override. Two ports carry a link and two sit
+# empty, which is what most homes look like. NoLink is the TR-098
+# vocabulary for an unplugged port.
 groups:
+  - prefix: InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.1
+    parameters:
+      - path: Status
+        value: "Up"
+
+  - prefix: InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.2
+    parameters:
+      - path: Status
+        value: "Up"
+
+  - prefix: InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.3
+    parameters:
+      - path: Status
+        value: "NoLink"
+
+  - prefix: InternetGatewayDevice.LANDevice.1.LANEthernetInterfaceConfig.4
+    parameters:
+      - path: Status
+        value: "NoLink"
+
   - prefix: InternetGatewayDevice.LANDevice.1
     parameters:
       - path: LANEthernetInterfaceNumberOfEntries
@@ -60,8 +85,6 @@ objects:
         type: xsd:boolean
         value: "true"
         writable: true
-      - path: Status
-        value: "Up"
       - path: MACAddress
         value: "00:00:5E:00:00:0{i}"
       - path: Stats.BytesSent
