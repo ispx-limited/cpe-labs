@@ -19,6 +19,9 @@ const (
 	ErrCodeResourcesExceeded = 7005
 	// ErrCodeMessageNotSupported is 7004.
 	ErrCodeMessageNotSupported = 7004
+	// ErrCodeInvalidArguments is 7004 under the name TR-369 7.4 gives it,
+	// for an Operate whose input arguments are malformed.
+	ErrCodeInvalidArguments = 7004
 	// ErrCodeParamActionFailed is 7008, for a parameter that exists and is
 	// writable but whose write did not take (a type or range violation).
 	ErrCodeParamActionFailed = 7008

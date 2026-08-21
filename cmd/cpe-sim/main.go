@@ -41,6 +41,7 @@ import (
 	"github.com/ispx-limited/cpe-labs/internal/diagnostics"
 	"github.com/ispx-limited/cpe-labs/internal/generators"
 	"github.com/ispx-limited/cpe-labs/internal/paramtree"
+	"github.com/ispx-limited/cpe-labs/internal/softwaremodules"
 	"github.com/ispx-limited/cpe-labs/internal/version"
 )
 
@@ -101,6 +102,14 @@ type cpeStack struct {
 	// 7005 (see uspFirmwareOperate). Accessed from the agent's dispatch
 	// goroutine and from the async operation's own goroutine.
 	uspFirmwareBusy atomic.Bool
+
+	// softwareModules runs the TR-157 lifecycle when the profile declares
+	// a softwareModules block, for CWMP ChangeDUState and the USP
+	// InstallDU() / Update() / Uninstall() commands alike. Nil disables
+	// both. uspSoftwareModulesBusy serializes the USP side the way
+	// uspFirmwareBusy does for firmware.
+	softwareModules        *softwaremodules.Manager
+	uspSoftwareModulesBusy atomic.Bool
 }
 
 func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
@@ -883,7 +892,7 @@ type cpeStackInputs struct {
 // scheduler registration, CR listener registration). A USP-only run
 // (no --acs-url) gets just the tree and generators; tracker / session /
 // runner stay nil. The returned stack's genRunner is non-nil iff the
-// profile declares generators.
+// profile declares generators or software modules.
 //
 // Everything except the tree is shared with the template by value: the
 // inform parameter map, generator declarations, pools and path
@@ -915,12 +924,25 @@ func buildCPEStack(cfg cpeconfig.Config, template *paramtree.Profile, in cpeStac
 	// protocol: generators drive the tree, and the tree is what produces USP
 	// ValueChange notifies, so a USP-only run still needs its values moving.
 	var genRunner *generators.Runner
-	if len(prof.Generators) > 0 {
+	if len(prof.Generators) > 0 || prof.SoftwareModules != nil {
+		// A software module brings its own generators at install time, so
+		// a profile that declares none still needs the runner to hand them
+		// to.
 		gr, gerr := buildGenerators(prof.Generators, prof.Tree, in.rngSource.ForCPE(in.id+":generators"), in.genSched, in.logger.With("cpe_id", in.id))
 		if gerr != nil {
 			return nil, fmt.Errorf("generators: %w", gerr)
 		}
 		genRunner = gr
+	}
+
+	var smManager *softwaremodules.Manager
+	if prof.SoftwareModules != nil {
+		smManager = softwaremodules.New(softwaremodules.Config{
+			Modules:    prof.SoftwareModules,
+			Tree:       prof.Tree,
+			Generators: genRunner,
+			Logger:     in.logger.With("cpe_id", in.id),
+		})
 	}
 
 	// CWMP stack, only when an ACS URL is configured. A USP-only run builds
@@ -1053,28 +1075,38 @@ func buildCPEStack(cfg cpeconfig.Config, template *paramtree.Profile, in cpeStac
 			}
 		}
 
+		// GetRPCMethods answers with every method registered below plus
+		// itself; keep the two lists in sync when adding handlers.
+		rpcMethods := []string{
+			"GetRPCMethods",
+			"GetParameterValues",
+			"GetParameterNames",
+			"GetParameterAttributes",
+			"SetParameterValues",
+			"SetParameterAttributes",
+			"AddObject",
+			"DeleteObject",
+			"Reboot",
+			"FactoryReset",
+			"Download",
+			"Upload",
+		}
+		var extraHandlers []cwmp.Handler
+		if smManager != nil {
+			// ChangeDUState is advertised and answered only when the profile
+			// declares software modules; a CPE without an execution
+			// environment faults the method as unsupported (9000).
+			rpcMethods = append(rpcMethods, "ChangeDUState")
+			extraHandlers = append(extraHandlers,
+				handlers.NewChangeDUState(buildDUStateScheduler(in.id, tracker, smManager, runner, in.logger)))
+		}
+
 		session, err = cwmp.NewSession(cwmp.SessionOptions{
 			Transport: tt,
 			Inform:    placeholder,
 			Logger:    in.logger.With("cpe_id", in.id),
-			Handlers: []cwmp.Handler{
-				// GetRPCMethods answers with every method this list
-				// registers plus itself; keep the slice below in sync
-				// when adding handlers.
-				handlers.NewGetRPCMethods([]string{
-					"GetRPCMethods",
-					"GetParameterValues",
-					"GetParameterNames",
-					"GetParameterAttributes",
-					"SetParameterValues",
-					"SetParameterAttributes",
-					"AddObject",
-					"DeleteObject",
-					"Reboot",
-					"FactoryReset",
-					"Download",
-					"Upload",
-				}),
+			Handlers: append([]cwmp.Handler{
+				handlers.NewGetRPCMethods(rpcMethods),
 				handlers.NewGetParameterValues(prof.Tree),
 				handlers.NewGetParameterNames(prof.Tree),
 				handlers.NewGetParameterAttributes(prof.Tree),
@@ -1093,7 +1125,7 @@ func buildCPEStack(cfg cpeconfig.Config, template *paramtree.Profile, in cpeStac
 				handlers.NewFactoryReset(factoryReset, scheduleFactoryReset),
 				handlers.NewDownload(scheduleTransfer),
 				handlers.NewUpload(scheduleTransfer),
-			},
+			}, extraHandlers...),
 		})
 		if err != nil {
 			return nil, fmt.Errorf("session: %w", err)
@@ -1206,6 +1238,7 @@ func buildCPEStack(cfg cpeconfig.Config, template *paramtree.Profile, in cpeStac
 		uspIdentityPaths: prof.DeviceIDPaths,
 		uspBootParams:    uspBootParameters(prof),
 		firmware:         prof.Transfer.Firmware,
+		softwareModules:  smManager,
 	}, nil
 }
 
@@ -1947,8 +1980,7 @@ func buildFactoryResetScheduler(sched *scheduler.Scheduler, cpeID string, delay 
 }
 
 // buildGenerators walks prof.Generators and constructs a runner with
-// one Generator per entry. Switches on cfg.Type, only "counter" is
-// supported in v0; future stories add drift / enum / timestamp.
+// one Generator per entry.
 func buildGenerators(cfgs []paramtree.GeneratorConfig, tree *paramtree.Tree, rng *rand.Rand, sched *generators.Scheduler, logger *slog.Logger) (*generators.Runner, error) {
 	r, err := generators.NewRunner(generators.RunnerOptions{
 		Logger:    logger,
@@ -1960,56 +1992,8 @@ func buildGenerators(cfgs []paramtree.GeneratorConfig, tree *paramtree.Tree, rng
 		return nil, err
 	}
 	for _, cfg := range cfgs {
-		var gen generators.Generator
-		switch cfg.Type {
-		case "counter":
-			if cfg.Counter == nil {
-				return nil, fmt.Errorf("generator %q: counter block missing", cfg.Path)
-			}
-			gen, err = generators.NewCounter(generators.CounterConfig{
-				Path:   cfg.Path,
-				Min:    cfg.Counter.Min,
-				Max:    cfg.Counter.Max,
-				Step:   cfg.Counter.Step,
-				Jitter: cfg.Counter.Jitter,
-			})
-		case "drift":
-			if cfg.Drift == nil {
-				return nil, fmt.Errorf("generator %q: drift block missing", cfg.Path)
-			}
-			gen, err = generators.NewDrift(generators.DriftConfig{
-				Path:    cfg.Path,
-				Min:     cfg.Drift.Min,
-				Max:     cfg.Drift.Max,
-				StepMax: cfg.Drift.StepMax,
-			})
-		case "enum":
-			if cfg.Enum == nil {
-				return nil, fmt.Errorf("generator %q: enum block missing", cfg.Path)
-			}
-			gen, err = generators.NewEnum(generators.EnumConfig{
-				Path:   cfg.Path,
-				Values: cfg.Enum.Values,
-				Mode:   cfg.Enum.Mode,
-			})
-		case "uptime":
-			gen, err = generators.NewTimestamp(generators.TimestampConfig{
-				Path: cfg.Path,
-				Kind: generators.TimestampUptime,
-			})
-		case "wallclock":
-			gen, err = generators.NewTimestamp(generators.TimestampConfig{
-				Path: cfg.Path,
-				Kind: generators.TimestampWallclock,
-			})
-		default:
-			return nil, fmt.Errorf("generator %q: type %q unsupported", cfg.Path, cfg.Type)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("generator %q: %w", cfg.Path, err)
-		}
-		if err := r.Add(gen, cfg.Interval); err != nil {
-			return nil, fmt.Errorf("generator %q: %w", cfg.Path, err)
+		if err := r.AddConfig(cfg); err != nil {
+			return nil, err
 		}
 	}
 	return r, nil

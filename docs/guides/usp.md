@@ -100,7 +100,7 @@ later is transport work rather than a change to the Agent.
 | Add / Delete | Instance creation and removal in multi-instance tables, reporting the instantiated path and its unique keys |
 | GetInstances | Instance enumeration, optionally first-level-only |
 | GetSupportedDM | The supported object and parameter model, with per-parameter access (read-only or read-write). `return_commands`, `return_events` and `return_unique_key_sets` are accepted but return nothing yet |
-| Operate | `Device.Reboot()` and `Device.FactoryReset()` synchronously. `Device.DeviceInfo.FirmwareImage.{i}.Download()` and `Activate()` asynchronously: the agent creates a `Device.LocalAgent.Request.{i}.` row, answers `OperateResp` with its path, and reports the outcome in an `OperationComplete` notify. See [Firmware Upgrades](firmware.md) |
+| Operate | `Device.Reboot()` and `Device.FactoryReset()` synchronously. `Device.DeviceInfo.FirmwareImage.{i}.Download()` and `Activate()`, and the software module commands `Device.SoftwareModules.InstallDU()`, `DeploymentUnit.{i}.Update()` and `DeploymentUnit.{i}.Uninstall()`, asynchronously: the agent creates a `Device.LocalAgent.Request.{i}.` row, answers `OperateResp` with its path, and reports the outcome in an `OperationComplete` notify. See [Firmware Upgrades](firmware.md) and [Software Modules](software-modules.md) |
 
 Errors are reported per path inside the response rather than failing the whole
 message, so a Get for ten paths where one is unknown still answers the other
@@ -126,7 +126,7 @@ The Agent pushes. It sends `Boot!` and `OnBoardRequest` unprompted on first
 contact, and once a Controller installs subscriptions it sends `ValueChange`,
 `ObjectCreation` and `ObjectDeletion` as the tree moves, `OperationComplete`
 as async commands finish, and `Event` notifies for the events it emits
-(`TransferComplete!` today).
+(`TransferComplete!` and `DUStateChange!`).
 
 Subscriptions live in `Device.LocalAgent.Subscription.{i}.`, alongside
 `Device.LocalAgent.EndpointID`, the `Device.LocalAgent.Controller.{i}.`
@@ -169,7 +169,8 @@ floods a Controller.
 matches the command path (`Device.DeviceInfo.FirmwareImage.1.Download()`, or a
 partial path covering it). `Event` subscriptions fire for events matched
 against `objPath` plus the event name, so a reference of `Device.LocalAgent.`
-covers `TransferComplete!`.
+covers `TransferComplete!` and one of `Device.SoftwareModules.` covers
+`DUStateChange!`.
 
 The `Periodic` notify type is not implemented yet. A Controller that installs
 it gets a subscription it can read back, but the Agent will not fire on it.

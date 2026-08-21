@@ -179,6 +179,45 @@ func (r *Runner) Add(g Generator, interval time.Duration) error {
 	return nil
 }
 
+// Remove unregisters the generator writing path. Its queued entry is
+// dropped the next time the scheduler reaches it, the same way Stop
+// lets a whole runner's entries lapse, so removing one generator costs
+// nothing proportional to the fleet's queue. Removing a path nobody
+// generates is not an error: an uninstall asks for every path the app
+// declared whether or not each one had a generator.
+func (r *Runner) Remove(path string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, ok := r.byPath[path]; !ok {
+		return
+	}
+	delete(r.byPath, path)
+	for i, sg := range r.items {
+		if sg.gen.Path() == path {
+			r.items = append(r.items[:i], r.items[i+1:]...)
+			break
+		}
+	}
+}
+
+// wants reports whether g is still registered with this runner: the
+// runner is not stopped, and g is the generator currently owning its
+// path (a removed generator whose path was re-added must not tick
+// through its stale queue entry).
+func (r *Runner) wants(g Generator) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.stopped {
+		return false
+	}
+	for _, sg := range r.items {
+		if sg.gen == g {
+			return true
+		}
+	}
+	return false
+}
+
 // Start registers every generator with the scheduler. Idempotent
 // (subsequent calls are no-ops). Returns an error if the runner has
 // been stopped.
@@ -244,17 +283,12 @@ func (r *Runner) Stop(ctx context.Context) error {
 	}
 }
 
-// running reports whether this Runner still wants ticks. The scheduler
-// consults it before dispatching and before re-queuing.
-func (r *Runner) running() bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return !r.stopped
-}
-
 // tick executes one generator against this CPE's tree. Called from a
 // scheduler worker.
 func (r *Runner) tick(g Generator) {
+	if !r.wants(g) {
+		return
+	}
 	r.mu.Lock()
 	if r.stopped {
 		r.mu.Unlock()

@@ -189,7 +189,10 @@ type uspAnnouncer interface {
 //
 // The firmware commands (Device.DeviceInfo.FirmwareImage.{i}.Download() and
 // Activate()) are asynchronous, matched by suffix under any FirmwareImage
-// instance the profile declares; see usp_firmware.go.
+// instance the profile declares; see usp_firmware.go. The software module
+// commands (InstallDU(), DeploymentUnit.{i}.Update() and Uninstall()) are
+// matched under the object the profile's softwareModules block names; see
+// usp_softwaremodules.go.
 func uspOperateFunc(st *cpeStack, log *slog.Logger, agent func() uspAnnouncer, fwAgent func() uspFirmwareAgent) uspagent.OperateFunc {
 	return func(command, commandKey string, inputArgs map[string]string) (*uspagent.OperateResult, error) {
 		switch command {
@@ -234,6 +237,9 @@ func uspOperateFunc(st *cpeStack, log *slog.Logger, agent func() uspAnnouncer, f
 		default:
 			if cmd, ok := parseFirmwareCommand(command); ok {
 				return uspFirmwareOperate(st, log, fwAgent, cmd, commandKey, inputArgs)
+			}
+			if cmd, ok := parseSoftwareModulesCommand(st, command); ok {
+				return uspSoftwareModulesOperate(st, log, fwAgent, cmd, commandKey, inputArgs)
 			}
 			return nil, fmt.Errorf("command %q is not implemented", command)
 		}

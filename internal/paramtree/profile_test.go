@@ -1327,18 +1327,6 @@ generators:
     max: 100
     step: 1
 `, "counter target must be xsd:unsignedInt"},
-		{"path not writable", `parameters:
-  - path: Device.X
-    type: xsd:unsignedInt
-    value: "0"
-generators:
-  - path: Device.X
-    type: counter
-    interval: 1s
-    min: 0
-    max: 100
-    step: 1
-`, "must be writable"},
 		{"unknown path", `parameters:
   - path: Device.X
     value: "y"

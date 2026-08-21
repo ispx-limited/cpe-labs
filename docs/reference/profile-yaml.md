@@ -24,6 +24,7 @@ generators:           # top-level generators list
 fleet:                # fleet count + offset + pools + serial pattern
 connectionRequest:    # CR listener auth + throttle
 transfer:             # Download / Upload TransferComplete defaults + faults + firmware
+softwareModules:      # TR-157 software module lifecycle (ChangeDUState, InstallDU())
 eventSchedule:        # Wall-clock latency for Reboot / FactoryReset / boot, and the boot ramp
 diagnostics:          # triggered diagnostics: ACS writes a trigger, CPE completes later
 ```
@@ -195,7 +196,7 @@ generators:
 | `step` | counter | Bytes-per-tick before jitter. |
 | `jitter` | counter | Uniform fraction (`0.2` = ±20%). |
 | `stepMax` | drift | Max `|delta|` per tick. |
-| `values` | enum | List of strings to cycle / pick from. |
+| `values` | enum | List of values to cycle / pick from; each must match the target leaf's type (`xsd:string` or `xsd:boolean`). |
 | `mode` | enum | `cycle` (default) or `random`. |
 
 The same fields work in the inline form. See [Value Generators](../guides/generators.md) for full validation rules and behavior.
@@ -320,6 +321,44 @@ parameters:
     instances: 1
     value: "Active"
 ```
+
+## `softwareModules`
+
+Enables the TR-157 software module lifecycle on both protocols: the CWMP `ChangeDUState` RPC (reported by `DUStateChangeComplete` in a later session) and the USP `Device.SoftwareModules.InstallDU()`, `DeploymentUnit.{i}.Update()` and `DeploymentUnit.{i}.Uninstall()` commands (reported by `OperationComplete` and the `DUStateChange!` event). An installed app's data model is grafted into the tree until it is uninstalled. See [Software Modules](../guides/software-modules.md).
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `path` | string | Required, with a trailing dot. The object carrying the `ExecEnv.`, `DeploymentUnit.` and `ExecutionUnit.` tables (`Device.SoftwareModules.` on TR-181). All three must be declared, and at least one `ExecEnv.{i}.` instance. No TR-181 / TR-098 default. |
+| `installDelay` | duration | Time an install or update spends in its transitory state after the manifest is fetched. Default `5s`. |
+| `uninstallDelay` | duration | The same for an uninstall. Default `1s`. |
+| `faults` | map | App name to fault. `reason` is one of `server-unreachable`, `corrupt`, `ee-mismatch`, `resources-exceeded`; `message` overrides the fault string. Applies to install and update, after the manifest is read, on both protocols. |
+
+```yaml
+softwareModules:
+  path: Device.SoftwareModules.
+  installDelay: 5s
+  uninstallDelay: 1s
+  faults:
+    broken-app:
+      reason: corrupt
+      message: "signature check failed"
+```
+
+The deployment and execution unit tables are declared empty (`instances: 0`) and filled by the lifecycle. The lifecycle writes whichever TR-157 leaves the template declares and requires `UUID`, `Name`, `Status` and `Version` on `DeploymentUnit.{i}.` and `Name`, `Status` and `References` on `ExecutionUnit.{i}.`. An `ExecEnv.{i}.` instance with `Enable` (`xsd:boolean`) and `Status` leaves is honoured: `Enable` false or a `Status` other than `Up` refuses installs to it. `profiles/example-tr181-minimal.yaml` shows the full set.
+
+## App manifests
+
+An app manifest is the file a software module install fetches. It shares the profile syntax, `parameters`, `objects`, `groups` and `generators`, declaring only the data model the app's execution unit adds to the device, under an `app` header:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `app.name` | string | Required. Letters, digits, `.`, `_`, `-`; starts with a letter or digit. Names the deployment unit and, with `vendor`, derives its UUID when the ACS supplies none. |
+| `app.version` | string | Required, no whitespace. |
+| `app.vendor` | string | Optional. |
+| `app.description` | string | Optional. |
+| `app.executionUnit` | string | Optional name for the execution unit; defaults to `app.name`. |
+
+A manifest declares at least one row and none of the profile-only blocks (`deviceIdPaths`, `fleet`, `transfer` and the rest). Its rows and generators are validated exactly as a profile's are. Fleet placeholders are not substituted in a manifest. `apps/home-hub.yaml` is the shipped example.
 
 ## `eventSchedule`
 

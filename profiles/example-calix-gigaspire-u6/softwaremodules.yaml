@@ -1,0 +1,83 @@
+# Device.SoftwareModules. (TR-157 as carried in TR-181): one container
+# execution environment, and the deployment and execution unit tables
+# the lifecycle fills when an ACS installs an app. Both tables ship
+# empty (instances: 0) so the rows exist only for what is installed.
+#
+# Modelled on what the spec defines rather than a capture: no public
+# GigaSpire data model export carries a populated SoftwareModules tree.
+parameters:
+  - path: Device.SoftwareModules.ExecEnvNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+  - path: Device.SoftwareModules.DeploymentUnitNumberOfEntries
+    type: xsd:unsignedInt
+    value: "0"
+  - path: Device.SoftwareModules.ExecutionUnitNumberOfEntries
+    type: xsd:unsignedInt
+    value: "0"
+
+objects:
+  - path: Device.SoftwareModules.ExecEnv
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Name
+        value: "containers"
+      - path: Type
+        value: "OCI"
+      - path: Vendor
+        value: "Calix"
+      - path: Version
+        value: "1.0"
+      - path: AllocatedMemory
+        type: xsd:int
+        value: "262144"
+      - path: AvailableMemory
+        type: xsd:int
+        value: "196608"
+      - path: ActiveExecutionUnits
+        value: ""
+
+  - path: Device.SoftwareModules.DeploymentUnit
+    instances: 0
+    parameters:
+      - path: UUID
+      - path: DUID
+      - path: Name
+      - path: Status
+      - path: Resolved
+        type: xsd:boolean
+      - path: URL
+      - path: Description
+      - path: Vendor
+      - path: Version
+      - path: ExecutionUnitList
+      - path: ExecutionEnvRef
+      - path: Installed
+        type: xsd:dateTime
+      - path: LastUpdate
+        type: xsd:dateTime
+
+  - path: Device.SoftwareModules.ExecutionUnit
+    instances: 0
+    parameters:
+      - path: EUID
+      - path: Name
+      - path: ExecEnvLabel
+      - path: Status
+      - path: ExecutionFaultCode
+      - path: ExecutionFaultMessage
+      - path: AutoStart
+        type: xsd:boolean
+      - path: Vendor
+      - path: Version
+      - path: Description
+      - path: References
+      - path: ExecutionEnvRef
+      - path: CreationTime
+        type: xsd:dateTime
