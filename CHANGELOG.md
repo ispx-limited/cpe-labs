@@ -1,9 +1,5 @@
 # Changelog
 
-Changes that matter to people running cpe-labs, newest first. Entries are
-written when a release is cut; releases before 0.6.0 are listed on the GitHub
-releases page.
-
 ## 0.6.0 (2026-08-20)
 
 ### Added
