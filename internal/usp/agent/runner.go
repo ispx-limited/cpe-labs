@@ -200,7 +200,7 @@ func (r *Runner) boot(cause, commandKey string, firmwareUpdated bool) error {
 
 // ReportValueChange offers a parameter to the subscription notifier as
 // though it had just changed, delivering it to whichever subscriptions
-// match.
+// match, and waits for the send.
 //
 // It exists for the one case where a change and its report cannot
 // happen together: the agent's MTP was gone at the moment the value
@@ -208,15 +208,22 @@ func (r *Runner) boot(cause, commandKey string, firmwareUpdated bool) error {
 // with no way to say so, and tells the controller once it can reach it
 // again. Nothing else should use this; every ordinary write is reported
 // by the tree observer at the time it happens.
+//
+// Waiting is the point rather than an accident. The report is followed
+// by the value the interface has NOW, and the two are a sequence: down,
+// then up. Sent concurrently they race, and a controller that receives
+// them in the wrong order ends up holding "Down" as the interface's
+// current value while the link is fine, which is a fault the operator
+// can see and the device does not have.
 func (r *Runner) ReportValueChange(path, value string) {
 	if r.notifier == nil {
 		return
 	}
-	r.notifier.handleChange(paramtree.Change{
+	r.notifier.notify(paramtree.Change{
 		Path: path,
 		New:  paramtree.Value{Raw: value},
 		Kind: paramtree.ChangeValue,
-	})
+	}, true)
 }
 
 // collectBootParameters reads the configured boot paths out of the tree,

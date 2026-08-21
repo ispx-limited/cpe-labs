@@ -146,10 +146,20 @@ func runLinkFault(ctx context.Context, st *cpeStack, cfg paramtree.LinkFaultConf
 		}
 	}
 
-	// (6) Up, reported the ordinary way by the tree observer.
+	// (6) Up. The interface itself goes through the tree, so the change
+	// is reported the ordinary way, and it is the last thing sent for
+	// that path.
 	setSystem(st, statusPath, up, log)
-	if hasLastChange {
-		setSystem(st, lastChangePath, "0", log)
+
+	// LastChange is reported rather than written, because the write
+	// would be a no-op: the tree has held 0 since the interface entered
+	// Down, so setting 0 again changes nothing and notifies nobody,
+	// which would leave the controller holding the outage duration as
+	// the interface's current time-in-state. Reporting it says what a
+	// real agent's next reading would: this interface changed state a
+	// moment ago.
+	if hasLastChange && st.uspAgent != nil {
+		st.uspAgent.ReportValueChange(lastChangePath, "0")
 	}
 
 	// (7) Only if asked. The absence of this is the signal: a device

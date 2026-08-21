@@ -348,6 +348,20 @@ type notifier struct {
 // tree (a generator tick, or a controller's own Set), so it does the minimum
 // work needed to decide and then hands the send off.
 func (n *notifier) handleChange(c paramtree.Change) {
+	n.notify(c, false)
+}
+
+// notify delivers one change to every matching subscription.
+//
+// blocking says whether to wait for each send. The tree observer does
+// not: it runs on the goroutine that wrote to the tree, and a slow
+// broker must not stall a generator tick. A caller that is reporting
+// something the agent could not report at the time does, because the
+// order those reports arrive in is the whole content of the report. An
+// interface that went down and came back is two notifications, and a
+// controller that receives them the other way round is told the
+// interface is down.
+func (n *notifier) notify(c paramtree.Change, blocking bool) {
 	// A controller writing the subscription table must not trigger notifies
 	// about the subscription table, which would be an immediate feedback loop:
 	// the Set that creates a subscription would notify, which would Set again.
@@ -370,8 +384,10 @@ func (n *notifier) handleChange(c paramtree.Change) {
 		if send == nil {
 			continue
 		}
-		// Send on its own goroutine: the caller is a tree writer, and a slow
-		// broker must not stall a generator tick.
+		if blocking {
+			_ = send(msg)
+			continue
+		}
 		go func(m *usp.Msg) { _ = send(m) }(msg)
 	}
 }

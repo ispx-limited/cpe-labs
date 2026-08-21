@@ -167,14 +167,22 @@ func TestLinkFaultReportsTheOutageOnlyOnceBack(t *testing.T) {
 	st, _, agent := linkFaultStack(t, true)
 	runLinkFault(context.Background(), st, linkFaultConfig(), quietLogger())
 
-	if len(agent.reported) != 2 {
-		t.Fatalf("reported %v, want the Down transition and how long it lasted", agent.reported)
+	// Down, then how long it lasted, then the reset that says the
+	// interface has just changed state again. The order is the content:
+	// a controller reading these backwards is told the WAN is down.
+	if len(agent.reported) != 3 {
+		t.Fatalf("reported %v, want the Down transition, its duration and the reset", agent.reported)
 	}
 	if agent.reported[0] != [2]string{"Device.IP.Interface.1.Status", "Down"} {
 		t.Errorf("first report = %v, want the Down the agent could not send at the time", agent.reported[0])
 	}
 	if agent.reported[1][0] != "Device.IP.Interface.1.LastChange" {
 		t.Errorf("second report = %v, want how long the interface had been down", agent.reported[1])
+	}
+	if agent.reported[2] != [2]string{"Device.IP.Interface.1.LastChange", "0"} {
+		t.Errorf("last report = %v, want LastChange reset; leaving the duration as the current "+
+			"value tells an operator the interface has been up for the length of the outage",
+			agent.reported[2])
 	}
 	for i, sent := range agent.sent {
 		if !sent {
@@ -189,6 +197,9 @@ func TestLinkFaultWithoutLastChangeReportsStatusOnly(t *testing.T) {
 
 	if len(agent.reported) != 1 {
 		t.Fatalf("reported %v, want only the Status transition on a profile with no LastChange", agent.reported)
+	}
+	if agent.reported[0][1] != "Down" {
+		t.Errorf("reported %v, want the Down transition", agent.reported[0])
 	}
 	if agent.reported[0][0] != "Device.IP.Interface.1.Status" {
 		t.Errorf("reported %v, want the Status transition", agent.reported[0])
