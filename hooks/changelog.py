@@ -29,4 +29,6 @@ def on_page_markdown(markdown, page, config, files):
     body = TRAILING_REFS.sub("", body)
     body = CLOSES_REFS.sub("", body)
     body = WARNING_SIGN.sub(r"\1 ", body)
+    if not body.strip():
+        body = "No releases.\n"
     return markdown.rstrip() + "\n\n" + body
