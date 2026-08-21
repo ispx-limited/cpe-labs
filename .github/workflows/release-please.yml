@@ -1,0 +1,41 @@
+name: release-please
+
+# Keeps one Release PR open against main with the next version and the
+# changelog entry built from the commits since the last tag. Merging that PR
+# creates the vX.Y.Z tag and the GitHub Release; workflows that publish or
+# deploy trigger on the tag. Tags pushed with the default GITHUB_TOKEN start
+# no workflows, which is why the step below mints a GitHub App token when the
+# repo has one configured.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mint release token
+        id: app
+        if: vars.RELEASE_APP_ID != ''
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_KEY }}
+
+      - name: Warn when no release token is configured
+        if: vars.RELEASE_APP_ID == ''
+        run: echo "::warning::RELEASE_APP_ID is not set. A tag created with the default token does not start the workflows that publish the release."
+
+      - name: Release Please
+        uses: googleapis/release-please-action@v5
+        with:
+          token: ${{ steps.app.outputs.token || github.token }}

@@ -6,6 +6,8 @@ on:
   pull_request:
     paths:
       - "docs/**"
+      - "hooks/**"
+      - "CHANGELOG.md"
       - "mkdocs.yml"
       - "requirements.txt"
       - ".github/workflows/docs.yml"
@@ -13,6 +15,8 @@ on:
     branches: [main]
     paths:
       - "docs/**"
+      - "hooks/**"
+      - "CHANGELOG.md"
       - "mkdocs.yml"
       - "requirements.txt"
       - ".github/workflows/docs.yml"

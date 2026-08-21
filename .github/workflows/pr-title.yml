@@ -1,0 +1,23 @@
+name: pr-title
+
+# PRs squash-merge, so the PR title becomes the commit subject that the
+# changelog and the version bump are computed from.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Title reads type(area): summary"
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          pattern='^(feat|fix|perf|revert|docs|refactor|test|build|ci|chore|style)(\([a-z0-9][a-z0-9._/, +-]*\))?!?: [^ ].*$'
+          if ! printf '%s\n' "$TITLE" | grep -Eq "$pattern"; then
+            echo "::error::PR title must read type(area): summary, for example fix(api): reject cross-tenant lookups. Types: feat fix perf revert docs refactor test build ci chore style."
+            exit 1
+          fi
