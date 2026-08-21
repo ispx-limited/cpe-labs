@@ -1,0 +1,117 @@
+# Device.WiFi.NeighboringWiFiDiagnostic: what the gateway heard on its
+# last scan. A real table holds the previous scan's results until the
+# next one, and an untouched fleet has usually scanned at provisioning,
+# so the table is populated rather than empty.
+#
+# The draw is weighted the way real air is: 2.4 GHz bunches on 1, 6 and
+# 11 because those are the only non-overlapping channels, and 6 is the
+# crowded one because most consumer gear defaults to it. Channel, band,
+# radio and width differ per result and are declared per instance below,
+# since a group may not redeclare a path the table materialized.
+
+parameters:
+  - path: Device.WiFi.NeighboringWiFiDiagnostic.DiagnosticsState
+    value: "Complete"
+    writable: true
+  - path: Device.WiFi.NeighboringWiFiDiagnostic.ResultNumberOfEntries
+    type: xsd:unsignedInt
+    value: "6"
+
+objects:
+  - path: Device.WiFi.NeighboringWiFiDiagnostic.Result
+    instances: 6
+    parameters:
+      - path: SSID
+        value: "neighbour-{cpe:hex:4}-{i}"
+      - path: BSSID
+        value: "DE:AD:BE:{cpe:hex:2}:01:0{i}"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-70"
+        writable: true
+        generator:
+          type: drift
+          interval: 120s
+          min: -92
+          max: -30
+          stepMax: 3
+      - path: Noise
+        type: xsd:int
+        value: "-90"
+      - path: SecurityModeEnabled
+        value: "WPA2-Personal"
+      - path: EncryptionMode
+        value: "AES"
+      - path: OperatingStandards
+        value: "n,ax"
+      - path: BeaconPeriod
+        type: xsd:unsignedInt
+        value: "100"
+
+groups:
+  - prefix: Device.WiFi.NeighboringWiFiDiagnostic.Result.1
+    parameters:
+      - path: Radio
+        value: "Device.WiFi.Radio.1"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "6"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+      - path: OperatingChannelBandwidth
+        value: "20MHz"
+  - prefix: Device.WiFi.NeighboringWiFiDiagnostic.Result.2
+    parameters:
+      - path: Radio
+        value: "Device.WiFi.Radio.1"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "6"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+      - path: OperatingChannelBandwidth
+        value: "20MHz"
+  - prefix: Device.WiFi.NeighboringWiFiDiagnostic.Result.3
+    parameters:
+      - path: Radio
+        value: "Device.WiFi.Radio.1"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "1"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+      - path: OperatingChannelBandwidth
+        value: "20MHz"
+  - prefix: Device.WiFi.NeighboringWiFiDiagnostic.Result.4
+    parameters:
+      - path: Radio
+        value: "Device.WiFi.Radio.1"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "11"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+      - path: OperatingChannelBandwidth
+        value: "20MHz"
+  - prefix: Device.WiFi.NeighboringWiFiDiagnostic.Result.5
+    parameters:
+      - path: Radio
+        value: "Device.WiFi.Radio.2"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "36"
+      - path: OperatingFrequencyBand
+        value: "5GHz"
+      - path: OperatingChannelBandwidth
+        value: "80MHz"
+  - prefix: Device.WiFi.NeighboringWiFiDiagnostic.Result.6
+    parameters:
+      - path: Radio
+        value: "Device.WiFi.Radio.2"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "44"
+      - path: OperatingFrequencyBand
+        value: "5GHz"
+      - path: OperatingChannelBandwidth
+        value: "80MHz"

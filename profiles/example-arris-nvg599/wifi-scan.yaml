@@ -1,0 +1,90 @@
+# InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic: the
+# ARRIS vendor scan table, populated as a gateway's last scan leaves it.
+# Same shape as the NVG578LX profile; an ACS's ARRIS mapping reads it as
+# the neighbour scan.
+
+parameters:
+  - path: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.DiagnosticsState
+    value: "Complete"
+    writable: true
+  - path: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.ResultNumberOfEntries
+    type: xsd:unsignedInt
+    value: "6"
+    writable: true
+
+objects:
+  - path: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.Result
+    instances: 6
+    parameters:
+      - path: BSSID
+        value: "DE:AD:BE:{cpe:hex:2}:02:0{i}"
+      - path: SSID
+        value: "neighbour-{cpe:hex:4}-{i}"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-70"
+        writable: true
+        generator:
+          type: drift
+          interval: 120s
+          min: -92
+          max: -24
+          stepMax: 3
+      - path: Bandwidth
+        value: "Auto"
+
+groups:
+  - prefix: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.Result.1
+    parameters:
+      - path: Radio
+        value: "InternetGatewayDevice.LANDevice.1.WLANConfiguration.1"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "6"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.Result.2
+    parameters:
+      - path: Radio
+        value: "InternetGatewayDevice.LANDevice.1.WLANConfiguration.1"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "6"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.Result.3
+    parameters:
+      - path: Radio
+        value: "InternetGatewayDevice.LANDevice.1.WLANConfiguration.1"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "1"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.Result.4
+    parameters:
+      - path: Radio
+        value: "InternetGatewayDevice.LANDevice.1.WLANConfiguration.1"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "11"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.Result.5
+    parameters:
+      - path: Radio
+        value: "InternetGatewayDevice.LANDevice.1.WLANConfiguration.2"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "36"
+      - path: OperatingFrequencyBand
+        value: "5GHz"
+  - prefix: InternetGatewayDevice.LANDevice.1.X_0000C5_Wireless.NeighboringWiFiDiagnostic.Result.6
+    parameters:
+      - path: Radio
+        value: "InternetGatewayDevice.LANDevice.1.WLANConfiguration.2"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "44"
+      - path: OperatingFrequencyBand
+        value: "5GHz"
