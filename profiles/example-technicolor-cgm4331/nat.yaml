@@ -1,11 +1,9 @@
-# Device.NAT.*, address translation.
+# NAT port forwards on the routed WAN connection.
 #
-# Three port forwards, because that is what a lived-in home has: a
-# media server, a console and a camera, each reachable from outside.
-# A table that ships empty is faithful to a gateway fresh out of the
-# box and to nothing an ISP ever sees in service. Leaf set follows
-# TR-181 2.20.1 Device.NAT.PortMapping.{i}; the forwards point at the
-# WAN data path, Device.IP.Interface.2.
+# Three of them, because that is what a lived-in home has: a media
+# server, a console and a camera, each reachable from outside. A table
+# that ships empty is faithful to a gateway fresh out of the box and to
+# nothing an ISP ever sees in service. Standard TR-098 leaf set.
 #
 # The leaves that differ per forward are declared per instance below:
 # the loader rejects a group that redeclares a path a table already
@@ -13,43 +11,22 @@
 # override.
 
 parameters:
-  - path: Device.NAT.InterfaceSettingNumberOfEntries
-    type: xsd:unsignedInt
-    value: "0"
-  - path: Device.NAT.PortMappingNumberOfEntries
+  - path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.PortMappingNumberOfEntries
     type: xsd:unsignedInt
     value: "3"
-  - path: Device.NAT.MaxNumberOfPortMappings
-    type: xsd:unsignedInt
-    value: "64"
 
 objects:
-  - path: Device.NAT.PortMapping
+  - path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.PortMapping
     instances: 3
     parameters:
-      - path: Enable
+      - path: PortMappingEnabled
         type: xsd:boolean
-        value: "true"
+        value: "1"
         writable: true
-      - path: Status
-        value: "Enabled"
-      - path: Alias
-        value: "cpe-map-{i}"
-        writable: true
-      - path: Interface
-        value: "Device.IP.Interface.2"
-        writable: true
-      - path: AllInterfaces
-        type: xsd:boolean
-        value: "false"
-        writable: true
-      - path: LeaseDuration
+      - path: PortMappingLeaseDuration
         type: xsd:unsignedInt
         value: "0"
         writable: true
-      - path: RemainingLeaseTime
-        type: xsd:unsignedInt
-        value: "0"
       - path: RemoteHost
         value: ""
         writable: true
@@ -59,12 +36,12 @@ objects:
         writable: true
 
 groups:
-  - prefix: Device.NAT.PortMapping.1
+  - prefix: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.PortMapping.1
     parameters:
-      - path: Description
+      - path: PortMappingDescription
         value: "Plex media server"
         writable: true
-      - path: Protocol
+      - path: PortMappingProtocol
         value: "TCP"
         writable: true
       - path: ExternalPort
@@ -78,12 +55,12 @@ groups:
       - path: InternalClient
         value: "192.168.1.20"
         writable: true
-  - prefix: Device.NAT.PortMapping.2
+  - prefix: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.PortMapping.2
     parameters:
-      - path: Description
+      - path: PortMappingDescription
         value: "Game console"
         writable: true
-      - path: Protocol
+      - path: PortMappingProtocol
         value: "UDP"
         writable: true
       - path: ExternalPort
@@ -97,12 +74,12 @@ groups:
       - path: InternalClient
         value: "192.168.1.31"
         writable: true
-  - prefix: Device.NAT.PortMapping.3
+  - prefix: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.PortMapping.3
     parameters:
-      - path: Description
+      - path: PortMappingDescription
         value: "Home camera"
         writable: true
-      - path: Protocol
+      - path: PortMappingProtocol
         value: "TCP"
         writable: true
       - path: ExternalPort

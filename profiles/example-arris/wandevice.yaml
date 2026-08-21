@@ -28,6 +28,75 @@ parameters:
 
 # Single-instance object: byte/packet counters with inline generators.
 groups:
+  - prefix: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.2.PortMapping.1
+    parameters:
+      - path: PortMappingDescription
+        value: "Plex media server"
+        writable: true
+      - path: PortMappingProtocol
+        value: "TCP"
+        writable: true
+      - path: ExternalPort
+        type: xsd:unsignedInt
+        value: "32400"
+        writable: true
+      - path: InternalPort
+        type: xsd:unsignedInt
+        value: "32400"
+        writable: true
+      - path: InternalClient
+        value: "192.168.1.20"
+        writable: true
+      - path: X_0000C5_InternalIPAddress
+        value: "192.168.1.20"
+        writable: true
+
+  - prefix: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.2.PortMapping.2
+    parameters:
+      - path: PortMappingDescription
+        value: "Game console"
+        writable: true
+      - path: PortMappingProtocol
+        value: "UDP"
+        writable: true
+      - path: ExternalPort
+        type: xsd:unsignedInt
+        value: "3074"
+        writable: true
+      - path: InternalPort
+        type: xsd:unsignedInt
+        value: "3074"
+        writable: true
+      - path: InternalClient
+        value: "192.168.1.31"
+        writable: true
+      - path: X_0000C5_InternalIPAddress
+        value: "192.168.1.31"
+        writable: true
+
+  - prefix: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.2.PortMapping.3
+    parameters:
+      - path: PortMappingDescription
+        value: "Home camera"
+        writable: true
+      - path: PortMappingProtocol
+        value: "TCP"
+        writable: true
+      - path: ExternalPort
+        type: xsd:unsignedInt
+        value: "8443"
+        writable: true
+      - path: InternalPort
+        type: xsd:unsignedInt
+        value: "443"
+        writable: true
+      - path: InternalClient
+        value: "192.168.1.40"
+        writable: true
+      - path: X_0000C5_InternalIPAddress
+        value: "192.168.1.40"
+        writable: true
+
   - prefix: InternetGatewayDevice.WANDevice.1.WANCommonInterfaceConfig
     parameters:
       - path: EnabledForInternet
@@ -216,7 +285,7 @@ groups:
       # in step with AddObject and DeleteObject.
       - path: PortMappingNumberOfEntries
         type: xsd:unsignedInt
-        value: "0"
+        value: "3"
 
   # PPPoE session counters. Voice/mgmt VLAN traffic is small compared
   # to the data path, so the steps model roughly 100 kbit/s of RTP.
@@ -329,16 +398,17 @@ objects:
         value: "voice"
         writable: true
 
-  # NAT port forwards. Empty at boot, exactly as the real gateway
-  # ships: instances exist only after an ACS AddObject. Leaf set and
-  # defaults are from a live create on an NVG578LX (9.5.0h4d131),
-  # including the X_0000C5_ mirrors the firmware maintains.
+  # NAT port forwards: three, because that is what a lived-in home
+  # has. Leaf set and defaults are from a live create on an NVG578LX
+  # (9.5.0h4d131), including the X_0000C5_ mirrors the firmware
+  # maintains; the per-forward leaves are declared per instance in the
+  # groups below, since a group may not redeclare a materialized path.
   - path: InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.2.PortMapping
-    instances: 0
+    instances: 3
     parameters:
       - path: PortMappingEnabled
         type: xsd:boolean
-        value: "0"
+        value: "1"
         writable: true
       - path: PortMappingLeaseDuration
         type: xsd:unsignedInt
@@ -347,29 +417,9 @@ objects:
       - path: RemoteHost
         value: ""
         writable: true
-      - path: ExternalPort
-        type: xsd:unsignedInt
-        value: "0"
-        writable: true
       - path: ExternalPortEndRange
         type: xsd:unsignedInt
         value: "0"
-        writable: true
-      - path: InternalPort
-        type: xsd:unsignedInt
-        value: "0"
-        writable: true
-      - path: PortMappingProtocol
-        value: "TCP"
-        writable: true
-      - path: InternalClient
-        value: ""
-        writable: true
-      - path: X_0000C5_InternalIPAddress
-        value: ""
-        writable: true
-      - path: PortMappingDescription
-        value: ""
         writable: true
       - path: X_0000C5_LeaseTimeConfigured
         type: xsd:unsignedInt

@@ -1,0 +1,22 @@
+# InternetGatewayDevice.UserInterface.RemoteAccess: whether the gateway answers
+# management HTTP from the WAN. The four leaves are the same on both
+# data models, which almost never happens; an ACS's remote-access
+# module reads exactly these. Off by default, which is how an ISP wants
+# a fleet to ship and the opposite of how several of them did.
+
+groups:
+  - prefix: InternetGatewayDevice.UserInterface.RemoteAccess
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Port
+        type: xsd:unsignedInt
+        value: "8443"
+        writable: true
+      - path: Protocol
+        value: "HTTPS"
+        writable: true
+      - path: SupportedProtocols
+        value: "HTTP,HTTPS"
