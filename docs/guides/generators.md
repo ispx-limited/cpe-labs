@@ -23,7 +23,7 @@ parameters:
       jitter: 0.2
 ```
 
-The leaf must be writable for the generator to write to it. Type constraints depend on the generator kind.
+Generators write as the device does, so the target may be read-only to the ACS, which is what a traffic counter or a sensor reading should be. Type constraints depend on the generator kind.
 
 When the parent path uses `{i}` templating (multi-instance object) the inline generator expands to one entry per materialized instance:
 

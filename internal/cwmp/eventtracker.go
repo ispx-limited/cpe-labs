@@ -3,6 +3,7 @@ package cwmp
 import (
 	"sync"
 
+	"github.com/ispx-limited/cpe-labs/internal/cwmp/dustate"
 	"github.com/ispx-limited/cpe-labs/internal/cwmp/inform"
 	"github.com/ispx-limited/cpe-labs/internal/cwmp/transfer"
 )
@@ -29,6 +30,12 @@ const (
 	// Inform redelivers the queued undelivered events from the failed
 	// attempt, with RetryCount stamped by the caller's RetryState.
 	TriggerRetry
+	// TriggerDUStateChangeComplete is a finished ChangeDUState whose
+	// DUStateChangeComplete RPC is due. The Inform carries "11 DU STATE
+	// CHANGE COMPLETE" beside the "M ChangeDUState" CommandKey event, the
+	// pairing TR-069 A.4.2.3 prescribes, the way a transfer pairs "7
+	// TRANSFER COMPLETE" with "M Download".
+	TriggerDUStateChangeComplete
 )
 
 // EventTracker decides the cwmp:Inform Event array for each session
@@ -43,6 +50,7 @@ type EventTracker struct {
 	pendingEvents            []inform.Event
 	pendingValueChanges      []string
 	pendingTransferCompletes []transfer.Complete
+	pendingDUStateCompletes  []dustate.Complete
 	baseParameterLists       map[string][]string
 }
 
@@ -100,6 +108,8 @@ func (t *EventTracker) NextSessionEvents(trigger Trigger) []inform.Event {
 		events = append(events, inform.Event{EventCode: inform.EventValueChange})
 	case TriggerTransferComplete:
 		events = append(events, inform.Event{EventCode: inform.EventTransferComplete})
+	case TriggerDUStateChangeComplete:
+		events = append(events, inform.Event{EventCode: inform.EventDUStateChange})
 	case TriggerRetry:
 		// Redelivery only: drain the queue into the lead position.
 		events = append(events, t.pendingEvents...)
@@ -220,6 +230,13 @@ func (t *EventTracker) QueueMethodDownload(commandKey string) {
 }
 
 // QueueMethodUpload queues "M Upload" for the next session.
+// QueueMethodChangeDUState enqueues the "M ChangeDUState" event for a
+// finished ChangeDUState; the DUStateChangeComplete record itself is
+// queued separately via QueueDUStateChangeComplete.
+func (t *EventTracker) QueueMethodChangeDUState(commandKey string) {
+	t.queueMethod(inform.EventMethodChangeDUState, commandKey)
+}
+
 func (t *EventTracker) QueueMethodUpload(commandKey string) {
 	t.queueMethod(inform.EventMethodUpload, commandKey)
 }
@@ -296,6 +313,38 @@ func (t *EventTracker) HasPendingTransferCompletes() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return len(t.pendingTransferCompletes) > 0
+}
+
+// QueueDUStateChangeComplete enqueues a DUStateChangeComplete record
+// for delivery in the next session, alongside the "M ChangeDUState"
+// event the caller queues via QueueMethodChangeDUState.
+func (t *EventTracker) QueueDUStateChangeComplete(rec dustate.Complete) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.pendingDUStateCompletes = append(t.pendingDUStateCompletes, rec)
+}
+
+// DrainDUStateChangeCompletes returns and clears the pending
+// DUStateChangeComplete records in FIFO order; RunSession re-queues
+// them when the session fails.
+func (t *EventTracker) DrainDUStateChangeCompletes() []dustate.Complete {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if len(t.pendingDUStateCompletes) == 0 {
+		return nil
+	}
+	out := make([]dustate.Complete, len(t.pendingDUStateCompletes))
+	copy(out, t.pendingDUStateCompletes)
+	t.pendingDUStateCompletes = t.pendingDUStateCompletes[:0]
+	return out
+}
+
+// HasPendingDUStateChangeCompletes reports whether any
+// DUStateChangeComplete records are queued.
+func (t *EventTracker) HasPendingDUStateChangeCompletes() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return len(t.pendingDUStateCompletes) > 0
 }
 
 // HasPendingValueChanges reports whether any RecordValueChange paths

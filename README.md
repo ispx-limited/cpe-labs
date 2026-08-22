@@ -61,7 +61,7 @@ TR-369 (USP) over MQTT. Runs standalone (no ACS required) or alongside CWMP:
 | Records | USP Record and Msg protobuf encoding, with per-path error codes rather than a blanket failure when one path in a batch is unknown |
 | Notifications | Boot!, OnBoardRequest, and pushed ValueChange, ObjectCreation and ObjectDeletion driven by real subscriptions in `Device.LocalAgent.Subscription.{i}.` |
 | Subscriptions | Wildcard reference lists, so one subscription covers every instance including those created later |
-| Commands | Device.Reboot() re-fires Boot!, Device.FactoryReset() re-fires OnBoardRequest and Boot!, the way a restarted or wiped device re-introduces itself |
+| Commands | Device.Reboot() re-fires Boot!, Device.FactoryReset() re-fires OnBoardRequest and Boot!, the way a restarted or wiped device re-introduces itself; FirmwareImage.{i}.Download() and Activate(), and the software module commands InstallDU(), Update() and Uninstall(), run asynchronously with a Request row, OperationComplete and their events |
 | MTP | MQTT 3.1.1 with the R-MQTT.24 reply-to-in-topic convention, which is what brokers without MQTT 5 user properties require |
 | Identity | TR-369 2.2 endpoint ids (`os::<OUI><Serial>`), derived from the same profile fields CWMP uses for its Inform DeviceId |
 
@@ -70,8 +70,8 @@ same parameter tree:
 
 | Area | Detail |
 |------|--------|
-| RPCs | GetParameterValues, SetParameterValues, GetParameterNames, GetParameterAttributes, SetParameterAttributes, AddObject, DeleteObject, Download, Upload, Reboot, FactoryReset, GetRPCMethods |
-| Events | Correct event codes per session, BOOTSTRAP delivered once, `M` method events queued, `7 TRANSFER COMPLETE` alongside its Download or Upload event |
+| RPCs | GetParameterValues, SetParameterValues, GetParameterNames, GetParameterAttributes, SetParameterAttributes, AddObject, DeleteObject, Download, Upload, Reboot, FactoryReset, ChangeDUState, GetRPCMethods |
+| Events | Correct event codes per session, BOOTSTRAP delivered once, `M` method events queued, `7 TRANSFER COMPLETE` alongside its Download or Upload event, `11 DU STATE CHANGE COMPLETE` with its DUStateChangeComplete |
 | Sessions | One at a time per CPE, mid-session triggers deferred rather than dropped, retry with the TR-069 Table 3 backoff and a stamped RetryCount |
 | Connection requests | HTTP listener per CPE with Basic or Digest auth, throttling, and credentials read live from the parameter tree so ACS-driven rotation works |
 | Informs | Jittered periodic intervals, or phase-anchored to `PeriodicInformTime` per TR-069 3.2.1.2 when the ACS sets it |

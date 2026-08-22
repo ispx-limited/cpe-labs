@@ -41,6 +41,7 @@ type Profile struct {
 	Fleet               FleetConfig
 	EventSchedule       EventScheduleConfig
 	Diagnostics         []DiagnosticConfig
+	SoftwareModules     *SoftwareModulesConfig
 }
 
 // FleetConfig describes how many simulated CPEs to spawn from this
@@ -497,6 +498,9 @@ func LoadProfileFromReader(r io.Reader, path string) (*Profile, error) {
 	if err != nil {
 		return nil, err
 	}
+	if herr := rejectAppHeader([]*loadedFile{pf}); herr != nil {
+		return nil, herr
+	}
 	tree := New()
 	mc, err := mergeFiles(tree, []*loadedFile{pf})
 	if err != nil {
@@ -517,6 +521,7 @@ func LoadProfileFromReader(r io.Reader, path string) (*Profile, error) {
 		Diagnostics:         mc.Diagnostics,
 		Fleet:               mc.Fleet,
 		EventSchedule:       mc.EventSchedule,
+		SoftwareModules:     mc.SoftwareModules,
 	}, nil
 }
 
@@ -537,6 +542,10 @@ type profile struct {
 	Fleet               *rawFleet               `yaml:"fleet"`
 	EventSchedule       *rawEventSchedule       `yaml:"eventSchedule"`
 	Diagnostics         []rawDiagnostic         `yaml:"diagnostics"`
+	SoftwareModules     *rawSoftwareModules     `yaml:"softwareModules"`
+
+	// App is only valid in an app manifest (see LoadAppManifest).
+	App *rawApp `yaml:"app"`
 }
 
 // rawObject is one TR-069/TR-098 multi-instance object. Path names the
@@ -837,6 +846,9 @@ func loadProfileDir(dir string) (*Profile, error) {
 		}
 		loaded = append(loaded, pf)
 	}
+	if herr := rejectAppHeader(loaded); herr != nil {
+		return nil, herr
+	}
 
 	tree := New()
 	mc, err := mergeFiles(tree, loaded)
@@ -858,6 +870,7 @@ func loadProfileDir(dir string) (*Profile, error) {
 		Diagnostics:         mc.Diagnostics,
 		Fleet:               mc.Fleet,
 		EventSchedule:       mc.EventSchedule,
+		SoftwareModules:     mc.SoftwareModules,
 	}, nil
 }
 
@@ -888,6 +901,7 @@ type mergedConfig struct {
 	Fleet               FleetConfig
 	EventSchedule       EventScheduleConfig
 	Diagnostics         []DiagnosticConfig
+	SoftwareModules     *SoftwareModulesConfig
 }
 
 // mergeFiles applies all files' parameters to tree, accumulates
@@ -1456,6 +1470,27 @@ func mergeFiles(tree *Tree, files []*loadedFile) (mergedConfig, error) {
 		fleetCfg.SerialPattern = "{base}-{i}"
 	}
 
+	// Merge softwareModules with conflict detection. Validated against
+	// the merged tree because the block names tables the rows declare.
+	var smCfg *SoftwareModulesConfig
+	var smSource string
+	for _, lf := range files {
+		raw := lf.prof.SoftwareModules
+		if raw == nil {
+			continue
+		}
+		if smSource != "" {
+			return mergedConfig{}, cpeerr.Wrap("paramtree.LoadProfile", cpeerr.KindInvalidArgument,
+				fmt.Errorf("%s and %s both declare softwareModules", smSource, lf.path))
+		}
+		cfg, serr := validateSoftwareModules(tree, lf.path, raw)
+		if serr != nil {
+			return mergedConfig{}, cpeerr.Wrap("paramtree.LoadProfile", cpeerr.KindInvalidArgument, serr)
+		}
+		smCfg = cfg
+		smSource = lf.path
+	}
+
 	return mergedConfig{
 		InformParams:        infParams,
 		DeviceIDPaths:       devIDPaths,
@@ -1467,6 +1502,7 @@ func mergeFiles(tree *Tree, files []*loadedFile) (mergedConfig, error) {
 		Fleet:               fleetCfg,
 		EventSchedule:       eventScheduleCfg,
 		Diagnostics:         diagnostics,
+		SoftwareModules:     smCfg,
 	}, nil
 }
 
@@ -1531,9 +1567,6 @@ func validateGenerator(tree *Tree, where string, raw rawGenerator) (GeneratorCon
 	if gerr != nil {
 		return GeneratorConfig{}, fmt.Errorf("%s: references unknown path: %w", where, gerr)
 	}
-	if !leaf.Writable {
-		return GeneratorConfig{}, fmt.Errorf("%s: target leaf must be writable", where)
-	}
 	if raw.Interval == "" {
 		return GeneratorConfig{}, fmt.Errorf("%s: interval is required", where)
 	}
@@ -1595,11 +1628,16 @@ func validateGenerator(tree *Tree, where string, raw rawGenerator) (GeneratorCon
 		gen.Drift = &dp
 
 	case "enum":
-		if leaf.Type != TypeString {
-			return GeneratorConfig{}, fmt.Errorf("%s: enum target must be %s, got %s", where, TypeString, leaf.Type)
+		if leaf.Type != TypeString && leaf.Type != TypeBoolean {
+			return GeneratorConfig{}, fmt.Errorf("%s: enum target must be %s or %s, got %s", where, TypeString, TypeBoolean, leaf.Type)
 		}
 		if len(raw.Values) == 0 {
 			return GeneratorConfig{}, fmt.Errorf("%s: enum requires non-empty values list", where)
+		}
+		for _, v := range raw.Values {
+			if verr := Validate(leaf.Type, v); verr != nil {
+				return GeneratorConfig{}, fmt.Errorf("%s: enum value %q does not match target type %s: %w", where, v, leaf.Type, verr)
+			}
 		}
 		mode := raw.Mode
 		if mode == "" {

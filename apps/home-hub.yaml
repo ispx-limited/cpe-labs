@@ -1,0 +1,82 @@
+# home-hub: a home-automation hub, the app the software module
+# lifecycle ships with. Install it on a simulated CPE (CWMP
+# ChangeDUState, or USP Device.SoftwareModules.InstallDU()) by URL and
+# the device gains Device.X_ISPX_Home. with two lights and a thermostat
+# whose readings move; uninstall it and the objects go. The execution
+# unit's References name Device.X_ISPX_Home. so a controller can find
+# what the app added.
+#
+# A manifest is a profile fragment with an app header: the same
+# parameters, objects and generators syntax a profile uses, declaring
+# only what the app provides.
+app:
+  name: home-hub
+  version: 1.0.0
+  vendor: ispx
+  description: Home automation hub with lighting and heating control
+  executionUnit: home-hub
+
+parameters:
+  - path: Device.X_ISPX_Home.LightNumberOfEntries
+    type: xsd:unsignedInt
+    value: "2"
+  - path: Device.X_ISPX_Home.ThermostatNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+
+objects:
+  - path: Device.X_ISPX_Home.Light
+    instances: 2
+    parameters:
+      - path: Name
+        value: "Light {i}"
+        writable: true
+      - path: Room
+        value: "Zone {i}"
+        writable: true
+      - path: On
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Brightness
+        type: xsd:unsignedInt
+        value: "70"
+        writable: true
+      - path: LastSet
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+
+  - path: Device.X_ISPX_Home.Thermostat
+    instances: 1
+    parameters:
+      - path: Name
+        value: "Heating"
+        writable: true
+      - path: Mode
+        value: "Auto"
+        writable: true
+      - path: Setpoint
+        type: xsd:int
+        value: "20"
+        writable: true
+      - path: Temperature
+        type: xsd:int
+        value: "19"
+      - path: Schedule
+        value: "06:30-08:30,17:00-22:30"
+        writable: true
+
+generators:
+  # Room temperature wanders a degree at a time inside a lived-in band;
+  # the first light follows an evening-style toggle so a value-change
+  # subscription has something to report without anyone touching it.
+  - path: Device.X_ISPX_Home.Thermostat.1.Temperature
+    type: drift
+    interval: 60s
+    min: 17
+    max: 23
+    stepMax: 1
+  - path: Device.X_ISPX_Home.Light.1.On
+    type: enum
+    interval: 300s
+    values: ["true", "false"]

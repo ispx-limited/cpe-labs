@@ -54,6 +54,15 @@ transfer:
     applyDelay: 60s
     fetch: true
 
+# The TR-157 software module lifecycle, on CWMP (ChangeDUState) and USP
+# (InstallDU(), Update(), Uninstall()). The object and its tables are in
+# softwaremodules.yaml; an installed app adds its own objects to the
+# tree for as long as it is installed.
+softwareModules:
+  path: Device.SoftwareModules.
+  installDelay: 5s
+  uninstallDelay: 1s
+
 informParameters:
   bootstrap:
     - Device.DeviceInfo.Manufacturer

@@ -31,6 +31,7 @@ const (
 	EventMethodScheduleInform = "M ScheduleInform"
 	EventMethodDownload       = "M Download"
 	EventMethodUpload         = "M Upload"
+	EventMethodChangeDUState  = "M ChangeDUState"
 )
 
 // Event is one entry in the cwmp:Inform Event array. CommandKey is

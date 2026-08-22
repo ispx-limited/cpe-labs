@@ -45,6 +45,15 @@ transfer:
     versionPath: Device.DeviceInfo.SoftwareVersion
     applyDelay: 30s
 
+# softwareModules enables the TR-157 software module lifecycle on both
+# protocols: the CWMP ChangeDUState RPC and the USP InstallDU() /
+# Update() / Uninstall() commands. An installed app grafts its own data
+# model into the tree (see apps/home-hub.yaml) until it is uninstalled.
+softwareModules:
+  path: Device.SoftwareModules.
+  installDelay: 5s
+  uninstallDelay: 1s
+
 # informParameters tells the inform builder which parameter paths
 # ride along in each event code's Inform ParameterList. The CPE side
 # of TR-069 is "vendor-chosen", operators decide which fields are
@@ -109,6 +118,98 @@ parameters:
   - path: Device.DeviceInfo.FirmwareImage.{i}.Status
     instances: 1
     value: "Active"
+
+  # ---- SoftwareModules (TR-157): one execution environment, empty
+  #      deployment and execution unit tables the lifecycle fills ----
+  - path: Device.SoftwareModules.ExecEnvNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+  - path: Device.SoftwareModules.DeploymentUnitNumberOfEntries
+    type: xsd:unsignedInt
+    value: "0"
+  - path: Device.SoftwareModules.ExecutionUnitNumberOfEntries
+    type: xsd:unsignedInt
+    value: "0"
+  - path: Device.SoftwareModules.ExecEnv.{i}.Enable
+    type: xsd:boolean
+    instances: 1
+    value: "true"
+    writable: true
+  - path: Device.SoftwareModules.ExecEnv.{i}.Status
+    instances: 1
+    value: "Up"
+  - path: Device.SoftwareModules.ExecEnv.{i}.Name
+    instances: 1
+    value: "containers"
+  - path: Device.SoftwareModules.ExecEnv.{i}.Type
+    instances: 1
+    value: "OCI"
+  - path: Device.SoftwareModules.ExecEnv.{i}.Vendor
+    instances: 1
+    value: "Example"
+  - path: Device.SoftwareModules.ExecEnv.{i}.Version
+    instances: 1
+    value: "1.0"
+  - path: Device.SoftwareModules.ExecEnv.{i}.ActiveExecutionUnits
+    instances: 1
+    value: ""
+  - path: Device.SoftwareModules.DeploymentUnit.{i}.UUID
+    instances: 0
+  - path: Device.SoftwareModules.DeploymentUnit.{i}.DUID
+    instances: 0
+  - path: Device.SoftwareModules.DeploymentUnit.{i}.Name
+    instances: 0
+  - path: Device.SoftwareModules.DeploymentUnit.{i}.Status
+    instances: 0
+  - path: Device.SoftwareModules.DeploymentUnit.{i}.Resolved
+    type: xsd:boolean
+    instances: 0
+  - path: Device.SoftwareModules.DeploymentUnit.{i}.URL
+    instances: 0
+  - path: Device.SoftwareModules.DeploymentUnit.{i}.Description
+    instances: 0
+  - path: Device.SoftwareModules.DeploymentUnit.{i}.Vendor
+    instances: 0
+  - path: Device.SoftwareModules.DeploymentUnit.{i}.Version
+    instances: 0
+  - path: Device.SoftwareModules.DeploymentUnit.{i}.ExecutionUnitList
+    instances: 0
+  - path: Device.SoftwareModules.DeploymentUnit.{i}.ExecutionEnvRef
+    instances: 0
+  - path: Device.SoftwareModules.DeploymentUnit.{i}.Installed
+    type: xsd:dateTime
+    instances: 0
+  - path: Device.SoftwareModules.DeploymentUnit.{i}.LastUpdate
+    type: xsd:dateTime
+    instances: 0
+  - path: Device.SoftwareModules.ExecutionUnit.{i}.EUID
+    instances: 0
+  - path: Device.SoftwareModules.ExecutionUnit.{i}.Name
+    instances: 0
+  - path: Device.SoftwareModules.ExecutionUnit.{i}.ExecEnvLabel
+    instances: 0
+  - path: Device.SoftwareModules.ExecutionUnit.{i}.Status
+    instances: 0
+  - path: Device.SoftwareModules.ExecutionUnit.{i}.ExecutionFaultCode
+    instances: 0
+  - path: Device.SoftwareModules.ExecutionUnit.{i}.ExecutionFaultMessage
+    instances: 0
+  - path: Device.SoftwareModules.ExecutionUnit.{i}.AutoStart
+    type: xsd:boolean
+    instances: 0
+  - path: Device.SoftwareModules.ExecutionUnit.{i}.Vendor
+    instances: 0
+  - path: Device.SoftwareModules.ExecutionUnit.{i}.Version
+    instances: 0
+  - path: Device.SoftwareModules.ExecutionUnit.{i}.Description
+    instances: 0
+  - path: Device.SoftwareModules.ExecutionUnit.{i}.References
+    instances: 0
+  - path: Device.SoftwareModules.ExecutionUnit.{i}.ExecutionEnvRef
+    instances: 0
+  - path: Device.SoftwareModules.ExecutionUnit.{i}.CreationTime
+    type: xsd:dateTime
+    instances: 0
 
   # ---- ManagementServer (writable so the ACS can update its own URL) ----
   - path: Device.ManagementServer.URL

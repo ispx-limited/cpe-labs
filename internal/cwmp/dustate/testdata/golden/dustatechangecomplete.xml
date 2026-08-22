@@ -1,0 +1,35 @@
+      <Results soap-enc:arrayType="cwmp:OpResultStruct[2]">
+        <OpResultStruct>
+          <UUID>11111111-2222-5333-8444-555555555555</UUID>
+          <DeploymentUnitRef>Device.SoftwareModules.DeploymentUnit.1</DeploymentUnitRef>
+          <Version>1.0.0</Version>
+          <CurrentState>Installed</CurrentState>
+          <Resolved>1</Resolved>
+          <ExecutionUnitRefList>Device.SoftwareModules.ExecutionUnit.1</ExecutionUnitRefList>
+          <StartTime>2026-08-21T12:00:00Z</StartTime>
+          <CompleteTime>2026-08-21T12:00:05Z</CompleteTime>
+          <Fault>
+            <FaultStruct>
+              <FaultCode>0</FaultCode>
+              <FaultString></FaultString>
+            </FaultStruct>
+          </Fault>
+        </OpResultStruct>
+        <OpResultStruct>
+          <UUID>11111111-2222-5333-8444-555555555556</UUID>
+          <DeploymentUnitRef></DeploymentUnitRef>
+          <Version></Version>
+          <CurrentState>Failed</CurrentState>
+          <Resolved>0</Resolved>
+          <ExecutionUnitRefList></ExecutionUnitRefList>
+          <StartTime>2026-08-21T12:00:00Z</StartTime>
+          <CompleteTime>2026-08-21T12:00:01Z</CompleteTime>
+          <Fault>
+            <FaultStruct>
+              <FaultCode>9018</FaultCode>
+              <FaultString>File corrupted &lt;signature&gt;</FaultString>
+            </FaultStruct>
+          </Fault>
+        </OpResultStruct>
+      </Results>
+      <CommandKey>install-home-hub</CommandKey>

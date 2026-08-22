@@ -248,7 +248,7 @@ func (s *Scheduler) collectDue() (ready []*schedEntry, delay time.Duration, hasN
 	now := s.clock.Now()
 	for s.queue.Len() > 0 && !s.queue[0].due.After(now) {
 		e := heap.Pop(&s.queue).(*schedEntry)
-		if !e.runner.running() {
+		if !e.runner.wants(e.gen) {
 			continue
 		}
 		ready = append(ready, e)

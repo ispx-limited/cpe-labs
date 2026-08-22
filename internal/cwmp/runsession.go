@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ispx-limited/cpe-labs/internal/cpeerr"
+	"github.com/ispx-limited/cpe-labs/internal/cwmp/dustate"
 	"github.com/ispx-limited/cpe-labs/internal/cwmp/inform"
 	"github.com/ispx-limited/cpe-labs/internal/cwmp/transfer"
 	"github.com/ispx-limited/cpe-labs/internal/paramtree"
@@ -58,6 +59,7 @@ func RunSession(ctx context.Context, opts RunSessionOptions, trigger Trigger) er
 			fmt.Errorf("tracker produced no events for trigger %d", trigger))
 	}
 	transferCompletes := opts.Tracker.DrainTransferCompletes()
+	duStateCompletes := opts.Tracker.DrainDUStateChangeCompletes()
 
 	// Build a fresh inform.Builder with this session's parameter lists.
 	builder, err := inform.NewBuilder(opts.Tree, inform.BuilderOptions{
@@ -71,6 +73,7 @@ func RunSession(ctx context.Context, opts RunSessionOptions, trigger Trigger) er
 		// attempt doesn't lose them.
 		requeueUndelivered(opts.Tracker, events)
 		requeueTransferCompletes(opts.Tracker, transferCompletes)
+		requeueDUStateCompletes(opts.Tracker, duStateCompletes)
 		return err
 	}
 
@@ -79,7 +82,7 @@ func RunSession(ctx context.Context, opts RunSessionOptions, trigger Trigger) er
 	// time. The Session struct holds a builder pointer that we
 	// short-circuit by exposing setBuilder (test-friendly indirection).
 	opts.Session.setBuilder(builder)
-	opts.Session.setPendingCPERPCs(adaptTransferCompletes(transferCompletes))
+	opts.Session.setPendingCPERPCs(append(adaptTransferCompletes(transferCompletes), adaptDUStateCompletes(duStateCompletes)...))
 
 	// Stamp the session retry count (3.2.1.1: the CPE MUST communicate
 	// the count regardless of the condition prompting the session, so a
@@ -94,6 +97,7 @@ func RunSession(ctx context.Context, opts RunSessionOptions, trigger Trigger) er
 	if err := opts.Session.Run(ctx, events); err != nil {
 		requeueUndelivered(opts.Tracker, events)
 		requeueTransferCompletes(opts.Tracker, transferCompletes)
+		requeueDUStateCompletes(opts.Tracker, duStateCompletes)
 		return err
 	}
 
@@ -132,6 +136,39 @@ func (t transferCompleteRPC) Body() ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// adaptDUStateCompletes wraps each DUStateChangeComplete record in a
+// CPEInitiatedRPC adapter, the same way transfers are wrapped.
+func adaptDUStateCompletes(recs []dustate.Complete) []CPEInitiatedRPC {
+	if len(recs) == 0 {
+		return nil
+	}
+	out := make([]CPEInitiatedRPC, len(recs))
+	for i, r := range recs {
+		out[i] = duStateCompleteRPC{rec: r}
+	}
+	return out
+}
+
+type duStateCompleteRPC struct {
+	rec dustate.Complete
+}
+
+func (d duStateCompleteRPC) Method() string { return "DUStateChangeComplete" }
+
+func (d duStateCompleteRPC) Body() ([]byte, error) {
+	var buf bytes.Buffer
+	if err := dustate.Render(&buf, &d.rec); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func requeueDUStateCompletes(t *EventTracker, recs []dustate.Complete) {
+	for _, r := range recs {
+		t.QueueDUStateChangeComplete(r)
+	}
 }
 
 // requeueTransferCompletes re-enqueues records that were drained but
