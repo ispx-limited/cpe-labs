@@ -42,6 +42,11 @@ type Profile struct {
 	EventSchedule       EventScheduleConfig
 	Diagnostics         []DiagnosticConfig
 	SoftwareModules     *SoftwareModulesConfig
+	// LinkFault is nil unless the profile declares faults.link. Nil
+	// means the process has no uplink outage to simulate and the
+	// trigger does nothing, which is what every profile that predates
+	// the block keeps doing.
+	LinkFault *LinkFaultConfig
 }
 
 // FleetConfig describes how many simulated CPEs to spawn from this
@@ -522,6 +527,7 @@ func LoadProfileFromReader(r io.Reader, path string) (*Profile, error) {
 		Fleet:               mc.Fleet,
 		EventSchedule:       mc.EventSchedule,
 		SoftwareModules:     mc.SoftwareModules,
+		LinkFault:           mc.LinkFault,
 	}, nil
 }
 
@@ -543,6 +549,7 @@ type profile struct {
 	EventSchedule       *rawEventSchedule       `yaml:"eventSchedule"`
 	Diagnostics         []rawDiagnostic         `yaml:"diagnostics"`
 	SoftwareModules     *rawSoftwareModules     `yaml:"softwareModules"`
+	Faults              *rawFaults              `yaml:"faults"`
 
 	// App is only valid in an app manifest (see LoadAppManifest).
 	App *rawApp `yaml:"app"`
@@ -871,6 +878,7 @@ func loadProfileDir(dir string) (*Profile, error) {
 		Fleet:               mc.Fleet,
 		EventSchedule:       mc.EventSchedule,
 		SoftwareModules:     mc.SoftwareModules,
+		LinkFault:           mc.LinkFault,
 	}, nil
 }
 
@@ -902,6 +910,7 @@ type mergedConfig struct {
 	EventSchedule       EventScheduleConfig
 	Diagnostics         []DiagnosticConfig
 	SoftwareModules     *SoftwareModulesConfig
+	LinkFault           *LinkFaultConfig
 }
 
 // mergeFiles applies all files' parameters to tree, accumulates
@@ -1312,6 +1321,28 @@ func mergeFiles(tree *Tree, files []*loadedFile) (mergedConfig, error) {
 		eventScheduleSource = lf.path
 	}
 
+	// Merge faults.link. One per profile, whichever file declares it:
+	// a fault is a statement about the whole device, so two files
+	// claiming different uplinks would leave which one goes down
+	// depending on file order.
+	var linkFault *LinkFaultConfig
+	var linkFaultSource string
+	for _, lf := range files {
+		if lf.prof.Faults == nil || lf.prof.Faults.Link == nil {
+			continue
+		}
+		if linkFaultSource != "" {
+			return mergedConfig{}, cpeerr.Wrap("paramtree.LoadProfile", cpeerr.KindInvalidArgument,
+				fmt.Errorf("%s and %s both declare faults.link", linkFaultSource, lf.path))
+		}
+		fault, err := parseLinkFault(tree, *lf.prof.Faults.Link, lf.path+": faults.link")
+		if err != nil {
+			return mergedConfig{}, cpeerr.Wrap("paramtree.LoadProfile", cpeerr.KindInvalidArgument, err)
+		}
+		linkFault = fault
+		linkFaultSource = lf.path
+	}
+
 	// Merge generators (top-level + inline). Two declarations on the
 	// same path reject. Inline generators on {i}-templated parameters
 	// expand to one entry per materialized instance.
@@ -1503,6 +1534,7 @@ func mergeFiles(tree *Tree, files []*loadedFile) (mergedConfig, error) {
 		EventSchedule:       eventScheduleCfg,
 		Diagnostics:         diagnostics,
 		SoftwareModules:     smCfg,
+		LinkFault:           linkFault,
 	}, nil
 }
 

@@ -110,6 +110,22 @@ type cpeStack struct {
 	// uspFirmwareBusy does for firmware.
 	softwareModules        *softwaremodules.Manager
 	uspSoftwareModulesBusy atomic.Bool
+
+	// instance is this CPE's absolute fleet index, the one fleet.offset
+	// shifts. Kept so a link fault can be aimed at a contiguous band of
+	// a cohort rather than all of it; see linkfault.go.
+	instance int
+
+	// uspLink and uspAgent are the halves of the USP stack an uplink
+	// fault drives: the transport it cuts, and the agent that reports
+	// the outage once the transport is back. Both nil on a CWMP-only
+	// run, which is why every use is guarded.
+	uspLink  uspLink
+	uspAgent uspReporter
+
+	// linkFaultBusy is this CPE's one-outage-at-a-time flag. Accessed
+	// from whichever goroutine the trigger arrived on.
+	linkFaultBusy atomic.Bool
 }
 
 func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
@@ -371,6 +387,13 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 			uspAgents++
 		}
 		logger.Info("usp agents started", "count", uspAgents, "broker", cfg.USPBroker)
+	}
+
+	// An uplink outage is armed only when the profile declares one, and
+	// even then nothing happens until the process is signalled. See
+	// linkfault.go for why the trigger is out of band.
+	if templateProf.LinkFault != nil {
+		watchLinkFaultSignal(ctx, stacks, *templateProf.LinkFault, logger)
 	}
 
 	// One-shot mode: exit after bootstrap if nothing is keeping us
@@ -1224,6 +1247,7 @@ func buildCPEStack(cfg cpeconfig.Config, template *paramtree.Profile, in cpeStac
 	return &cpeStack{
 		id:             in.id,
 		serial:         in.serial,
+		instance:       in.instance,
 		tree:           prof.Tree,
 		tracker:        tracker,
 		transport:      tt,

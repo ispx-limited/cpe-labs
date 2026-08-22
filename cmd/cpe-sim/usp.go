@@ -90,6 +90,11 @@ func startUSPAgent(ctx context.Context, cfg cpeconfig.Config, st *cpeStack, logg
 		return err
 	}
 
+	// The uplink fault needs both halves of the stack: the transport to
+	// cut, and the agent to report the outage with once it is back.
+	st.uspLink = transport
+	st.uspAgent = runner
+
 	// One goroutine per agent, mirroring one goroutine per CWMP session: the
 	// runner blocks on ctx, and a connect failure is logged rather than taking
 	// the process down, so one unreachable broker does not stop a fleet that is
