@@ -112,5 +112,10 @@ informParameters:
 faults:
   link:
     interface: Device.IP.Interface.1
-    duration: 2m
+    # Long enough to watch. The broker notices the lost session anywhere
+    # from a few seconds to ninety after the cut, depending on where in
+    # the keepalive cycle it lands, and a controller that groups silences
+    # into incidents does so on its own tick; with two minutes the window
+    # in which an incident can open was sometimes a few seconds wide.
+    duration: 5m
     reboot: false
