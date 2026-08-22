@@ -118,4 +118,8 @@ faults:
     # into incidents does so on its own tick; with two minutes the window
     # in which an incident can open was sometimes a few seconds wide.
     duration: 5m
+    # The first fifty agents of the process only (instances count from one): a demonstration is one
+    # estate going dark, not every home in the cohort, and a thousand
+    # agents dropping at once says less about the controller than fifty.
+    instances: 1-50
     reboot: false
