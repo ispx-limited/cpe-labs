@@ -1,0 +1,34 @@
+# Device.Users.User: the gateway's local accounts. User 5 is the remote
+# management account on this firmware, the one an ACS rotates; the
+# others exist so the table's shape matches the real device. Passwords
+# are write-only on the real device; the sim accepts the write and
+# reports the value back like any parameter, which is what lets a test
+# assert the rotation landed.
+
+parameters:
+  - path: Device.UsersNumberOfEntries
+    type: xsd:unsignedInt
+    value: "5"
+
+groups:
+  - prefix: Device.Users.User.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+      - path: Username
+        value: "admin"
+      - path: Password
+        value: ""
+        writable: true
+  - prefix: Device.Users.User.5
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Username
+        value: "remote"
+      - path: Password
+        value: ""
+        writable: true

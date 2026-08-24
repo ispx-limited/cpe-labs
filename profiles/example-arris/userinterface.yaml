@@ -20,3 +20,44 @@ groups:
         writable: true
       - path: SupportedProtocols
         value: "HTTP,HTTPS"
+      # The NVG's vendor extras beside the standard leaves: the ACS's
+      # remote-access module reads status through the vendor path and
+      # writes the allowlist and idle timeout, so a grant's atomic
+      # SetParameterValues names all three.
+      - path: X_0000C5_Status
+        value: "Down"
+      - path: X_0000C5_ACL
+        value: ""
+        writable: true
+      - path: X_0000C5_IdleTimeout
+        type: xsd:unsignedInt
+        value: "15"
+        writable: true
+
+  # The NVG's local account table, as the firmware exposes it: a vendor
+  # table under UserInterface rather than the TR-098 User.{i}. table.
+  # User 3 is the remote management account, the one an ACS rotates.
+  # Passwords are write-only on the real device; the sim accepts the
+  # write and reports the value back like any parameter, which is what
+  # lets a test assert the rotation landed.
+  - prefix: InternetGatewayDevice.UserInterface.User.1
+    parameters:
+      - path: Username
+        value: "admin"
+      - path: Password
+        value: ""
+        writable: true
+  - prefix: InternetGatewayDevice.UserInterface.User.2
+    parameters:
+      - path: Username
+        value: "tech"
+      - path: Password
+        value: ""
+        writable: true
+  - prefix: InternetGatewayDevice.UserInterface.User.3
+    parameters:
+      - path: Username
+        value: "remote"
+      - path: Password
+        value: ""
+        writable: true
