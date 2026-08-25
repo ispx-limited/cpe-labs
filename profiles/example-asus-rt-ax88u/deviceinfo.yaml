@@ -1,0 +1,102 @@
+# Identity and health. The manufacturer string is the long form ASUS
+# hardware reports ("ASUSTeK Computer Inc."), which is one of the
+# things an ACS learns from a survey rather than from the brand name.
+groups:
+  - prefix: Device.DeviceInfo
+    parameters:
+      - path: Manufacturer
+        value: "ASUSTeK Computer Inc."
+      - path: ManufacturerOUI
+        value: "00005E"
+      - path: ModelName
+        value: "RT-AX88U"
+      - path: Description
+        value: "ASUS RT-AX88U AX6000 dual-band WiFi 6 router"
+      - path: ProductClass
+        value: "RT-AX88U"
+      - path: SerialNumber
+        value: "BASE"
+      - path: HardwareVersion
+        value: "1.0"
+      # See _top.yaml: the build named in the public vulnerability
+      # records, written the way the router itself writes it.
+      - path: SoftwareVersion
+        value: "3.0.0.4.388_23110"
+      - path: AdditionalSoftwareVersion
+        value: ""
+      - path: SpecVersion
+        value: "1.0"
+      - path: ProvisioningCode
+        value: ""
+        writable: true
+      - path: UpTime
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: uptime
+          interval: 30s
+      - path: DeviceLog
+        value: ""
+  - prefix: Device.DeviceInfo.MemoryStatus
+    parameters:
+      - path: Total
+        type: xsd:unsignedInt
+        value: "1048576"
+      - path: Free
+        type: xsd:unsignedInt
+        value: "612340"
+  - prefix: Device.DeviceInfo.ProcessStatus
+    parameters:
+      - path: CPUUsage
+        type: xsd:unsignedInt
+        value: "9"
+      - path: ProcessNumberOfEntries
+        type: xsd:unsignedInt
+        value: "142"
+  - prefix: Device.DeviceInfo.TemperatureStatus
+    parameters:
+      - path: TemperatureSensorNumberOfEntries
+        type: xsd:unsignedInt
+        value: "3"
+  - prefix: Device.DeviceInfo.TemperatureStatus.TemperatureSensor.1
+    parameters:
+      - path: Name
+        value: "cpu"
+  - prefix: Device.DeviceInfo.TemperatureStatus.TemperatureSensor.2
+    parameters:
+      - path: Name
+        value: "wifi-2.4g"
+  - prefix: Device.DeviceInfo.TemperatureStatus.TemperatureSensor.3
+    parameters:
+      - path: Name
+        value: "wifi-5g"
+
+# Three sensors, the way the router's own UI shows them: the CPU and
+# the two radios.
+objects:
+  - path: Device.DeviceInfo.TemperatureStatus.TemperatureSensor
+    instances: 3
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: Value
+        type: xsd:int
+        value: "58"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: 44
+          max: 76
+          stepMax: 2
+      - path: MinValue
+        type: xsd:int
+        value: "40"
+      - path: MaxValue
+        type: xsd:int
+        value: "84"

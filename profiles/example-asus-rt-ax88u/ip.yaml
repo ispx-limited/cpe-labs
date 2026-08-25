@@ -1,0 +1,212 @@
+# IP.Interface.1 is the WAN and IP.Interface.2 the LAN, with the LAN on
+# 192.168.50.1, the address this vendor ships every router with.
+parameters:
+  - path: Device.IP.IPv4Capable
+    type: xsd:boolean
+    value: "true"
+  - path: Device.IP.IPv4Enable
+    type: xsd:boolean
+    value: "true"
+    writable: true
+  - path: Device.IP.IPv6Capable
+    type: xsd:boolean
+    value: "true"
+  - path: Device.IP.IPv6Enable
+    type: xsd:boolean
+    value: "true"
+    writable: true
+  - path: Device.IP.InterfaceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "2"
+
+objects:
+  - path: Device.IP.Interface
+    instances: 2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Alias
+        value: "IP_{i}"
+        writable: true
+      - path: LastChange
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Type
+        value: "Normal"
+      - path: Loopback
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: IPv4Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: IPv6Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: IPv4AddressNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+      - path: IPv6AddressNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+      - path: IPv6PrefixNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+      - path: MaxMTUSize
+        type: xsd:unsignedInt
+        value: "1500"
+        writable: true
+      - path: CurrentMTUSize
+        type: xsd:unsignedInt
+        value: "1500"
+      - path: Reset
+        type: xsd:boolean
+        value: "false"
+        writable: true
+  - path: Device.IP.Interface.1.IPv4Address
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: AddressingType
+        value: "DHCP"
+        writable: true
+      - path: IPAddress
+        value: "{wan_ipv4}"
+        writable: true
+      - path: SubnetMask
+        value: "255.255.255.0"
+        writable: true
+      - path: Alias
+        value: "WAN_ADDRESS"
+        writable: true
+  - path: Device.IP.Interface.1.IPv6Address
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: IPAddressStatus
+        value: "Preferred"
+      - path: IPAddress
+        value: "{wan_ipv6}"
+        writable: true
+      - path: Origin
+        value: "AutoConfigured"
+        writable: true
+      - path: Alias
+        value: "WAN_ADDRESS_V6"
+        writable: true
+  - path: Device.IP.Interface.1.IPv6Prefix
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: Prefix
+        value: "{delegated_prefix}"
+        writable: true
+      - path: Origin
+        value: "PrefixDelegation"
+      - path: StaticType
+        value: "Static"
+        writable: true
+      - path: Alias
+        value: "DELEGATED"
+        writable: true
+  - path: Device.IP.Interface.2.IPv4Address
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: AddressingType
+        value: "Static"
+        writable: true
+      - path: IPAddress
+        value: "192.168.50.1"
+        writable: true
+      - path: SubnetMask
+        value: "255.255.255.0"
+        writable: true
+      - path: Alias
+        value: "LAN_ADDRESS"
+        writable: true
+  - path: Device.IP.Interface.2.IPv6Address
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: IPAddressStatus
+        value: "Preferred"
+      - path: IPAddress
+        value: "{delegated_prefix}1"
+        writable: true
+      - path: Origin
+        value: "Static"
+        writable: true
+      - path: Alias
+        value: "LAN_ADDRESS_V6"
+        writable: true
+  - path: Device.IP.Interface.2.IPv6Prefix
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: PrefixStatus
+        value: "Preferred"
+      - path: Prefix
+        value: "{delegated_prefix}"
+        writable: true
+      - path: Origin
+        value: "Child"
+        writable: true
+      - path: StaticType
+        value: "Inapplicable"
+        writable: true
+      - path: Alias
+        value: "LAN_PREFIX_V6"
+        writable: true
+
+groups:
+  - prefix: Device.IP.Interface.1
+    parameters:
+      - path: Name
+        value: "wan"
+      - path: LowerLayers
+        value: "Device.Ethernet.Interface.9"
+        writable: true
+  - prefix: Device.IP.Interface.2
+    parameters:
+      - path: Name
+        value: "br0"
+      - path: LowerLayers
+        value: "Device.Ethernet.Interface.1"
+        writable: true

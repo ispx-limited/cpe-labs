@@ -1,0 +1,60 @@
+# IP ping, the one network diagnostic every gateway has. Writing
+# Requested runs it; the counts and timings below are what a healthy
+# line to a nearby host reports.
+parameters:
+  - path: Device.IP.Diagnostics.IPv4PingSupported
+    type: xsd:boolean
+    value: "true"
+  - path: Device.IP.Diagnostics.IPv6PingSupported
+    type: xsd:boolean
+    value: "true"
+
+groups:
+  - prefix: Device.IP.Diagnostics.IPPing
+    parameters:
+      - path: DiagnosticsState
+        value: "None"
+        writable: true
+      - path: Interface
+        value: ""
+        writable: true
+      - path: Host
+        value: ""
+        writable: true
+      - path: NumberOfRepetitions
+        type: xsd:unsignedInt
+        value: "4"
+        writable: true
+      - path: Timeout
+        type: xsd:unsignedInt
+        value: "1000"
+        writable: true
+      - path: DataBlockSize
+        type: xsd:unsignedInt
+        value: "56"
+        writable: true
+      - path: DSCP
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: SuccessCount
+        type: xsd:unsignedInt
+        value: "4"
+      - path: FailureCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: AverageResponseTime
+        type: xsd:unsignedInt
+        value: "11"
+      - path: MinimumResponseTime
+        type: xsd:unsignedInt
+        value: "8"
+      - path: MaximumResponseTime
+        type: xsd:unsignedInt
+        value: "19"
+
+diagnostics:
+  - statePath: Device.IP.Diagnostics.IPPing.DiagnosticsState
+    trigger: Requested
+    complete: Complete
+    duration: 4s
