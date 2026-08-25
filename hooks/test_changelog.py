@@ -50,21 +50,20 @@ class WithNotes(unittest.TestCase):
         body = changelog.clean(GENERATED)
         self.assertEqual(changelog.with_notes(body, self.notes), body)
 
-    def test_notes_lead_and_the_entries_fold_beneath(self):
-        (self.notes / "0.2.0.md").write_text("Sign-in is throttled.\n", encoding="utf-8")
+    def test_notes_replace_the_entries_of_their_version_only(self):
+        (self.notes / "0.2.0.md").write_text("- Sign-in is throttled per address\n", encoding="utf-8")
         page = changelog.with_notes(changelog.clean(GENERATED), self.notes)
         self.assertIn(
-            "## 0.2.0 (2026-08-21)\n\nSign-in is throttled.\n\n/// details | All changes\n",
+            "## 0.2.0 (2026-08-21)\n\n- Sign-in is throttled per address\n\n## 0.1.0 (2026-08-20)\n\n### Fixed\n",
             page,
         )
-        self.assertIn("**BREAKING CHANGES**\n\n* **api:**", page)
-        self.assertIn("**Added**\n\n* **auth:**", page)
-        self.assertIn("* **auth:** sign-in is throttled per address\n///\n\n## 0.1.0 (2026-08-20)", page)
-        # The other version keeps its headings, so only the folded ones are demoted.
-        self.assertIn("## 0.1.0 (2026-08-20)\n\n### Fixed\n", page)
+        self.assertNotIn("**api:**", page)
+        self.assertNotIn("**auth:**", page)
+        self.assertNotIn("BREAKING", page)
+        self.assertIn("* **firmware:** a delayed completion report", page)
 
     def test_notes_for_an_uncut_release_are_not_rendered(self):
-        (self.notes / "0.3.0.md").write_text("Not released.\n", encoding="utf-8")
+        (self.notes / "0.3.0.md").write_text("- Not released\n", encoding="utf-8")
         page = changelog.with_notes(changelog.clean(GENERATED), self.notes)
         self.assertNotIn("Not released", page)
 
@@ -85,9 +84,10 @@ class Page(unittest.TestCase):
     def test_empty_changelog_reads_no_releases(self):
         self.assertEqual(self.render("# Changelog\n"), "<!-- filled -->\n\nNo releases.\n")
 
-    def test_page_carries_notes_and_entries(self):
-        page = self.render(GENERATED, {"0.1.0": "The first release.\n"})
-        self.assertIn("## 0.1.0 (2026-08-20)\n\nThe first release.\n\n/// details | All changes\n**Fixed**", page)
+    def test_page_carries_notes_where_they_exist_and_entries_elsewhere(self):
+        page = self.render(GENERATED, {"0.1.0": "- The first release\n"})
+        self.assertIn("## 0.1.0 (2026-08-20)\n\n- The first release\n", page)
+        self.assertNotIn("**firmware:**", page)
         self.assertIn("## 0.2.0 (2026-08-21)\n\n\n### BREAKING CHANGES", page)
 
     def test_other_pages_are_untouched(self):
