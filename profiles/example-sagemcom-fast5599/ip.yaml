@@ -1,0 +1,417 @@
+# Device.IP: three interfaces. 1 is the LAN bridge (192.168.1.0/24),
+# 2 is the WAN data path (IPoE on the surveyed unit, per-CPE address
+# from the pools in _top.yaml), 3 is the guest bridge. One address of
+# each family per interface; the delegated prefix's ::1 is the LAN
+# address, which is what a gateway assigns its own bridge.
+
+parameters:
+  - path: Device.IP.InterfaceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "3"
+
+objects:
+  - path: Device.IP.Interface
+    instances: 3
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: LastChange
+        type: xsd:unsignedInt
+        value: "0"
+      - path: LowerLayers
+        value: ""
+        writable: true
+      - path: IPv4Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Router
+        value: ""
+      - path: Reset
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: MaxMTUSize
+        type: xsd:unsignedInt
+        value: "1500"
+        writable: true
+      - path: Type
+        value: "Normal"
+      - path: Loopback
+        type: xsd:boolean
+        value: "false"
+      - path: AutoIPEnable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.DiscardPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.DiscardPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.UnicastPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.UnicastPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.MulticastPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.MulticastPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BroadcastPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BroadcastPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.UnknownProtoPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  - path: Device.IP.Interface.1.IPv4Address
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Alias
+        value: "IP_BR_LAN_ADDRESS"
+        writable: true
+      - path: IPAddress
+        value: "192.168.1.1"
+        writable: true
+      - path: SubnetMask
+        value: "255.255.255.0"
+        writable: true
+      - path: AddressingType
+        value: "Static"
+        writable: true
+      - path: Status
+        value: "Enabled"
+
+  - path: Device.IP.Interface.1.IPv6Address
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: IPAddressStatus
+        value: "Preferred"
+      - path: Alias
+        value: "LINK_LOCAL"
+        writable: true
+      - path: IPAddress
+        value: "fe80::ba8c:2bff:fe2e:3f03"
+        writable: true
+      - path: Origin
+        value: "AutoConfigured"
+        writable: true
+      - path: Prefix
+        value: "Device.IP.Interface.1.IPv6Prefix.1"
+        writable: true
+      - path: PreferredLifetime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: ValidLifetime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: Anycast
+        type: xsd:boolean
+        value: "false"
+        writable: true
+
+  - path: Device.IP.Interface.1.IPv6Prefix
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: PrefixStatus
+        value: "Preferred"
+      - path: Alias
+        value: "LINK_LOCAL"
+        writable: true
+      - path: Prefix
+        value: "fe80::/64"
+        writable: true
+      - path: Origin
+        value: "AutoConfigured"
+        writable: true
+      - path: StaticType
+        value: "Static"
+        writable: true
+      - path: ParentPrefix
+        value: ""
+      - path: ChildPrefixBits
+        value: ""
+      - path: OnLink
+        type: xsd:boolean
+        value: "false"
+      - path: Autonomous
+        type: xsd:boolean
+        value: "false"
+      - path: PreferredLifetime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: ValidLifetime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+
+  - path: Device.IP.Interface.2.IPv4Address
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Alias
+        value: "IP_DATA_ADDRESS"
+        writable: true
+      - path: IPAddress
+        value: "{wan_ipv4}"
+        writable: true
+      - path: SubnetMask
+        value: "255.255.255.240"
+        writable: true
+      - path: AddressingType
+        value: "DHCP"
+        writable: true
+      - path: Status
+        value: "Enabled"
+
+  - path: Device.IP.Interface.2.IPv6Address
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Disabled"
+      - path: IPAddressStatus
+        value: "Unknown"
+      - path: Alias
+        value: "LINK_LOCAL"
+        writable: true
+      - path: IPAddress
+        value: ""
+        writable: true
+      - path: Origin
+        value: "AutoConfigured"
+        writable: true
+      - path: Prefix
+        value: "Device.IP.Interface.2.IPv6Prefix.1"
+        writable: true
+      - path: PreferredLifetime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: ValidLifetime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: Anycast
+        type: xsd:boolean
+        value: "false"
+        writable: true
+
+  - path: Device.IP.Interface.2.IPv6Prefix
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Disabled"
+      - path: PrefixStatus
+        value: "Invalid"
+      - path: Alias
+        value: "LINK_LOCAL"
+        writable: true
+      - path: Prefix
+        value: ""
+        writable: true
+      - path: Origin
+        value: "AutoConfigured"
+        writable: true
+      - path: StaticType
+        value: "Static"
+        writable: true
+      - path: ParentPrefix
+        value: ""
+      - path: ChildPrefixBits
+        value: ""
+      - path: OnLink
+        type: xsd:boolean
+        value: "false"
+      - path: Autonomous
+        type: xsd:boolean
+        value: "false"
+      - path: PreferredLifetime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: ValidLifetime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+
+  - path: Device.IP.Interface.3.IPv4Address
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Alias
+        value: "IP_BR_GUEST_ADDRESS"
+        writable: true
+      - path: IPAddress
+        value: "192.168.201.1"
+        writable: true
+      - path: SubnetMask
+        value: "255.255.255.0"
+        writable: true
+      - path: AddressingType
+        value: "Static"
+        writable: true
+      - path: Status
+        value: "Enabled"
+
+groups:
+  - prefix: Device.IP
+    parameters:
+      - path: IPv4Capable
+        type: xsd:boolean
+        value: "true"
+      - path: IPv4Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: IPv4Status
+        value: "Enabled"
+      - path: IPv6Capable
+        type: xsd:boolean
+        value: "true"
+      - path: IPv6Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: IPv6Status
+        value: "Enabled"
+      - path: ULAPrefix
+        value: ""
+
+  - prefix: Device.IP.Interface.1
+    parameters:
+      - path: Alias
+        value: "IP_BR_LAN"
+        writable: true
+      - path: Name
+        value: "Device.IP.Interface.1"
+      - path: IPv6Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: ULAEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+
+  - prefix: Device.IP.Interface.2
+    parameters:
+      - path: Alias
+        value: "IP_DATA"
+        writable: true
+      - path: Name
+        value: "Device.IP.Interface.2"
+      - path: IPv6Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: ULAEnable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+
+  - prefix: Device.IP.Interface.3
+    parameters:
+      - path: Alias
+        value: "IP_BR_GUEST"
+        writable: true
+      - path: Name
+        value: "Device.IP.Interface.3"
+      - path: IPv6Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: ULAEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+
+  - prefix: Device.IP.Interface.1
+    parameters:
+      - path: IPv4AddressNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+      - path: IPv6AddressNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+      - path: IPv6PrefixNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+
+  - prefix: Device.IP.Interface.2
+    parameters:
+      - path: IPv4AddressNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+      - path: IPv6AddressNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+      - path: IPv6PrefixNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+
+  - prefix: Device.IP.Interface.3
+    parameters:
+      - path: IPv4AddressNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+      - path: IPv6AddressNumberOfEntries
+        type: xsd:unsignedInt
+        value: "0"
+      - path: IPv6PrefixNumberOfEntries
+        type: xsd:unsignedInt
+        value: "0"

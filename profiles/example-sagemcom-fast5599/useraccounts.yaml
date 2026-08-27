@@ -1,0 +1,89 @@
+# Device.UserAccounts.User: the gateway's local accounts, under the
+# vendor's table rather than Device.Users.User. Five logins as on the
+# surveyed firmware; tech (role support-user) is the support login an
+# ACS rotates. Passwords are write-only on the real device; the sim
+# accepts the write and reports the value back, which is what lets a
+# test assert a rotation landed.
+
+parameters:
+  - path: Device.UserAccounts.UserNumberOfEntries
+    type: xsd:unsignedInt
+    value: "5"
+
+objects:
+  - path: Device.UserAccounts.User
+    instances: 5
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Password
+        value: ""
+        writable: true
+      - path: Category
+        value: ""
+      - path: ForcePasswordChange
+        type: xsd:boolean
+        value: "false"
+        writable: true
+
+groups:
+  - prefix: Device.UserAccounts
+    parameters:
+      - path: LANInterface
+        value: "Device.IP.Interface.1"
+      - path: WANInterface
+        value: "Device.IP.Interface.2"
+      - path: MNGInterface
+        value: ""
+
+  - prefix: Device.UserAccounts.User.1
+    parameters:
+      - path: Login
+        value: "internal"
+      - path: Role
+        value: "internal"
+      - path: Alias
+        value: "internal"
+        writable: true
+
+  - prefix: Device.UserAccounts.User.2
+    parameters:
+      - path: Login
+        value: "acs"
+      - path: Role
+        value: ""
+      - path: Alias
+        value: "acs"
+        writable: true
+
+  - prefix: Device.UserAccounts.User.3
+    parameters:
+      - path: Login
+        value: "tech"
+      - path: Role
+        value: "support-user"
+      - path: Alias
+        value: "tech"
+        writable: true
+
+  - prefix: Device.UserAccounts.User.4
+    parameters:
+      - path: Login
+        value: "admin"
+      - path: Role
+        value: "support-user"
+      - path: Alias
+        value: "admin"
+        writable: true
+
+  - prefix: Device.UserAccounts.User.5
+    parameters:
+      - path: Login
+        value: "root"
+      - path: Role
+        value: ""
+      - path: Alias
+        value: "root"
+        writable: true

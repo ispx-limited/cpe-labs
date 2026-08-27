@@ -1,0 +1,157 @@
+# Device.PPP: one interface, configured and down. The surveyed unit
+# ran IPoE with the PPP account still provisioned, which is what a
+# migrated line looks like: the username identifies the subscriber
+# even though the session never comes up.
+
+parameters:
+  - path: Device.PPP.InterfaceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+
+objects:
+  - path: Device.PPP.Interface
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "LowerLayerDown"
+      - path: Alias
+        value: "WAN"
+        writable: true
+      - path: Name
+        value: "Device.PPP.Interface.1"
+      - path: LastChange
+        type: xsd:unsignedInt
+        value: "0"
+      - path: LowerLayers
+        value: ""
+        writable: true
+      - path: Reset
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: ConnectionStatus
+        value: "Disconnected"
+      - path: LastConnectionError
+        value: "ERROR_NONE"
+      - path: AutoDisconnectTime
+        type: xsd:unsignedInt
+        value: "0"
+      - path: IdleDisconnectTime
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: WarnDisconnectDelay
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Username
+        value: "{cpe_id}@isp.example"
+        writable: true
+      - path: Password
+        value: ""
+        writable: true
+      - path: EncryptionProtocol
+        value: "None"
+      - path: CompressionProtocol
+        value: "None"
+      - path: AuthenticationProtocol
+        value: "PAP"
+        writable: true
+      - path: MaxMRUSize
+        type: xsd:unsignedInt
+        value: "1500"
+        writable: true
+      - path: CurrentMRUSize
+        type: xsd:unsignedInt
+        value: "0"
+      - path: ConnectionTrigger
+        value: "ALWAYSON"
+        writable: true
+      - path: LCPEcho
+        type: xsd:unsignedInt
+        value: "10"
+        writable: true
+      - path: LCPEchoRetry
+        type: xsd:unsignedInt
+        value: "5"
+        writable: true
+      - path: IPCPEnable
+        type: xsd:boolean
+        value: "true"
+      - path: IPv6CPEnable
+        type: xsd:boolean
+        value: "true"
+      - path: PPPoE.SessionID
+        type: xsd:unsignedInt
+        value: "1"
+      - path: PPPoE.ACName
+        value: ""
+        writable: true
+      - path: PPPoE.ServiceName
+        value: ""
+        writable: true
+      - path: IPCP.LocalIPAddress
+        value: ""
+      - path: IPCP.RemoteIPAddress
+        value: ""
+      - path: IPCP.DNSServers
+        value: ""
+      - path: IPCP.PassthroughEnable
+        type: xsd:boolean
+        value: "false"
+      - path: IPCP.PassthroughDHCPPool
+        value: ""
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.DiscardPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.DiscardPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.UnicastPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.UnicastPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.MulticastPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.MulticastPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BroadcastPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BroadcastPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.UnknownProtoPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+groups:
+  - prefix: Device.PPP
+    parameters:
+      - path: SupportedNCPs
+        value: ""

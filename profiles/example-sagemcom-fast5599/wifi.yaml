@@ -1,0 +1,2549 @@
+# Device.WiFi: three radios (2.4, 5 and 6 GHz, all WiFi 7), nine SSIDs
+# and nine access points, which is the real shape of this gateway:
+# a main network per band, a guest network on 2.4 and 5, a backhaul
+# on 5 and 6 for mesh extenders, and a WPA2-only legacy network on
+# 2.4 and 5 for clients that cannot do WPA3. Stations sit on the main
+# and legacy access points; the backhaul on 6 GHz carries one, the
+# extender.
+#
+# No MultiAP.APDevice and no DataElements: this firmware keeps its
+# mesh under Device.WiFi.MultiAP.X_SAGEMCOM_MultiAPConfig, which is
+# configuration rather than topology, so the network map an ACS can
+# draw from the standard tables is hosts and stations only.
+#
+# NeighboringWiFiDiagnostic is the standard object with the standard
+# Result table; the run is declared in _top.yaml.
+
+parameters:
+  - path: Device.WiFi.RadioNumberOfEntries
+    type: xsd:unsignedInt
+    value: "3"
+  - path: Device.WiFi.SSIDNumberOfEntries
+    type: xsd:unsignedInt
+    value: "9"
+  - path: Device.WiFi.AccessPointNumberOfEntries
+    type: xsd:unsignedInt
+    value: "9"
+  - path: Device.WiFi.NeighboringWiFiDiagnostic.ResultNumberOfEntries
+    type: xsd:unsignedInt
+    value: "6"
+
+objects:
+  - path: Device.WiFi.Radio
+    instances: 3
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: LastChange
+        type: xsd:unsignedInt
+        value: "0"
+      - path: LowerLayers
+        value: ""
+        writable: true
+      - path: AutoChannelSupported
+        type: xsd:boolean
+        value: "true"
+      - path: AutoChannelEnable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: AutoChannelRefreshPeriod
+        type: xsd:unsignedInt
+        value: "900"
+      - path: GuardInterval
+        value: "Auto"
+      - path: MCS
+        type: xsd:int
+        value: "-1"
+      - path: TransmitPowerSupported
+        value: "-1,0,10,20,30,40,50,60,70,80,90,100"
+      - path: TransmitPower
+        type: xsd:int
+        value: "-1"
+        writable: true
+      - path: RegulatoryDomain
+        value: "GBI"
+        writable: true
+      - path: RetryLimit
+        type: xsd:unsignedInt
+        value: "7"
+      - path: CCARequest
+        value: ""
+      - path: CCAReport
+        value: ""
+      - path: RPIHistogramRequest
+        value: ""
+      - path: RPIHistogramReport
+        value: ""
+      - path: FragmentationThreshold
+        type: xsd:unsignedInt
+        value: "2346"
+        writable: true
+      - path: RTSThreshold
+        type: xsd:unsignedInt
+        value: "2347"
+        writable: true
+      - path: LongRetryLimit
+        type: xsd:unsignedInt
+        value: "6"
+      - path: BeaconPeriod
+        type: xsd:unsignedInt
+        value: "100"
+        writable: true
+      - path: DTIMPeriod
+        type: xsd:unsignedInt
+        value: "1"
+        writable: true
+      - path: PacketAggregationEnable
+        type: xsd:boolean
+        value: "true"
+      - path: PreambleType
+        value: "Auto"
+      - path: BasicDataTransmitRates
+        value: ""
+      - path: FirmwareVersion
+        value: "17.10.369.39012"
+      - path: ChannelLastChange
+        type: xsd:unsignedInt
+        value: "0"
+      - path: ChannelLastSelectionReason
+        value: "Manual"
+      - path: MaxSupportedSSIDs
+        type: xsd:unsignedInt
+        value: "8"
+      - path: CenterFrequencySegment0
+        type: xsd:unsignedInt
+        value: "0"
+      - path: CenterFrequencySegment1
+        type: xsd:unsignedInt
+        value: "0"
+      - path: EnableRRM
+        type: xsd:boolean
+        value: "true"
+      - path: Stats.ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.DiscardPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.DiscardPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PLCPErrorCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.FCSErrorCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.InvalidMACCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsOtherReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.Noise
+        type: xsd:int
+        value: "0"
+      - path: Stats.TotalChannelChangeCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ManualChannelChangeCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.AutoStartupChannelChangeCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.AutoUserChannelChangeCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.AutoRefreshChannelChangeCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.AutoDynamicChannelChangeCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.AutoDFSChannelChangeCount
+        type: xsd:unsignedInt
+        value: "0"
+
+  - path: Device.WiFi.SSID
+    instances: 9
+    parameters:
+      - path: LastChange
+        type: xsd:unsignedInt
+        value: "0"
+      - path: MLDUnit
+        type: xsd:int
+        value: "-1"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: Stats.ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.DiscardPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.DiscardPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.UnicastPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.UnicastPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.MulticastPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.MulticastPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BroadcastPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BroadcastPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.UnknownProtoPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.RetransCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.FailedRetransCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.RetryCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.MultipleRetryCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ACKFailureCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.AggregatedPacketCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.DiscardPacketsSentNoAssoc
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.FragSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.SentNoAck
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.TooLongReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.TooShortReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.AckUcastReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  - path: Device.WiFi.AccessPoint
+    instances: 9
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: RetryLimit
+        type: xsd:unsignedInt
+        value: "0"
+      - path: WMMCapability
+        type: xsd:boolean
+        value: "true"
+      - path: WMMEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: ConnectedClients
+        type: xsd:unsignedInt
+        value: "0"
+      - path: AllowedMACAddress
+        value: ""
+      - path: MACAddressControlEnabled
+        type: xsd:boolean
+        value: "false"
+      - path: CpeOperationMode
+        value: "ROUTER"
+      - path: Security.WEPKey
+        value: ""
+        writable: true
+      - path: Security.PreSharedKey
+        value: ""
+        writable: true
+      - path: Security.KeyPassphrase
+        value: ""
+        writable: true
+      - path: Security.RekeyingInterval
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: Security.SAEPassphrase
+        value: ""
+        writable: true
+      - path: Security.Reset
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: WPS.Version
+        value: "2.0"
+
+  - path: Device.WiFi.AccessPoint.1.AssociatedDevice
+    instances: 3
+    parameters:
+      - path: Retransmissions
+        type: xsd:unsignedInt
+        value: "0"
+      - path: OperatingStandard
+        value: "b,g,n"
+      - path: IPAddress
+        value: ""
+      - path: Noise
+        type: xsd:int
+        value: "0"
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.RetransCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.FailedRetransCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.RetryCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.MultipleRetryCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  - path: Device.WiFi.AccessPoint.2.AssociatedDevice
+    instances: 3
+    parameters:
+      - path: AuthenticationState
+        type: xsd:boolean
+        value: "false"
+      - path: Retransmissions
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Active
+        type: xsd:boolean
+        value: "false"
+      - path: IPAddress
+        value: ""
+      - path: Noise
+        type: xsd:int
+        value: "0"
+      - path: AssociationTime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: HostName
+        value: ""
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.RetransCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.FailedRetransCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.RetryCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.MultipleRetryCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  - path: Device.WiFi.AccessPoint.3.AssociatedDevice
+    instances: 3
+    parameters:
+      - path: MaxSupportedDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "2882350"
+      - path: MaxSupportedDataUplinkRate
+        type: xsd:unsignedInt
+        value: "2882350"
+      - path: Retransmissions
+        type: xsd:unsignedInt
+        value: "0"
+      - path: OperatingStandard
+        value: "ax,be"
+      - path: IPAddress
+        value: ""
+      - path: Noise
+        type: xsd:int
+        value: "0"
+      - path: AssociationTime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.RetransCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.FailedRetransCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.RetryCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.MultipleRetryCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  - path: Device.WiFi.AccessPoint.7.AssociatedDevice
+    instances: 1
+    parameters:
+      - path: MACAddress
+        value: "5C:51:4F:00:00:07"
+      - path: AuthenticationState
+        type: xsd:boolean
+        value: "false"
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "0"
+      - path: MaxSupportedDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "0"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "0"
+      - path: MaxSupportedDataUplinkRate
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Retransmissions
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Active
+        type: xsd:boolean
+        value: "false"
+      - path: OperatingStandard
+        value: ""
+      - path: IPAddress
+        value: ""
+      - path: Noise
+        type: xsd:int
+        value: "0"
+      - path: AssociationTime
+        type: xsd:dateTime
+        value: "0001-01-01T00:00:00Z"
+      - path: HostName
+        value: ""
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.RetransCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.FailedRetransCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.RetryCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.MultipleRetryCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  - path: Device.WiFi.AccessPoint.8.AssociatedDevice
+    instances: 2
+    parameters:
+      - path: Retransmissions
+        type: xsd:unsignedInt
+        value: "0"
+      - path: IPAddress
+        value: ""
+      - path: Noise
+        type: xsd:int
+        value: "0"
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.RetransCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.FailedRetransCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.RetryCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.MultipleRetryCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  - path: Device.WiFi.AccessPoint.9.AssociatedDevice
+    instances: 2
+    parameters:
+      - path: AuthenticationState
+        type: xsd:boolean
+        value: "false"
+      - path: Retransmissions
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Active
+        type: xsd:boolean
+        value: "false"
+      - path: IPAddress
+        value: ""
+      - path: Noise
+        type: xsd:int
+        value: "0"
+      - path: AssociationTime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.RetransCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.FailedRetransCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.RetryCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.MultipleRetryCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  - path: Device.WiFi.NeighboringWiFiDiagnostic.Result
+    instances: 6
+    parameters:
+      - path: Alias
+        value: "neighbour-{i}"
+        writable: true
+
+groups:
+  - prefix: Device.WiFi.Radio.1
+    parameters:
+      - path: Alias
+        value: "WLAN_2_4"
+        writable: true
+      - path: Name
+        value: "Device.WiFi.Radio.1"
+      - path: MaxBitRate
+        type: xsd:unsignedInt
+        value: "1032"
+        writable: true
+      - path: SupportedFrequencyBands
+        value: "2.4GHz"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+        writable: true
+      - path: SupportedStandards
+        value: "b,g,n,ax,be"
+      - path: OperatingStandards
+        value: "b,g,n,ax,be"
+        writable: true
+      - path: PossibleChannels
+        value: "1,2,3,4,5,6,7,8,9,10,11,12,13"
+      - path: ChannelsInUse
+        value: "9,10,11,12,13"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "11"
+        writable: true
+      - path: OperatingChannelBandwidth
+        value: "20MHz"
+        writable: true
+      - path: CurrentOperatingChannelBandwidth
+        value: "20MHz"
+      - path: ExtensionChannel
+        value: "Auto"
+      - path: IEEE80211hSupported
+        type: xsd:boolean
+        value: "false"
+      - path: IEEE80211hEnabled
+        type: xsd:boolean
+        value: "false"
+      - path: OperationalDataTransmitRates
+        value: "12,12,18,24,36,48,72,96"
+      - path: SupportedDataTransmitRates
+        value: ",12,12,18,24,36,48,72,96"
+      - path: MaxSupportedAssociations
+        type: xsd:unsignedInt
+        value: "512"
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 12000000
+          jitter: 0.2
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 24000000
+          jitter: 0.2
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 8000
+          jitter: 0.3
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 16000
+          jitter: 0.3
+
+  - prefix: Device.WiFi.Radio.2
+    parameters:
+      - path: Alias
+        value: "WLAN_5"
+        writable: true
+      - path: Name
+        value: "Device.WiFi.Radio.2"
+      - path: MaxBitRate
+        type: xsd:unsignedInt
+        value: "5764"
+        writable: true
+      - path: SupportedFrequencyBands
+        value: "5GHz"
+      - path: OperatingFrequencyBand
+        value: "5GHz"
+        writable: true
+      - path: SupportedStandards
+        value: "a,n,ac,ax,be"
+      - path: OperatingStandards
+        value: "a,n,ac,ax,be"
+        writable: true
+      - path: PossibleChannels
+        value: "36,40,44,48,52,56,60,64,100,104,108,112,116,120,124,128,132,136,140,149,153,157,161,165"
+      - path: ChannelsInUse
+        value: "36,40,44,48,52,56,60,64"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "64"
+        writable: true
+      - path: OperatingChannelBandwidth
+        value: "160MHz"
+        writable: true
+      - path: CurrentOperatingChannelBandwidth
+        value: "160MHz"
+      - path: ExtensionChannel
+        value: "Auto"
+      - path: IEEE80211hSupported
+        type: xsd:boolean
+        value: "true"
+      - path: IEEE80211hEnabled
+        type: xsd:boolean
+        value: "true"
+      - path: OperationalDataTransmitRates
+        value: "8,18,24,36,72,96"
+      - path: SupportedDataTransmitRates
+        value: ",8,18,24,36,72,96"
+      - path: MaxSupportedAssociations
+        type: xsd:unsignedInt
+        value: "128"
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 12000000
+          jitter: 0.2
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 24000000
+          jitter: 0.2
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 8000
+          jitter: 0.3
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 16000
+          jitter: 0.3
+
+  - prefix: Device.WiFi.Radio.3
+    parameters:
+      - path: Alias
+        value: "WLAN_6"
+        writable: true
+      - path: Name
+        value: "Device.WiFi.Radio.3"
+      - path: MaxBitRate
+        type: xsd:unsignedInt
+        value: "11529"
+        writable: true
+      - path: SupportedFrequencyBands
+        value: "6GHz"
+      - path: OperatingFrequencyBand
+        value: "6GHz"
+        writable: true
+      - path: SupportedStandards
+        value: "ax,be"
+      - path: OperatingStandards
+        value: "ax,be"
+        writable: true
+      - path: PossibleChannels
+        value: "1,5,9,13,17,21,25,29,33,37,41,45,49,53,57,61,65,69,73,77,81,85,89,93"
+      - path: ChannelsInUse
+        value: "225,229,233,237,241,245,249,253,257,261,265,269,273,277,281,285"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "5"
+        writable: true
+      - path: OperatingChannelBandwidth
+        value: "320MHZ_1"
+        writable: true
+      - path: CurrentOperatingChannelBandwidth
+        value: "320MHz-1"
+      - path: ExtensionChannel
+        value: "ABOVECONTROLCHANNEL"
+      - path: IEEE80211hSupported
+        type: xsd:boolean
+        value: "false"
+      - path: IEEE80211hEnabled
+        type: xsd:boolean
+        value: "true"
+      - path: OperationalDataTransmitRates
+        value: "8,18,24,36,72,96"
+      - path: SupportedDataTransmitRates
+        value: ",8,18,24,36,72,96"
+      - path: MaxSupportedAssociations
+        type: xsd:unsignedInt
+        value: "128"
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 12000000
+          jitter: 0.2
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 24000000
+          jitter: 0.2
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 8000
+          jitter: 0.3
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 16000
+          jitter: 0.3
+
+  - prefix: Device.WiFi.SSID.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Alias
+        value: "WLAN_2_4"
+        writable: true
+      - path: Name
+        value: "Device.WiFi.SSID.1"
+      - path: LowerLayers
+        value: "Device.WiFi.Radio.1"
+        writable: true
+      - path: BSSID
+        value: "EC:FC:2F:{cpe:mac:2}:03"
+      - path: MACAddress
+        value: "EC:FC:2F:{cpe:mac:2}:03"
+      - path: SSID
+        value: "Sagem-{cpe:hex:4}"
+        writable: true
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 12000000
+          jitter: 0.2
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 24000000
+          jitter: 0.2
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 8000
+          jitter: 0.3
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 16000
+          jitter: 0.3
+
+  - prefix: Device.WiFi.SSID.2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Alias
+        value: "WLAN_5"
+        writable: true
+      - path: Name
+        value: "Device.WiFi.SSID.2"
+      - path: LowerLayers
+        value: "Device.WiFi.Radio.2"
+        writable: true
+      - path: BSSID
+        value: "EC:FC:2F:{cpe:mac:2}:04"
+      - path: MACAddress
+        value: "EC:FC:2F:{cpe:mac:2}:04"
+      - path: SSID
+        value: "Sagem-{cpe:hex:4}"
+        writable: true
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 12000000
+          jitter: 0.2
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 24000000
+          jitter: 0.2
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 8000
+          jitter: 0.3
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 16000
+          jitter: 0.3
+
+  - prefix: Device.WiFi.SSID.3
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Alias
+        value: "WLAN_6"
+        writable: true
+      - path: Name
+        value: "Device.WiFi.SSID.3"
+      - path: LowerLayers
+        value: "Device.WiFi.Radio.3"
+        writable: true
+      - path: BSSID
+        value: "EC:FC:2F:{cpe:mac:2}:05"
+      - path: MACAddress
+        value: "EC:FC:2F:{cpe:mac:2}:05"
+      - path: SSID
+        value: "Sagem-{cpe:hex:4}"
+        writable: true
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 12000000
+          jitter: 0.2
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 24000000
+          jitter: 0.2
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 8000
+          jitter: 0.3
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 16000
+          jitter: 0.3
+
+  - prefix: Device.WiFi.SSID.4
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Status
+        value: "Down"
+      - path: Alias
+        value: "GUEST_2_4"
+        writable: true
+      - path: Name
+        value: "Device.WiFi.SSID.4"
+      - path: LowerLayers
+        value: "Device.WiFi.Radio.1"
+        writable: true
+      - path: BSSID
+        value: "EC:FC:2F:{cpe:mac:2}:06"
+      - path: MACAddress
+        value: "EC:FC:2F:{cpe:mac:2}:06"
+      - path: SSID
+        value: "Sagem-{cpe:hex:4}-Guest"
+        writable: true
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.WiFi.SSID.5
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Status
+        value: "Down"
+      - path: Alias
+        value: "GUEST_5"
+        writable: true
+      - path: Name
+        value: "Device.WiFi.SSID.5"
+      - path: LowerLayers
+        value: "Device.WiFi.Radio.2"
+        writable: true
+      - path: BSSID
+        value: "EC:FC:2F:{cpe:mac:2}:07"
+      - path: MACAddress
+        value: "EC:FC:2F:{cpe:mac:2}:07"
+      - path: SSID
+        value: "Sagem-{cpe:hex:4}-Guest"
+        writable: true
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.WiFi.SSID.6
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Alias
+        value: "WL_BACKHAUL"
+        writable: true
+      - path: Name
+        value: "Device.WiFi.SSID.6"
+      - path: LowerLayers
+        value: "Device.WiFi.Radio.2"
+        writable: true
+      - path: BSSID
+        value: "EC:FC:2F:{cpe:mac:2}:08"
+      - path: MACAddress
+        value: "EC:FC:2F:{cpe:mac:2}:08"
+      - path: SSID
+        value: "Sagem-{cpe:hex:4}-BH"
+        writable: true
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.WiFi.SSID.7
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Alias
+        value: "WL_BACKHAUL_6"
+        writable: true
+      - path: Name
+        value: "Device.WiFi.SSID.7"
+      - path: LowerLayers
+        value: "Device.WiFi.Radio.3"
+        writable: true
+      - path: BSSID
+        value: "EC:FC:2F:{cpe:mac:2}:09"
+      - path: MACAddress
+        value: "EC:FC:2F:{cpe:mac:2}:09"
+      - path: SSID
+        value: "Sagem-{cpe:hex:4}-BH"
+        writable: true
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.WiFi.SSID.8
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Alias
+        value: "WLAN_2_4_legacy"
+        writable: true
+      - path: Name
+        value: "Device.WiFi.SSID.8"
+      - path: LowerLayers
+        value: "Device.WiFi.Radio.1"
+        writable: true
+      - path: BSSID
+        value: "EC:FC:2F:{cpe:mac:2}:0A"
+      - path: MACAddress
+        value: "EC:FC:2F:{cpe:mac:2}:0A"
+      - path: SSID
+        value: "Sagem-{cpe:hex:4}"
+        writable: true
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.WiFi.SSID.9
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Alias
+        value: "WLAN_5_legacy"
+        writable: true
+      - path: Name
+        value: "Device.WiFi.SSID.9"
+      - path: LowerLayers
+        value: "Device.WiFi.Radio.2"
+        writable: true
+      - path: BSSID
+        value: "EC:FC:2F:{cpe:mac:2}:0B"
+      - path: MACAddress
+        value: "EC:FC:2F:{cpe:mac:2}:0B"
+      - path: SSID
+        value: "Sagem-{cpe:hex:4}"
+        writable: true
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.WiFi.AccessPoint.1
+    parameters:
+      - path: Status
+        value: "Enabled"
+      - path: Alias
+        value: "WLAN_2_4"
+        writable: true
+      - path: SSIDReference
+        value: "Device.WiFi.SSID.1"
+        writable: true
+      - path: SSIDAdvertisementEnabled
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: UAPSDCapability
+        type: xsd:boolean
+        value: "false"
+      - path: UAPSDEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: MaxAssociatedDevices
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: IsolationEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Security.ModesSupported
+        value: "WPA2-Personal,WPA3-Personal,WPA3-Personal-Transition"
+      - path: Security.ModeEnabled
+        value: "WPA2-WPA3-Personal"
+        writable: true
+      - path: Security.MFPConfig
+        value: "Optional"
+        writable: true
+      - path: WPS.Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: WPS.Status
+        value: "CONFIGURED"
+      - path: WPS.ConfigMethodsSupported
+        value: "PushButton,VirtualPushButton,PhysicalPushButton,PIN"
+      - path: WPS.ConfigMethodsEnabled
+        value: "PushButton"
+
+  - prefix: Device.WiFi.AccessPoint.2
+    parameters:
+      - path: Status
+        value: "Enabled"
+      - path: Alias
+        value: "WLAN_5"
+        writable: true
+      - path: SSIDReference
+        value: "Device.WiFi.SSID.2"
+        writable: true
+      - path: SSIDAdvertisementEnabled
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: UAPSDCapability
+        type: xsd:boolean
+        value: "true"
+      - path: UAPSDEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: MaxAssociatedDevices
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: IsolationEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Security.ModesSupported
+        value: "WPA2-Personal,WPA3-Personal,WPA3-Personal-Transition"
+      - path: Security.ModeEnabled
+        value: "WPA2-WPA3-Personal"
+        writable: true
+      - path: Security.MFPConfig
+        value: "Optional"
+        writable: true
+      - path: WPS.Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: WPS.Status
+        value: "CONFIGURED"
+      - path: WPS.ConfigMethodsSupported
+        value: "PushButton,VirtualPushButton,PhysicalPushButton,PIN"
+      - path: WPS.ConfigMethodsEnabled
+        value: "PushButton"
+
+  - prefix: Device.WiFi.AccessPoint.3
+    parameters:
+      - path: Status
+        value: "Enabled"
+      - path: Alias
+        value: "WLAN_6"
+        writable: true
+      - path: SSIDReference
+        value: "Device.WiFi.SSID.3"
+        writable: true
+      - path: SSIDAdvertisementEnabled
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: UAPSDCapability
+        type: xsd:boolean
+        value: "true"
+      - path: UAPSDEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: MaxAssociatedDevices
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: IsolationEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Security.ModesSupported
+        value: "WPA3-Personal"
+      - path: Security.ModeEnabled
+        value: "WPA3-Personal"
+        writable: true
+      - path: Security.MFPConfig
+        value: "Required"
+        writable: true
+      - path: WPS.Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: WPS.Status
+        value: "Disabled"
+      - path: WPS.ConfigMethodsSupported
+        value: ""
+      - path: WPS.ConfigMethodsEnabled
+        value: "PushButton"
+
+  - prefix: Device.WiFi.AccessPoint.4
+    parameters:
+      - path: Status
+        value: "Disabled"
+      - path: Alias
+        value: "GUEST_2_4"
+        writable: true
+      - path: SSIDReference
+        value: "Device.WiFi.SSID.4"
+        writable: true
+      - path: SSIDAdvertisementEnabled
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: UAPSDCapability
+        type: xsd:boolean
+        value: "false"
+      - path: UAPSDEnable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: MaxAssociatedDevices
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: IsolationEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Security.ModesSupported
+        value: "WPA2-Personal,WPA3-Personal,WPA3-Personal-Transition"
+      - path: Security.ModeEnabled
+        value: "WPA2-WPA3-Personal"
+        writable: true
+      - path: Security.MFPConfig
+        value: "Optional"
+        writable: true
+      - path: WPS.Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: WPS.Status
+        value: "CONFIGURED"
+      - path: WPS.ConfigMethodsSupported
+        value: "PushButton,VirtualPushButton,PhysicalPushButton,PIN"
+      - path: WPS.ConfigMethodsEnabled
+        value: "PushButton"
+
+  - prefix: Device.WiFi.AccessPoint.5
+    parameters:
+      - path: Status
+        value: "Disabled"
+      - path: Alias
+        value: "GUEST_5"
+        writable: true
+      - path: SSIDReference
+        value: "Device.WiFi.SSID.5"
+        writable: true
+      - path: SSIDAdvertisementEnabled
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: UAPSDCapability
+        type: xsd:boolean
+        value: "true"
+      - path: UAPSDEnable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: MaxAssociatedDevices
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: IsolationEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Security.ModesSupported
+        value: "WPA2-Personal,WPA3-Personal,WPA3-Personal-Transition"
+      - path: Security.ModeEnabled
+        value: "WPA2-WPA3-Personal"
+        writable: true
+      - path: Security.MFPConfig
+        value: "Optional"
+        writable: true
+      - path: WPS.Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: WPS.Status
+        value: "CONFIGURED"
+      - path: WPS.ConfigMethodsSupported
+        value: "PushButton,VirtualPushButton,PhysicalPushButton,PIN"
+      - path: WPS.ConfigMethodsEnabled
+        value: "PushButton"
+
+  - prefix: Device.WiFi.AccessPoint.6
+    parameters:
+      - path: Status
+        value: "Enabled"
+      - path: Alias
+        value: "AP_BACKHAUL"
+        writable: true
+      - path: SSIDReference
+        value: "Device.WiFi.SSID.6"
+        writable: true
+      - path: SSIDAdvertisementEnabled
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: UAPSDCapability
+        type: xsd:boolean
+        value: "true"
+      - path: UAPSDEnable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: MaxAssociatedDevices
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: IsolationEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Security.ModesSupported
+        value: "None,WPA-Personal,WPA2-Personal,WPA3-Personal,WPA-WPA2-Personal,WPA3-Personal-Transition,OWE,DPP"
+      - path: Security.ModeEnabled
+        value: "WPA2-WPA3-Personal"
+        writable: true
+      - path: Security.MFPConfig
+        value: "Optional"
+        writable: true
+      - path: WPS.Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: WPS.Status
+        value: "Disabled"
+      - path: WPS.ConfigMethodsSupported
+        value: "PushButton,VirtualPushButton,PhysicalPushButton,PIN"
+      - path: WPS.ConfigMethodsEnabled
+        value: "PushButton,VirtualPushButton,PhysicalPushButton,PIN"
+
+  - prefix: Device.WiFi.AccessPoint.7
+    parameters:
+      - path: Status
+        value: "Enabled"
+      - path: Alias
+        value: "AP_BACKHAUL_6"
+        writable: true
+      - path: SSIDReference
+        value: "Device.WiFi.SSID.7"
+        writable: true
+      - path: SSIDAdvertisementEnabled
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: UAPSDCapability
+        type: xsd:boolean
+        value: "true"
+      - path: UAPSDEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: MaxAssociatedDevices
+        type: xsd:unsignedInt
+        value: "128"
+        writable: true
+      - path: IsolationEnable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Security.ModesSupported
+        value: "WPA3-Personal,OWE,DPP"
+      - path: Security.ModeEnabled
+        value: "WPA3-Personal"
+        writable: true
+      - path: Security.MFPConfig
+        value: "Required"
+        writable: true
+      - path: WPS.Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: WPS.Status
+        value: "Disabled"
+      - path: WPS.ConfigMethodsSupported
+        value: ""
+      - path: WPS.ConfigMethodsEnabled
+        value: "PushButton"
+
+  - prefix: Device.WiFi.AccessPoint.8
+    parameters:
+      - path: Status
+        value: "Enabled"
+      - path: Alias
+        value: "WLAN_2_4_legacy"
+        writable: true
+      - path: SSIDReference
+        value: "Device.WiFi.SSID.8"
+        writable: true
+      - path: SSIDAdvertisementEnabled
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: UAPSDCapability
+        type: xsd:boolean
+        value: "false"
+      - path: UAPSDEnable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: MaxAssociatedDevices
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: IsolationEnable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Security.ModesSupported
+        value: "WPA2-Personal,WPA3-Personal,WPA3-Personal-Transition"
+      - path: Security.ModeEnabled
+        value: "WPA2-Personal"
+        writable: true
+      - path: Security.MFPConfig
+        value: "Optional"
+        writable: true
+      - path: WPS.Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: WPS.Status
+        value: "Disabled"
+      - path: WPS.ConfigMethodsSupported
+        value: "PushButton,VirtualPushButton,PhysicalPushButton,PIN"
+      - path: WPS.ConfigMethodsEnabled
+        value: "PushButton"
+
+  - prefix: Device.WiFi.AccessPoint.9
+    parameters:
+      - path: Status
+        value: "Enabled"
+      - path: Alias
+        value: "WLAN_5_legacy"
+        writable: true
+      - path: SSIDReference
+        value: "Device.WiFi.SSID.9"
+        writable: true
+      - path: SSIDAdvertisementEnabled
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: UAPSDCapability
+        type: xsd:boolean
+        value: "true"
+      - path: UAPSDEnable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: MaxAssociatedDevices
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: IsolationEnable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Security.ModesSupported
+        value: "WPA2-Personal,WPA3-Personal,WPA3-Personal-Transition"
+      - path: Security.ModeEnabled
+        value: "WPA2-Personal"
+        writable: true
+      - path: Security.MFPConfig
+        value: "Optional"
+        writable: true
+      - path: WPS.Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: WPS.Status
+        value: "Disabled"
+      - path: WPS.ConfigMethodsSupported
+        value: "PushButton,VirtualPushButton,PhysicalPushButton,PIN"
+      - path: WPS.ConfigMethodsEnabled
+        value: "PushButton"
+
+  - prefix: Device.WiFi.AccessPoint.1.AssociatedDevice.1
+    parameters:
+      - path: MACAddress
+        value: "5C:51:4F:00:00:01"
+      - path: AuthenticationState
+        type: xsd:boolean
+        value: "true"
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "65000"
+      - path: MaxSupportedDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "72222"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "72222"
+      - path: MaxSupportedDataUplinkRate
+        type: xsd:unsignedInt
+        value: "72222"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-53"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -82
+          max: -40
+          stepMax: 3
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: AssociationTime
+        value: "1-01-01T01:00:40"
+      - path: HostName
+        value: "client-1"
+
+  - prefix: Device.WiFi.AccessPoint.1.AssociatedDevice.2
+    parameters:
+      - path: MACAddress
+        value: "5C:51:4F:00:00:02"
+      - path: AuthenticationState
+        type: xsd:boolean
+        value: "true"
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "65000"
+      - path: MaxSupportedDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "72222"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "58500"
+      - path: MaxSupportedDataUplinkRate
+        type: xsd:unsignedInt
+        value: "72222"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-74"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -82
+          max: -40
+          stepMax: 3
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: AssociationTime
+        type: xsd:dateTime
+        value: "2026-08-25T07:25:39Z"
+      - path: HostName
+        value: "client-2"
+
+  - prefix: Device.WiFi.AccessPoint.1.AssociatedDevice.3
+    parameters:
+      - path: MACAddress
+        value: "5C:51:4F:00:00:03"
+      - path: AuthenticationState
+        type: xsd:boolean
+        value: "false"
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "130000"
+      - path: MaxSupportedDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "144444"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "26000"
+      - path: MaxSupportedDataUplinkRate
+        type: xsd:unsignedInt
+        value: "144444"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-56"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -82
+          max: -40
+          stepMax: 3
+      - path: Active
+        type: xsd:boolean
+        value: "false"
+      - path: AssociationTime
+        type: xsd:dateTime
+        value: "2026-08-24T06:09:52Z"
+      - path: HostName
+        value: "client-3"
+
+  - prefix: Device.WiFi.AccessPoint.1
+    parameters:
+      - path: AssociatedDeviceNumberOfEntries
+        type: xsd:unsignedInt
+        value: "3"
+
+  - prefix: Device.WiFi.AccessPoint.2.AssociatedDevice.1
+    parameters:
+      - path: MACAddress
+        value: "5C:51:4F:00:00:04"
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "136110"
+      - path: MaxSupportedDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "1200950"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "6000"
+      - path: MaxSupportedDataUplinkRate
+        type: xsd:unsignedInt
+        value: "1200950"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-78"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -82
+          max: -40
+          stepMax: 3
+      - path: OperatingStandard
+        value: "a,n,ac,ax"
+
+  - prefix: Device.WiFi.AccessPoint.2.AssociatedDevice.2
+    parameters:
+      - path: MACAddress
+        value: "5C:51:4F:00:00:05"
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "6000"
+      - path: MaxSupportedDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "1200950"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "6000"
+      - path: MaxSupportedDataUplinkRate
+        type: xsd:unsignedInt
+        value: "1200950"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-72"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -82
+          max: -40
+          stepMax: 3
+      - path: OperatingStandard
+        value: "a,n,ac,ax"
+
+  - prefix: Device.WiFi.AccessPoint.2.AssociatedDevice.3
+    parameters:
+      - path: MACAddress
+        value: "5C:51:4F:00:00:06"
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "6000"
+      - path: MaxSupportedDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "2882350"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "24000"
+      - path: MaxSupportedDataUplinkRate
+        type: xsd:unsignedInt
+        value: "2882350"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-78"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -82
+          max: -40
+          stepMax: 3
+      - path: OperatingStandard
+        value: "a,n,ac,ax,be"
+
+  - prefix: Device.WiFi.AccessPoint.2
+    parameters:
+      - path: AssociatedDeviceNumberOfEntries
+        type: xsd:unsignedInt
+        value: "3"
+
+  - prefix: Device.WiFi.AccessPoint.3.AssociatedDevice.1
+    parameters:
+      - path: MACAddress
+        value: "5C:51:4F:00:00:06"
+      - path: AuthenticationState
+        type: xsd:boolean
+        value: "true"
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "408330"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "432350"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-78"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -82
+          max: -40
+          stepMax: 3
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: HostName
+        value: "client-1"
+
+  - prefix: Device.WiFi.AccessPoint.3.AssociatedDevice.2
+    parameters:
+      - path: MACAddress
+        value: "5C:51:4F:00:00:07"
+      - path: AuthenticationState
+        type: xsd:boolean
+        value: "false"
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "1361110"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "1088880"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-73"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -82
+          max: -40
+          stepMax: 3
+      - path: Active
+        type: xsd:boolean
+        value: "false"
+      - path: HostName
+        value: ""
+
+  - prefix: Device.WiFi.AccessPoint.3.AssociatedDevice.3
+    parameters:
+      - path: MACAddress
+        value: "5C:51:4F:00:00:08"
+      - path: AuthenticationState
+        type: xsd:boolean
+        value: "false"
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "6000"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "6000"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-74"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -82
+          max: -40
+          stepMax: 3
+      - path: Active
+        type: xsd:boolean
+        value: "false"
+      - path: HostName
+        value: ""
+
+  - prefix: Device.WiFi.AccessPoint.3
+    parameters:
+      - path: AssociatedDeviceNumberOfEntries
+        type: xsd:unsignedInt
+        value: "3"
+
+  - prefix: Device.WiFi.AccessPoint.4
+    parameters:
+      - path: AssociatedDeviceNumberOfEntries
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.WiFi.AccessPoint.5
+    parameters:
+      - path: AssociatedDeviceNumberOfEntries
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.WiFi.AccessPoint.6
+    parameters:
+      - path: AssociatedDeviceNumberOfEntries
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.WiFi.AccessPoint.7.AssociatedDevice.1
+    parameters:
+      - path: SignalStrength
+        type: xsd:int
+        value: "0"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -82
+          max: -40
+          stepMax: 3
+
+  - prefix: Device.WiFi.AccessPoint.7
+    parameters:
+      - path: AssociatedDeviceNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+
+  - prefix: Device.WiFi.AccessPoint.8.AssociatedDevice.1
+    parameters:
+      - path: MACAddress
+        value: "5C:51:4F:00:00:08"
+      - path: AuthenticationState
+        type: xsd:boolean
+        value: "false"
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "1000"
+      - path: MaxSupportedDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "229410"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "1000"
+      - path: MaxSupportedDataUplinkRate
+        type: xsd:unsignedInt
+        value: "229410"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-82"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -82
+          max: -40
+          stepMax: 3
+      - path: Active
+        type: xsd:boolean
+        value: "false"
+      - path: OperatingStandard
+        value: "b,g,n,ax"
+      - path: AssociationTime
+        type: xsd:dateTime
+        value: "2026-08-25T08:52:13Z"
+      - path: HostName
+        value: "client-1"
+
+  - prefix: Device.WiFi.AccessPoint.8.AssociatedDevice.2
+    parameters:
+      - path: MACAddress
+        value: "5C:51:4F:00:00:09"
+      - path: AuthenticationState
+        type: xsd:boolean
+        value: "true"
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "144444"
+      - path: MaxSupportedDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "144444"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "144444"
+      - path: MaxSupportedDataUplinkRate
+        type: xsd:unsignedInt
+        value: "144444"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-54"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -82
+          max: -40
+          stepMax: 3
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: OperatingStandard
+        value: "b,g,n"
+      - path: AssociationTime
+        value: "1-01-01T01:01:04"
+      - path: HostName
+        value: "client-2"
+
+  - prefix: Device.WiFi.AccessPoint.8
+    parameters:
+      - path: AssociatedDeviceNumberOfEntries
+        type: xsd:unsignedInt
+        value: "2"
+
+  - prefix: Device.WiFi.AccessPoint.9.AssociatedDevice.1
+    parameters:
+      - path: MACAddress
+        value: "5C:51:4F:00:00:0A"
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "6000"
+      - path: MaxSupportedDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "433333"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "6000"
+      - path: MaxSupportedDataUplinkRate
+        type: xsd:unsignedInt
+        value: "433333"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-71"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -82
+          max: -40
+          stepMax: 3
+      - path: OperatingStandard
+        value: "a,n,ac"
+      - path: HostName
+        value: "client-1"
+
+  - prefix: Device.WiFi.AccessPoint.9.AssociatedDevice.2
+    parameters:
+      - path: MACAddress
+        value: "5C:51:4F:00:00:08"
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "408330"
+      - path: MaxSupportedDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "2401910"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "544440"
+      - path: MaxSupportedDataUplinkRate
+        type: xsd:unsignedInt
+        value: "2401910"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-88"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -82
+          max: -40
+          stepMax: 3
+      - path: OperatingStandard
+        value: "a,n,ac,ax"
+      - path: HostName
+        value: ""
+
+  - prefix: Device.WiFi.AccessPoint.9
+    parameters:
+      - path: AssociatedDeviceNumberOfEntries
+        type: xsd:unsignedInt
+        value: "2"
+
+  - prefix: Device.WiFi.NeighboringWiFiDiagnostic
+    parameters:
+      - path: DiagnosticsState
+        value: "None"
+        writable: true
+
+  - prefix: Device.WiFi.NeighboringWiFiDiagnostic.Result.1
+    parameters:
+      - path: Radio
+        value: "Device.WiFi.Radio.1"
+      - path: SSID
+        value: "neighbour-1"
+        writable: true
+      - path: BSSID
+        value: "DE:AD:BE:EF:01:01"
+      - path: Mode
+        value: "Infrastructure"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "1"
+        writable: true
+      - path: SignalStrength
+        type: xsd:int
+        value: "-62"
+      - path: SecurityModeEnabled
+        value: "WPA2-Personal"
+      - path: EncryptionMode
+        value: "AES"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+        writable: true
+      - path: SupportedStandards
+        value: "g,n"
+      - path: OperatingStandards
+        value: "g,n"
+        writable: true
+      - path: OperatingChannelBandwidth
+        value: "20MHz"
+        writable: true
+      - path: BeaconPeriod
+        type: xsd:unsignedInt
+        value: "100"
+        writable: true
+      - path: Noise
+        type: xsd:int
+        value: "-92"
+      - path: BasicDataTransferRates
+        value: ""
+      - path: SupportedDataTransferRates
+        value: ""
+      - path: DTIMPeriod
+        value: ""
+        writable: true
+
+  - prefix: Device.WiFi.NeighboringWiFiDiagnostic.Result.2
+    parameters:
+      - path: Radio
+        value: "Device.WiFi.Radio.1"
+      - path: SSID
+        value: "neighbour-2"
+        writable: true
+      - path: BSSID
+        value: "DE:AD:BE:EF:01:02"
+      - path: Mode
+        value: "Infrastructure"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "6"
+        writable: true
+      - path: SignalStrength
+        type: xsd:int
+        value: "-78"
+      - path: SecurityModeEnabled
+        value: "WPA2-WPA3-Personal"
+      - path: EncryptionMode
+        value: "AES"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+        writable: true
+      - path: SupportedStandards
+        value: "g,n,ax"
+      - path: OperatingStandards
+        value: "g,n,ax"
+        writable: true
+      - path: OperatingChannelBandwidth
+        value: "20MHz"
+        writable: true
+      - path: BeaconPeriod
+        type: xsd:unsignedInt
+        value: "100"
+        writable: true
+      - path: Noise
+        type: xsd:int
+        value: "-92"
+      - path: BasicDataTransferRates
+        value: ""
+      - path: SupportedDataTransferRates
+        value: ""
+      - path: DTIMPeriod
+        value: ""
+        writable: true
+
+  - prefix: Device.WiFi.NeighboringWiFiDiagnostic.Result.3
+    parameters:
+      - path: Radio
+        value: "Device.WiFi.Radio.1"
+      - path: SSID
+        value: "neighbour-3"
+        writable: true
+      - path: BSSID
+        value: "DE:AD:BE:EF:01:03"
+      - path: Mode
+        value: "Infrastructure"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "11"
+        writable: true
+      - path: SignalStrength
+        type: xsd:int
+        value: "-85"
+      - path: SecurityModeEnabled
+        value: "WPA-WPA2-Personal"
+      - path: EncryptionMode
+        value: "AES"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+        writable: true
+      - path: SupportedStandards
+        value: "b,g,n"
+      - path: OperatingStandards
+        value: "b,g,n"
+        writable: true
+      - path: OperatingChannelBandwidth
+        value: "20MHz"
+        writable: true
+      - path: BeaconPeriod
+        type: xsd:unsignedInt
+        value: "100"
+        writable: true
+      - path: Noise
+        type: xsd:int
+        value: "-91"
+      - path: BasicDataTransferRates
+        value: ""
+      - path: SupportedDataTransferRates
+        value: ""
+      - path: DTIMPeriod
+        value: ""
+        writable: true
+
+  - prefix: Device.WiFi.NeighboringWiFiDiagnostic.Result.4
+    parameters:
+      - path: Radio
+        value: "Device.WiFi.Radio.2"
+      - path: SSID
+        value: "neighbour-4"
+        writable: true
+      - path: BSSID
+        value: "DE:AD:BE:EF:01:04"
+      - path: Mode
+        value: "Infrastructure"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "36"
+        writable: true
+      - path: SignalStrength
+        type: xsd:int
+        value: "-58"
+      - path: SecurityModeEnabled
+        value: "WPA2-Personal"
+      - path: EncryptionMode
+        value: "AES"
+      - path: OperatingFrequencyBand
+        value: "5GHz"
+        writable: true
+      - path: SupportedStandards
+        value: "ac,ax"
+      - path: OperatingStandards
+        value: "ac,ax"
+        writable: true
+      - path: OperatingChannelBandwidth
+        value: "80MHz"
+        writable: true
+      - path: BeaconPeriod
+        type: xsd:unsignedInt
+        value: "100"
+        writable: true
+      - path: Noise
+        type: xsd:int
+        value: "-95"
+      - path: BasicDataTransferRates
+        value: ""
+      - path: SupportedDataTransferRates
+        value: ""
+      - path: DTIMPeriod
+        value: ""
+        writable: true
+
+  - prefix: Device.WiFi.NeighboringWiFiDiagnostic.Result.5
+    parameters:
+      - path: Radio
+        value: "Device.WiFi.Radio.2"
+      - path: SSID
+        value: "neighbour-5"
+        writable: true
+      - path: BSSID
+        value: "DE:AD:BE:EF:01:05"
+      - path: Mode
+        value: "Infrastructure"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "100"
+        writable: true
+      - path: SignalStrength
+        type: xsd:int
+        value: "-71"
+      - path: SecurityModeEnabled
+        value: "WPA3-Personal"
+      - path: EncryptionMode
+        value: "AES"
+      - path: OperatingFrequencyBand
+        value: "5GHz"
+        writable: true
+      - path: SupportedStandards
+        value: "ac,ax"
+      - path: OperatingStandards
+        value: "ac,ax"
+        writable: true
+      - path: OperatingChannelBandwidth
+        value: "80MHz"
+        writable: true
+      - path: BeaconPeriod
+        type: xsd:unsignedInt
+        value: "100"
+        writable: true
+      - path: Noise
+        type: xsd:int
+        value: "-96"
+      - path: BasicDataTransferRates
+        value: ""
+      - path: SupportedDataTransferRates
+        value: ""
+      - path: DTIMPeriod
+        value: ""
+        writable: true
+
+  - prefix: Device.WiFi.NeighboringWiFiDiagnostic.Result.6
+    parameters:
+      - path: Radio
+        value: "Device.WiFi.Radio.3"
+      - path: SSID
+        value: "neighbour-6"
+        writable: true
+      - path: BSSID
+        value: "DE:AD:BE:EF:01:06"
+      - path: Mode
+        value: "Infrastructure"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "5"
+        writable: true
+      - path: SignalStrength
+        type: xsd:int
+        value: "-74"
+      - path: SecurityModeEnabled
+        value: "WPA3-Personal"
+      - path: EncryptionMode
+        value: "AES"
+      - path: OperatingFrequencyBand
+        value: "6GHz"
+        writable: true
+      - path: SupportedStandards
+        value: "ax,be"
+      - path: OperatingStandards
+        value: "ax,be"
+        writable: true
+      - path: OperatingChannelBandwidth
+        value: "160MHz"
+        writable: true
+      - path: BeaconPeriod
+        type: xsd:unsignedInt
+        value: "100"
+        writable: true
+      - path: Noise
+        type: xsd:int
+        value: "-97"
+      - path: BasicDataTransferRates
+        value: ""
+      - path: SupportedDataTransferRates
+        value: ""
+      - path: DTIMPeriod
+        value: ""
+        writable: true

@@ -1,0 +1,94 @@
+# Device.UserInterface.RemoteAccess: whether the gateway answers
+# management HTTPS from the WAN. The four standard leaves are here,
+# and beside them what this firmware adds: the address the remote UI
+# accepts management from, an idle timeout, and a second remote
+# application port. Off by default, which is how an ISP wants a fleet
+# to ship.
+
+groups:
+  - prefix: Device.UserInterface
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: PasswordRequired
+        type: xsd:boolean
+        value: "false"
+      - path: PasswordUserSelectable
+        type: xsd:boolean
+        value: "false"
+      - path: PasswordReset
+        type: xsd:boolean
+        value: "false"
+      - path: UpgradeAvailable
+        type: xsd:boolean
+        value: "false"
+      - path: WarrantyDate
+        value: "0-12-31T17:00:00"
+      - path: ISPName
+        value: ""
+      - path: ISPHelpDesk
+        value: ""
+      - path: ISPHomePage
+        value: ""
+      - path: ISPHelpPage
+        value: ""
+      - path: ISPLogo
+        value: ""
+      - path: ISPLogoSize
+        type: xsd:unsignedInt
+        value: "0"
+      - path: ISPMailServer
+        value: ""
+      - path: ISPNewsServer
+        value: ""
+      - path: TextColor
+        value: ""
+      - path: BackgroundColor
+        value: ""
+      - path: ButtonColor
+        value: ""
+      - path: ButtonTextColor
+        value: ""
+      - path: AutoUpdateServer
+        value: ""
+      - path: UserUpdateServer
+        value: ""
+      - path: AvailableLanguages
+        value: "EN,FR,ES,DE,IT,DA,AR,PT,RO,IND,HU,FI,SWE,EU,CAT,GL,HB,PL"
+      - path: CurrentLanguage
+        value: "HB"
+
+  - prefix: Device.UserInterface.RemoteAccess
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Port
+        type: xsd:unsignedInt
+        value: "443"
+        writable: true
+      - path: SupportedProtocols
+        value: ""
+      - path: Protocol
+        value: "HTTPS"
+        writable: true
+      - path: RemoteAccessHost
+        value: ""
+        writable: true
+      - path: Timeout
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: RemoteApplicationEnable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: GeneralCodeRemoteApplication
+        value: ""
+      - path: RemoteApplicationHTTPSPort
+        type: xsd:unsignedInt
+        value: "30443"
+        writable: true

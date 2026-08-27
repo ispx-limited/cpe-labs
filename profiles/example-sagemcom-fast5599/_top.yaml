@@ -1,0 +1,131 @@
+# Sagemcom FAST5599, TR-181 (Device.*) profile.
+#
+# A WiFi 7 fibre gateway: five switch ports, a 10 Gbit/s Ethernet
+# uplink, an SFP cage, three radios including 6 GHz, and a mesh kept
+# under a vendor subtree. Surveyed from a real unit's data model dump
+# (TR-181 2.12, Sagemcom OUI ECFC2F); the tree is the device's, with
+# addresses, names and credentials replaced. What makes it worth
+# simulating:
+#
+#   - The uplink is Ethernet.Interface.6 (PHY6, Upstream=true), after
+#     the five switch ports, not Interface.1. The SFP cage is
+#     Optical.Interface.1 and also reports Upstream=true while dormant.
+#   - The WAN data path is IP.Interface.2; Interface.1 is the LAN
+#     bridge and Interface.3 the guest bridge.
+#   - Local accounts are Device.UserAccounts.User.{i} with a Login
+#     leaf, not Device.Users.User.{i}.Username.
+#   - No MultiAP.APDevice and no DataElements; the mesh is under
+#     Device.WiFi.MultiAP.X_SAGEMCOM_MultiAPConfig and the network map
+#     from standard tables is hosts and stations only.
+#   - Nine SSIDs and access points across three bands: main, guest,
+#     mesh backhaul and a WPA2-only legacy network.
+
+deviceIdPaths:
+  manufacturer: Device.DeviceInfo.Manufacturer
+  oui:          Device.DeviceInfo.ManufacturerOUI
+  productClass: Device.DeviceInfo.ProductClass
+  serialNumber: Device.DeviceInfo.SerialNumber
+
+fleet:
+  count: 1
+  # Sagemcom-style shape: a letter, a factory and date code, and an
+  # alphanumeric tail drawn from the per-CPE seeded RNG so serials look
+  # real, stay stable for a given --seed, and stay unique across the
+  # fleet. Changing the pattern on an existing deployment mints new
+  # device identities at the ACS (identity is OUI plus serial).
+  serialPattern: "N724{cpe:ALNUM:11}"
+  pools:
+    wan_ipv4:
+      type: ipv4
+      # CGNAT space rather than a doc /24: the pool must reach every
+      # fleet offset a manifest cohort can take, and /10 holds four
+      # million homes. Also what a real access network hands a CPE.
+      cidr: "100.64.0.0/10"
+    wan_ipv6:
+      type: ipv6
+      cidr: "2001:db8:3::/64"
+    delegated_prefix:
+      type: ipv6prefix
+      super: "2001:db8:c000::/36"
+      sublen: 56
+
+periodicInformPaths:
+  interval: Device.ManagementServer.PeriodicInformInterval
+  enable:   Device.ManagementServer.PeriodicInformEnable
+  time:     Device.ManagementServer.PeriodicInformTime
+
+acsCredentialPaths:
+  username: Device.ManagementServer.Username
+  password: Device.ManagementServer.Password
+
+connectionRequest:
+  scheme: digest
+  realm: cpe-sim
+  throttleWindow: 5s
+  usernameParameter: Device.ManagementServer.ConnectionRequestUsername
+  passwordParameter: Device.ManagementServer.ConnectionRequestPassword
+
+# A Download with FileType "1 Firmware Upgrade Image" is applied for
+# real: the image is fetched, its declared version written to
+# versionPath after a dark window, and announced in a boot session.
+transfer:
+  firmware:
+    versionPath: Device.DeviceInfo.SoftwareVersion
+    applyDelay: 60s
+    fetch: true
+
+informParameters:
+  bootstrap:
+    - Device.DeviceInfo.Manufacturer
+    - Device.DeviceInfo.ManufacturerOUI
+    - Device.DeviceInfo.ModelName
+    - Device.DeviceInfo.ProductClass
+    - Device.DeviceInfo.SerialNumber
+    - Device.DeviceInfo.HardwareVersion
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.ManagementServer.URL
+    - Device.ManagementServer.ParameterKey
+    - Device.Ethernet.Interface.6.Status
+    - Device.IP.Interface.2.IPv4Address.1.IPAddress
+  boot:
+    # SoftwareVersion is a forced Inform parameter (TR-069 Annex A),
+    # and it is the boot after a firmware Download where it matters.
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.DeviceInfo.UpTime
+  periodic:
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.DeviceInfo.UpTime
+    - Device.Ethernet.Interface.6.Stats.BytesSent
+    - Device.Ethernet.Interface.6.Stats.BytesReceived
+    - Device.WiFi.SSID.1.Stats.BytesSent
+    - Device.WiFi.SSID.1.Stats.BytesReceived
+    - Device.WiFi.SSID.2.Stats.BytesSent
+    - Device.WiFi.SSID.2.Stats.BytesReceived
+    - Device.WiFi.SSID.3.Stats.BytesSent
+    - Device.WiFi.SSID.3.Stats.BytesReceived
+  valueChange:
+    - Device.WiFi.AccessPoint.1.AssociatedDeviceNumberOfEntries
+    - Device.WiFi.AccessPoint.2.AssociatedDeviceNumberOfEntries
+    - Device.WiFi.AccessPoint.3.AssociatedDeviceNumberOfEntries
+    - Device.WiFi.SSID.1.Status
+    - Device.WiFi.SSID.2.Status
+    - Device.WiFi.SSID.3.Status
+  connectionRequest:
+    - Device.DeviceInfo.UpTime
+
+# Triggered diagnostics: the ACS writes Requested, the run takes a
+# few seconds, the state lands on Complete. The neighbour scan also
+# fills its count.
+diagnostics:
+  - statePath: Device.IP.Diagnostics.IPPing.DiagnosticsState
+    duration: 4s
+  - statePath: Device.IP.Diagnostics.TraceRoute.DiagnosticsState
+    duration: 6s
+  - statePath: Device.IP.Diagnostics.DownloadDiagnostics.DiagnosticsState
+    duration: 12s
+  - statePath: Device.IP.Diagnostics.UploadDiagnostics.DiagnosticsState
+    duration: 12s
+  - statePath: Device.WiFi.NeighboringWiFiDiagnostic.DiagnosticsState
+    duration: 8s
+    countPath: Device.WiFi.NeighboringWiFiDiagnostic.ResultNumberOfEntries
+    resultCount: 6

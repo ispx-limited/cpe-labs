@@ -1,0 +1,85 @@
+# Device.Optical: the SFP cage. Dormant on the surveyed unit, which
+# uplinks through the 10 Gbit/s Ethernet port; it reports zero levels
+# and Upstream=true, so an ACS keying the WAN off Upstream alone sees
+# two candidates on this model.
+
+parameters:
+  - path: Device.Optical.InterfaceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+
+objects:
+  - path: Device.Optical.Interface
+    instances: 1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Dormant"
+      - path: Alias
+        value: "OPTICAL0"
+        writable: true
+      - path: Name
+        value: "Device.Optical.Interface.1"
+      - path: LastChange
+        type: xsd:unsignedInt
+        value: "0"
+      - path: LowerLayers
+        value: ""
+        writable: true
+      - path: Upstream
+        type: xsd:boolean
+        value: "true"
+      - path: OpticalSignalLevel
+        type: xsd:int
+        value: "0"
+      - path: LowerOpticalThreshold
+        type: xsd:int
+        value: "-127500"
+      - path: UpperOpticalThreshold
+        type: xsd:int
+        value: "-127500"
+      - path: TransmitOpticalLevel
+        type: xsd:int
+        value: "0"
+      - path: LowerTransmitPowerThreshold
+        type: xsd:int
+        value: "-63500"
+      - path: UpperTransmitPowerThreshold
+        type: xsd:int
+        value: "-63500"
+      - path: Temperature
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Voltage
+        type: xsd:unsignedInt
+        value: "0"
+      - path: BIASCurrent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: OpticalVendorName
+        value: ""
+      - path: OpticalPartNumber
+        value: ""
+      - path: Alarm
+        value: "None"
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
