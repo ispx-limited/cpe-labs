@@ -21,6 +21,13 @@ periodicInformPaths:
   interval: Device.ManagementServer.PeriodicInformInterval
   enable:   Device.ManagementServer.PeriodicInformEnable
 
+# ACS auth identity read live from the tree, so credential rotation
+# via SetParameterValues lands on the next session. Empty values fall
+# back to --acs-username/--acs-password.
+acsCredentialPaths:
+  username: Device.ManagementServer.Username
+  password: Device.ManagementServer.Password
+
 # generators makes parameter-tree leaves move over time without ACS
 # intervention. Each entry runs on its own profile-fixed interval
 # (independent from the periodic Inform interval) and the next periodic

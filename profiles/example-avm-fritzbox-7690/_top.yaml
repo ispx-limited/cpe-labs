@@ -36,6 +36,13 @@ periodicInformPaths:
   interval: Device.ManagementServer.PeriodicInformInterval
   enable:   Device.ManagementServer.PeriodicInformEnable
 
+# ACS auth identity read live from the tree, so credential rotation
+# via SetParameterValues lands on the next session. Empty values fall
+# back to --acs-username/--acs-password.
+acsCredentialPaths:
+  username: Device.ManagementServer.Username
+  password: Device.ManagementServer.Password
+
 # A Download with FileType "1 Firmware Upgrade Image" is applied for
 # real: the image is fetched, its declared version written to
 # versionPath after a dark window, and announced in a boot session. An

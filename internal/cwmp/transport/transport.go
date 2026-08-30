@@ -20,6 +20,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/ispx-limited/cpe-labs/internal/cpeerr"
@@ -144,6 +145,11 @@ type Transport struct {
 	client *http.Client
 	jar    http.CookieJar
 	auth   *authState // populated after first 401
+	// noIdentity fires the one warning about answering a challenge with
+	// no username: a profile without acsCredentialPaths and no static
+	// credentials produces a well-formed, unauthenticatable answer, and
+	// the ACS's refusal alone does not say why.
+	noIdentity sync.Once
 }
 
 // NewTransport returns a Transport that uses pool's shared RoundTripper.
@@ -192,6 +198,12 @@ func (t *Transport) Send(ctx context.Context, body []byte) ([]byte, error) {
 			return nil, t.httpError(resp, respBody, cpeerr.KindInvalidArgument)
 		}
 		username, password := t.credentials()
+		if username == "" {
+			t.noIdentity.Do(func() {
+				t.pool.logger.Warn("answering an ACS auth challenge with no username; declare acsCredentialPaths in the profile or pass --acs-username",
+					"acs_url", t.cfg.ACSURL)
+			})
+		}
 		auth, parseErr := parseChallenge(challenge, username, password, t.pool.cnonce)
 		if parseErr != nil {
 			return nil, cpeerr.Wrap("transport.Send", cpeerr.KindInvalidArgument, parseErr)
