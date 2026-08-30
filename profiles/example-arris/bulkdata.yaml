@@ -1,0 +1,39 @@
+# InternetGatewayDevice.BulkData.*, TR-157 Annex A.
+#
+# The CPE collects on a schedule the ACS configures and pushes reports
+# out of band, instead of answering questions during a session. Only
+# profiles whose hardware advertises the capability declare this block:
+# on TR-069 it is a vendor fact, not something every device has, and a
+# simulator fleet where they all had it would answer a survey question
+# that the installed base answers differently.
+#
+# Every value here is what an NVG578LX on firmware 9.5.0 reports when
+# asked. Two are worth reading twice:
+#
+#   parameterWildCardSupported is false. The published data model
+#   carries a default of true, but a default is what an object is
+#   created with, not what the hardware answers. Modelling it as false
+#   is the point: an ACS then has to handle the constraint the device
+#   actually imposes. It cannot collapse an index in the middle of a
+#   path, so it writes one Parameter row per stable parent instance. It
+#   can still collect a whole table whose instances churn, because an
+#   object path is a separate mechanism and is not gated on this flag.
+#
+#   maxNumberOfParameterReferences is -1, the data model's spelling of
+#   unlimited, so the wildcard constraint costs bookkeeping rather than
+#   a ceiling.
+#
+# The Profile table this mounts is writable and empty. An ACS creates a
+# row with AddObject, fills it with SetParameterValues, and the
+# ProfileNumberOfEntries counter keeps step. Note what the row does not
+# have: no Alias, because TR-106 alias addressing is optional on CWMP
+# and this hardware does not implement it.
+
+bulkData:
+  root: InternetGatewayDevice
+  protocols: HTTP
+  encodingTypes: JSON
+  minReportingInterval: 300
+  maxNumberOfProfiles: 50
+  maxNumberOfParameterReferences: -1
+  parameterWildCardSupported: false

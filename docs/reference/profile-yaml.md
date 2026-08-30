@@ -25,6 +25,7 @@ fleet:                # fleet count + offset + pools + serial pattern
 connectionRequest:    # CR listener auth + throttle
 transfer:             # Download / Upload TransferComplete defaults + faults + firmware
 softwareModules:      # TR-157 software module lifecycle (ChangeDUState, InstallDU())
+bulkData:             # TR-157 Annex A bulk data collection, CWMP side
 eventSchedule:        # Wall-clock latency for Reboot / FactoryReset / boot, and the boot ramp
 diagnostics:          # triggered diagnostics: ACS writes a trigger, CPE completes later
 faults:               # uplink outage, triggered out of band
@@ -346,6 +347,41 @@ softwareModules:
 ```
 
 The deployment and execution unit tables are declared empty (`instances: 0`) and filled by the lifecycle. The lifecycle writes whichever TR-157 leaves the template declares and requires `UUID`, `Name`, `Status` and `Version` on `DeploymentUnit.{i}.` and `Name`, `Status` and `References` on `ExecutionUnit.{i}.`. An `ExecEnv.{i}.` instance with `Enable` (`xsd:boolean`) and `Status` leaves is honoured: `Enable` false or a `Status` other than `Up` refuses installs to it. `profiles/example-tr181-minimal.yaml` shows the full set.
+
+## `bulkData`
+
+Mounts `<root>.BulkData.`, TR-157 Annex A: the CPE collects on a schedule the ACS configures and pushes reports out of band, rather than answering questions during a session.
+
+Declare it only on a profile whose hardware advertises the capability. Unlike the TR-369 agent, which mounts `Device.BulkData.` on every agent, bulk data on TR-069 is a vendor fact that a fleet survey exists to measure. Most of the installed base does not have the subtree at all, and a fleet where every device had one would answer a question the real fleet answers differently.
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `root` | string | Required. `InternetGatewayDevice` or `Device`. |
+| `protocols` | string | Required. Comma-separated transports, verbatim as the device reports them, e.g. `HTTP`. |
+| `encodingTypes` | string | Required. Comma-separated encodings, e.g. `JSON`. |
+| `minReportingInterval` | int | Required, at least 1. The floor in seconds on `Profile.{i}.ReportingInterval`. |
+| `maxNumberOfProfiles` | int | Required. `-1` is the data model's spelling of unlimited. |
+| `maxNumberOfParameterReferences` | int | Required. `-1` for unlimited. |
+| `parameterWildCardSupported` | bool | Whether a `Reference` may carry `*` in place of an instance identifier. |
+
+```yaml
+bulkData:
+  root: InternetGatewayDevice
+  protocols: HTTP
+  encodingTypes: JSON
+  minReportingInterval: 300
+  maxNumberOfProfiles: 50
+  maxNumberOfParameterReferences: -1
+  parameterWildCardSupported: false
+```
+
+The `Profile.{i}.` table this mounts is writable and starts empty. An ACS creates a row with `AddObject`, fills it with `SetParameterValues`, and `ProfileNumberOfEntries` keeps step. Each instance carries `JSONEncoding.`, `HTTP.` and its own nested `Parameter.{i}.` and `HTTP.RequestURIParameter.{i}.` tables.
+
+`parameterWildCardSupported: false` is worth modelling honestly rather than defaulting to true, because it changes what an ACS has to do. With wildcards off a `Reference` cannot collapse an index in the middle of a path, so the ACS writes one `Parameter.{i}.` row per stable parent instance. It can still collect a whole table whose instances churn: an object path ending in `.` is a separate mechanism and is not gated on the flag.
+
+There is no `Alias` on the profile row. TR-106 alias addressing is optional on CWMP and the hardware `profiles/example-arris/` models does not implement it, so an ACS cannot mark the rows it owns that way. There is no `Parameter.{i}.Exclude` either; that arrived in a later TR-181 revision than the TR-098-rooted spelling.
+
+Booleans marshal canonically, so a device reports `false` here where some firmware reports `0`. Both are valid `xsd:boolean`, and anything comparing the reported string has to accept either.
 
 ## App manifests
 

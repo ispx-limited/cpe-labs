@@ -549,6 +549,7 @@ type profile struct {
 	EventSchedule       *rawEventSchedule       `yaml:"eventSchedule"`
 	Diagnostics         []rawDiagnostic         `yaml:"diagnostics"`
 	SoftwareModules     *rawSoftwareModules     `yaml:"softwareModules"`
+	BulkData            *rawBulkData            `yaml:"bulkData"`
 	Faults              *rawFaults              `yaml:"faults"`
 
 	// App is only valid in an app manifest (see LoadAppManifest).
@@ -574,6 +575,20 @@ type rawObject struct {
 // the parent isn't a multi-instance table. Loader concatenates
 // Prefix + "." + child.Path for each leaf with no AddTable
 // registration (singletons can't be AddObject'd).
+// rawBulkData is the profile's bulkData: block, opt-in per profile. See
+// MountBulkData: on CWMP the capability is a vendor fact, so a profile
+// declares it only when the hardware it models advertises it, with the
+// values that hardware reports.
+type rawBulkData struct {
+	Root                           string `yaml:"root"`
+	Protocols                      string `yaml:"protocols"`
+	EncodingTypes                  string `yaml:"encodingTypes"`
+	MinReportingInterval           int    `yaml:"minReportingInterval"`
+	MaxNumberOfProfiles            int    `yaml:"maxNumberOfProfiles"`
+	MaxNumberOfParameterReferences int    `yaml:"maxNumberOfParameterReferences"`
+	ParameterWildCardSupported     bool   `yaml:"parameterWildCardSupported"`
+}
+
 type rawGroup struct {
 	Prefix     string            `yaml:"prefix"`
 	Parameters []rawProfileParam `yaml:"parameters"`
@@ -1499,6 +1514,30 @@ func mergeFiles(tree *Tree, files []*loadedFile) (mergedConfig, error) {
 	}
 	if fleetCfg.SerialPattern == "" {
 		fleetCfg.SerialPattern = "{base}-{i}"
+	}
+
+	// Merge bulkData and mount it. One profile file may declare it, the
+	// same rule softwareModules follows, because the block describes the
+	// device rather than any one file's slice of it.
+	var bdSource string
+	for _, lf := range files {
+		raw := lf.prof.BulkData
+		if raw == nil {
+			continue
+		}
+		if bdSource != "" {
+			return mergedConfig{}, cpeerr.Wrap("paramtree.LoadProfile", cpeerr.KindInvalidArgument,
+				fmt.Errorf("%s and %s both declare bulkData", bdSource, lf.path))
+		}
+		cfg, verr := validateBulkData(lf.path, raw)
+		if verr != nil {
+			return mergedConfig{}, cpeerr.Wrap("paramtree.LoadProfile", cpeerr.KindInvalidArgument, verr)
+		}
+		if merr := MountBulkData(tree, cfg); merr != nil {
+			return mergedConfig{}, cpeerr.Wrap("paramtree.LoadProfile", cpeerr.KindInvalidArgument,
+				fmt.Errorf("%s: bulkData: %w", lf.path, merr))
+		}
+		bdSource = lf.path
 	}
 
 	// Merge softwareModules with conflict detection. Validated against
