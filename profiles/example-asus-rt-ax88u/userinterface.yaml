@@ -1,0 +1,31 @@
+# Remote management of the router's own web UI. The four standard
+# leaves are here; the allow-list, the idle timeout and the live state
+# are vendor extensions beside them, because TR-181 has no home for
+# them and the real firmware exposes all three. Enable is what the box
+# was told; X_ASUS_Status is what it is doing.
+groups:
+  - prefix: Device.UserInterface.RemoteAccess
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Port
+        type: xsd:unsignedInt
+        value: "8443"
+        writable: true
+      - path: Protocol
+        value: "HTTPS"
+        writable: true
+      - path: SupportedProtocols
+        value: "HTTPS"
+      - path: X_ASUS_AllowedAddresses
+        value: ""
+        writable: true
+      - path: X_ASUS_IdleTimeout
+        type: xsd:unsignedInt
+        value: "30"
+        writable: true
+      - path: X_ASUS_Status
+        type: xsd:boolean
+        value: "false"

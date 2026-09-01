@@ -1,0 +1,110 @@
+# ASUS RT-AX88U, TR-181 (Device.*) profile.
+#
+# An AX6000 dual-band WiFi 6 router with one WAN and eight LAN ports,
+# the AiMesh whole-home system on top, and no MultiAP or Data Elements
+# objects at all: ASUS keeps the mesh, the site survey and the remote
+# management controls under its own X_ASUS_ subtrees. That is the
+# point of this profile. The tree is standard where TR-181 has a name
+# for the thing, and vendor-shaped where real consumer routers are,
+# so an ACS integrating it has to survey the device rather than
+# assume the baseline covers it:
+#
+#   - Device.WiFi.X_ASUS_AiMesh.Node.{i}. is the mesh tree (topology).
+#   - Device.WiFi.X_ASUS_SiteSurvey. is the neighbour scan, with a
+#     DiagnosticsState the ACS triggers; there is no
+#     NeighboringWiFiDiagnostic on the box.
+#   - The WAN is Ethernet.Interface.9 (eth0, Upstream=true), after the
+#     eight switch ports, not Interface.1.
+#   - Remote management carries an address allow-list and an idle
+#     timeout as X_ASUS_ leaves under UserInterface.RemoteAccess, and
+#     the login itself is Device.Users.User.1.
+#
+# The firmware string matters. 3.0.0.4.388_23110 is the build named in
+# the public vulnerability records for this router: one record names
+# it exactly and three more fence every build below 3.0.0.4.388_23748,
+# so a fleet of these is a fleet an ACS should be able to identify as
+# affected. The router writes the build with an underscore and the
+# public feed files the same build with a dot (3.0.0.4.388.23110), so
+# this profile also exercises whether an ACS compares the two forms as
+# the same version. Change SoftwareVersion to 3.0.0.4.388_24709 or
+# later and every match should clear.
+#
+# Modelled from public catalogues, not from a device capture. The OUI
+# is the documentation OUI (00005E) rather than an ASUS registration:
+# real OUIs belong to real hardware, and a fabricated one in a public
+# profile is exactly the value someone would paste into a production
+# mapping. The vendor extensions use the name form (X_ASUS_) that
+# TR-106 permits alongside the OUI form, so they read as this vendor's
+# rather than as another profile's on the shared documentation OUI.
+# Loads first lexicographically (underscore prefix).
+
+deviceIdPaths:
+  manufacturer: Device.DeviceInfo.Manufacturer
+  oui:          Device.DeviceInfo.ManufacturerOUI
+  productClass: Device.DeviceInfo.ProductClass
+  serialNumber: Device.DeviceInfo.SerialNumber
+
+fleet:
+  count: 1
+  # Twelve characters, a letter-digit prefix and a ten-character tail,
+  # the shape of an ASUS factory serial without being one. The prefix
+  # has to differ from every other profile sharing the documentation
+  # OUI, because identity at the ACS is OUI plus serial and two cohorts
+  # minting the same pattern would collapse into one device population.
+  serialPattern: "M8{cpe:ALNUM:10}"
+  pools:
+    wan_ipv4:
+      type: ipv4
+      cidr: "100.64.0.0/10"
+    wan_ipv6:
+      type: ipv6
+      cidr: "2001:db8:7::/64"
+    delegated_prefix:
+      type: ipv6prefix
+      super: "2001:db8:8000::/36"
+      sublen: 56
+
+periodicInformPaths:
+  interval: Device.ManagementServer.PeriodicInformInterval
+  enable:   Device.ManagementServer.PeriodicInformEnable
+
+acsCredentialPaths:
+  username: Device.ManagementServer.Username
+  password: Device.ManagementServer.Password
+
+# A Download with FileType "1 Firmware Upgrade Image" is applied for
+# real: the image is fetched, its declared version written to
+# SoftwareVersion after a dark window, and announced in a boot session.
+# A campaign that moves this router off 3.0.0.4.388_23110 therefore
+# changes what compliance reads.
+transfer:
+  firmware:
+    versionPath: Device.DeviceInfo.SoftwareVersion
+    applyDelay: 60s
+    fetch: true
+
+informParameters:
+  bootstrap:
+    - Device.DeviceInfo.Manufacturer
+    - Device.DeviceInfo.ManufacturerOUI
+    - Device.DeviceInfo.ModelName
+    - Device.DeviceInfo.ProductClass
+    - Device.DeviceInfo.SerialNumber
+    - Device.DeviceInfo.HardwareVersion
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.ManagementServer.URL
+    - Device.ManagementServer.ParameterKey
+    - Device.IP.Interface.1.IPv4Address.1.IPAddress
+  boot:
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.DeviceInfo.UpTime
+  # Identity repeats on every periodic Inform so a device whose
+  # bootstrap the ACS missed still carries a model and a firmware.
+  periodic:
+    - Device.DeviceInfo.ModelName
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.DeviceInfo.UpTime
+    - Device.Ethernet.Interface.9.Stats.BytesSent
+    - Device.Ethernet.Interface.9.Stats.BytesReceived
+  connectionRequest:
+    - Device.DeviceInfo.UpTime

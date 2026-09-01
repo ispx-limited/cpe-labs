@@ -1,8 +1,10 @@
 package transport_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -123,5 +125,42 @@ func TestSendBadCredentialsFailOnce(t *testing.T) {
 	}
 	if got := calls.Load(); got != 2 {
 		t.Errorf("server calls = %d, want 2 (initial + one challenge answer)", got)
+	}
+}
+
+// A CPE with no identity at all (no acsCredentialPaths, no static
+// credentials) still answers the challenge, so the ACS refuses it as a
+// bad credential rather than a missing one; the transport says why,
+// once, so the operator is not left reading the ACS's side alone.
+func TestSendWithoutAnyIdentityWarnsOnce(t *testing.T) {
+	t.Parallel()
+
+	var seen atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if auth := r.Header.Get("Authorization"); auth != "" {
+			seen.Add(1)
+			if !strings.Contains(auth, `username=""`) {
+				t.Errorf("Authorization = %q, want an empty username", auth)
+			}
+		}
+		w.Header().Set("WWW-Authenticate", `Digest realm="acs", qop="auth", nonce="n1"`)
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+
+	var logs bytes.Buffer
+	tt := mustTransport(t, mustPool(t, transport.PoolOptions{Logger: slog.New(slog.NewTextHandler(&logs, nil))}), transport.Config{ACSURL: srv.URL})
+
+	for i := 0; i < 2; i++ {
+		if _, err := tt.Send(context.Background(), []byte("inform")); err == nil {
+			t.Fatalf("send %d: expected the 401 to surface as an error", i)
+		}
+		tt.ResetSession()
+	}
+	if seen.Load() == 0 {
+		t.Fatal("the challenge was never answered")
+	}
+	if n := strings.Count(logs.String(), "no username"); n != 1 {
+		t.Errorf("warned %d times, want exactly once:\n%s", n, logs.String())
 	}
 }

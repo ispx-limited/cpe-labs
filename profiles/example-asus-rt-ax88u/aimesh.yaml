@@ -1,0 +1,141 @@
+# AiMesh, the vendor's whole-home mesh, under its own subtree. Nothing
+# about it is in Device.WiFi.MultiAP. or Device.WiFi.DataElements.,
+# which this router does not implement: an ACS drawing a network map
+# from the standard objects sees a single gateway and nine hosts, and
+# the two nodes, the backhauls and which host hangs off which node
+# are only readable here.
+#
+# Node.1 is the router itself (Role Router). Node.2 is an RT-AX58U in
+# the lounge on a 5 GHz wireless backhaul, Node.3 a ZenWiFi XD4 in the
+# study on a wired backhaul. Each node carries the stations associated
+# to it, with the same MAC the router's Hosts table lists, so a
+# topology script can join hostname and address by MAC.
+parameters:
+  - path: Device.WiFi.X_ASUS_AiMesh.Enable
+    type: xsd:boolean
+    value: "true"
+    writable: true
+  - path: Device.WiFi.X_ASUS_AiMesh.Role
+    value: "Router"
+  - path: Device.WiFi.X_ASUS_AiMesh.SystemName
+    value: "Home"
+    writable: true
+  - path: Device.WiFi.X_ASUS_AiMesh.NodeNumberOfEntries
+    type: xsd:unsignedInt
+    value: "3"
+
+groups:
+  - prefix: Device.WiFi.X_ASUS_AiMesh.Node.1
+    parameters:
+      - path: MACAddress
+        value: "00:00:5E:{cpe:hex:2}:A0:01"
+      - path: Role
+        value: "Router"
+      - path: ModelName
+        value: "RT-AX88U"
+      - path: FirmwareVersion
+        value: "3.0.0.4.388_23110"
+      - path: Status
+        value: "Online"
+      - path: Location
+        value: "Hallway"
+        writable: true
+      - path: BackhaulType
+        value: ""
+      - path: ClientNumberOfEntries
+        type: xsd:unsignedInt
+        value: "0"
+  - prefix: Device.WiFi.X_ASUS_AiMesh.Node.2
+    parameters:
+      - path: MACAddress
+        value: "00:00:5E:{cpe:hex:2}:C2:01"
+      - path: Role
+        value: "Node"
+      - path: ModelName
+        value: "RT-AX58U"
+      - path: FirmwareVersion
+        value: "3.0.0.4.388_23285"
+      - path: Status
+        value: "Online"
+      - path: Location
+        value: "Lounge"
+        writable: true
+      - path: BackhaulType
+        value: "5GHz"
+      - path: BackhaulRSSI
+        type: xsd:int
+        value: "-58"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -71
+          max: -49
+          stepMax: 2
+      - path: ClientNumberOfEntries
+        type: xsd:unsignedInt
+        value: "2"
+  - prefix: Device.WiFi.X_ASUS_AiMesh.Node.3
+    parameters:
+      - path: MACAddress
+        value: "00:00:5E:{cpe:hex:2}:C3:01"
+      - path: Role
+        value: "Node"
+      - path: ModelName
+        value: "ZenWiFi XD4"
+      - path: FirmwareVersion
+        value: "3.0.0.4.388_23285"
+      - path: Status
+        value: "Online"
+      - path: Location
+        value: "Study"
+        writable: true
+      - path: BackhaulType
+        value: "Ethernet"
+      - path: BackhaulRSSI
+        type: xsd:int
+        value: "0"
+      - path: ClientNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+
+objects:
+  - path: Device.WiFi.X_ASUS_AiMesh.Node.2.Client
+    instances: 2
+    parameters:
+      - path: MACAddress
+        value: "02:A1:B2:00:03:0{i}"
+      - path: Band
+        value: "5GHz"
+      - path: RSSI
+        type: xsd:int
+        value: "-55"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -76
+          max: -42
+          stepMax: 3
+      - path: TxRate
+        type: xsd:unsignedInt
+        value: "866000"
+      - path: RxRate
+        type: xsd:unsignedInt
+        value: "650000"
+  - path: Device.WiFi.X_ASUS_AiMesh.Node.3.Client
+    instances: 1
+    parameters:
+      - path: MACAddress
+        value: "02:A1:B2:00:04:01"
+      - path: Band
+        value: "Ethernet"
+      - path: RSSI
+        type: xsd:int
+        value: "0"
+      - path: TxRate
+        type: xsd:unsignedInt
+        value: "1000000"
+      - path: RxRate
+        type: xsd:unsignedInt
+        value: "1000000"

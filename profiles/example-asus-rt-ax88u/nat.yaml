@@ -1,0 +1,90 @@
+# Port forwards. Two on the box at first contact; an ACS adds and
+# removes rows with AddObject and DeleteObject, and
+# PortMappingNumberOfEntries follows. The per-forward leaves are
+# declared per instance below, because a group may not redeclare a
+# path the table materialised.
+parameters:
+  - path: Device.NAT.InterfaceSettingNumberOfEntries
+    type: xsd:unsignedInt
+    value: "0"
+  - path: Device.NAT.PortMappingNumberOfEntries
+    type: xsd:unsignedInt
+    value: "2"
+  - path: Device.NAT.MaxNumberOfPortMappings
+    type: xsd:unsignedInt
+    value: "64"
+
+objects:
+  - path: Device.NAT.PortMapping
+    instances: 2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: Alias
+        value: "vsrv-{i}"
+        writable: true
+      - path: Interface
+        value: "Device.IP.Interface.1"
+        writable: true
+      - path: AllInterfaces
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: LeaseDuration
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: RemainingLeaseTime
+        type: xsd:unsignedInt
+        value: "0"
+      - path: RemoteHost
+        value: ""
+        writable: true
+      - path: ExternalPortEndRange
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+
+groups:
+  - prefix: Device.NAT.PortMapping.1
+    parameters:
+      - path: Description
+        value: "NAS web"
+        writable: true
+      - path: Protocol
+        value: "TCP"
+        writable: true
+      - path: ExternalPort
+        type: xsd:unsignedInt
+        value: "5001"
+        writable: true
+      - path: InternalPort
+        type: xsd:unsignedInt
+        value: "5001"
+        writable: true
+      - path: InternalClient
+        value: "192.168.50.90"
+        writable: true
+  - prefix: Device.NAT.PortMapping.2
+    parameters:
+      - path: Description
+        value: "Console"
+        writable: true
+      - path: Protocol
+        value: "UDP"
+        writable: true
+      - path: ExternalPort
+        type: xsd:unsignedInt
+        value: "3074"
+        writable: true
+      - path: InternalPort
+        type: xsd:unsignedInt
+        value: "3074"
+        writable: true
+      - path: InternalClient
+        value: "192.168.50.80"
+        writable: true

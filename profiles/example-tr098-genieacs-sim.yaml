@@ -108,3 +108,10 @@ parameters:
     type: xsd:boolean
     value: "false"
     writable: true
+
+# ACS auth identity read live from the tree, so credential rotation
+# via SetParameterValues lands on the next session. Empty values fall
+# back to --acs-username/--acs-password.
+acsCredentialPaths:
+  username: InternetGatewayDevice.ManagementServer.Username
+  password: InternetGatewayDevice.ManagementServer.Password

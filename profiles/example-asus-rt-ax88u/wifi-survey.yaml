@@ -1,0 +1,138 @@
+# The site survey, the vendor's name for a neighbour scan. Writing
+# Requested to DiagnosticsState runs one: the state walks to Complete
+# after the sweep and the result count lands first, the way the real
+# firmware behaves. The results are a fixed neighbourhood, because a
+# given home hears roughly the same networks every sweep; only the
+# signal moves.
+parameters:
+  - path: Device.WiFi.X_ASUS_SiteSurvey.DiagnosticsState
+    value: "None"
+    writable: true
+  - path: Device.WiFi.X_ASUS_SiteSurvey.ResultNumberOfEntries
+    type: xsd:unsignedInt
+    value: "6"
+
+objects:
+  - path: Device.WiFi.X_ASUS_SiteSurvey.Result
+    instances: 6
+    parameters:
+      - path: SignalStrength
+        type: xsd:int
+        value: "-70"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -88
+          max: -52
+          stepMax: 3
+      - path: Noise
+        type: xsd:int
+        value: "-92"
+      - path: SecurityModeEnabled
+        value: "WPA2-Personal"
+      - path: EncryptionMode
+        value: "AES"
+      - path: BeaconPeriod
+        type: xsd:unsignedInt
+        value: "100"
+
+groups:
+  - prefix: Device.WiFi.X_ASUS_SiteSurvey.Result.1
+    parameters:
+      - path: Radio
+        value: "Device.WiFi.Radio.1"
+      - path: SSID
+        value: "VM7412831"
+      - path: BSSID
+        value: "DE:AD:BE:EF:10:01"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "1"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+      - path: OperatingChannelBandwidth
+        value: "20MHz"
+  - prefix: Device.WiFi.X_ASUS_SiteSurvey.Result.2
+    parameters:
+      - path: Radio
+        value: "Device.WiFi.Radio.1"
+      - path: SSID
+        value: "BT-K7M2QP"
+      - path: BSSID
+        value: "DE:AD:BE:EF:10:02"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "6"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+      - path: OperatingChannelBandwidth
+        value: "40MHz"
+  - prefix: Device.WiFi.X_ASUS_SiteSurvey.Result.3
+    parameters:
+      - path: Radio
+        value: "Device.WiFi.Radio.1"
+      - path: SSID
+        value: "SKY4F2A1"
+      - path: BSSID
+        value: "DE:AD:BE:EF:10:03"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "11"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+      - path: OperatingChannelBandwidth
+        value: "20MHz"
+  - prefix: Device.WiFi.X_ASUS_SiteSurvey.Result.4
+    parameters:
+      - path: Radio
+        value: "Device.WiFi.Radio.2"
+      - path: SSID
+        value: "VM7412831_5G"
+      - path: BSSID
+        value: "DE:AD:BE:EF:50:01"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "36"
+      - path: OperatingFrequencyBand
+        value: "5GHz"
+      - path: OperatingChannelBandwidth
+        value: "80MHz"
+  - prefix: Device.WiFi.X_ASUS_SiteSurvey.Result.5
+    parameters:
+      - path: Radio
+        value: "Device.WiFi.Radio.2"
+      - path: SSID
+        value: "BT-K7M2QP"
+      - path: BSSID
+        value: "DE:AD:BE:EF:50:02"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "44"
+      - path: OperatingFrequencyBand
+        value: "5GHz"
+      - path: OperatingChannelBandwidth
+        value: "80MHz"
+  - prefix: Device.WiFi.X_ASUS_SiteSurvey.Result.6
+    parameters:
+      - path: Radio
+        value: "Device.WiFi.Radio.2"
+      - path: SSID
+        value: "EE-Hub-9kTz"
+      - path: BSSID
+        value: "DE:AD:BE:EF:50:03"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "149"
+      - path: OperatingFrequencyBand
+        value: "5GHz"
+      - path: OperatingChannelBandwidth
+        value: "80MHz"
+
+diagnostics:
+  - statePath: Device.WiFi.X_ASUS_SiteSurvey.DiagnosticsState
+    trigger: Requested
+    complete: Complete
+    duration: 8s
+    countPath: Device.WiFi.X_ASUS_SiteSurvey.ResultNumberOfEntries
+    resultCount: 6

@@ -1,0 +1,27 @@
+# The local account. One login on this router, and it is the one the
+# remote management password belongs to: there is no separate remote
+# user, which is what makes User.1 the right-hand side of a remote
+# access credential mapping.
+parameters:
+  - path: Device.Users.UserNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+
+groups:
+  - prefix: Device.Users.User.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+      - path: Username
+        value: "admin"
+        writable: true
+      - path: Password
+        value: ""
+        writable: true
+      - path: RemoteAccessCapable
+        type: xsd:boolean
+        value: "true"
+      - path: Language
+        value: "en"
+        writable: true
