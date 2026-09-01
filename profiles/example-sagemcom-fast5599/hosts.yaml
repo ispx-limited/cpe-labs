@@ -1,0 +1,548 @@
+# Device.Hosts: six of the surveyed unit's clients, addresses and
+# names replaced, layer references pointing at the real interfaces
+# and access points. The vendor leaves beside the standard ones
+# (DetectedDeviceType, UserFriendlyName, the blacklist state) are what
+# this firmware's host table actually carries.
+
+parameters:
+  - path: Device.Hosts.HostNumberOfEntries
+    type: xsd:unsignedInt
+    value: "14"
+
+objects:
+  - path: Device.Hosts.Host
+    instances: 14
+    parameters:
+      - path: AddressSource
+        value: "DHCP"
+      - path: DHCPClient
+        value: ""
+      - path: LeaseTimeRemaining
+        type: xsd:unsignedInt
+        value: "86400"
+      - path: AssociatedDevice
+        value: ""
+      - path: Layer3Interface
+        value: "Device.IP.Interface.1"
+      - path: ClientID
+        value: ""
+      - path: UserClassID
+        value: ""
+      - path: ActiveLastChange
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: UserDeviceType
+        value: "MISCELLANEOUS"
+      - path: Icon
+        value: ""
+      - path: BlacklistEnable
+        type: xsd:boolean
+        value: "true"
+      - path: Blacklisted
+        type: xsd:boolean
+        value: "false"
+
+groups:
+  - prefix: Device.Hosts.Host.1
+    parameters:
+      - path: Alias
+        value: "cpe-6"
+        writable: true
+      - path: PhysAddress
+        value: "5C:51:4F:00:00:02"
+      - path: IPAddress
+        value: "192.168.1.62"
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.1"
+      - path: VendorClassID
+        value: ""
+      - path: HostName
+        value: "client-1"
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: LeaseStart
+        type: xsd:unsignedInt
+        value: "678405"
+      - path: LeaseDuration
+        type: xsd:unsignedInt
+        value: "43200"
+        writable: true
+      - path: InterfaceType
+        value: "WiFi"
+      - path: WiFiInterface
+        value: "Primary"
+      - path: DetectedDeviceType
+        value: ""
+      - path: UserFriendlyName
+        value: "client-1"
+      - path: UserHostName
+        value: "client-1"
+
+  - prefix: Device.Hosts.Host.2
+    parameters:
+      - path: Alias
+        value: "cpe-25"
+        writable: true
+      - path: PhysAddress
+        value: "5C:51:4F:00:00:05"
+      - path: IPAddress
+        value: "192.168.1.45"
+      - path: Layer1Interface
+        value: ""
+      - path: VendorClassID
+        value: ""
+      - path: HostName
+        value: "client-2"
+      - path: Active
+        type: xsd:boolean
+        value: "false"
+      - path: LeaseStart
+        type: xsd:unsignedInt
+        value: "435965"
+      - path: LeaseDuration
+        type: xsd:unsignedInt
+        value: "43200"
+        writable: true
+      - path: InterfaceType
+        value: "Ethernet"
+      - path: WiFiInterface
+        value: "Primary"
+      - path: DetectedDeviceType
+        value: "Smartphone"
+      - path: UserFriendlyName
+        value: "client-2"
+      - path: UserHostName
+        value: "client-2"
+
+  - prefix: Device.Hosts.Host.3
+    parameters:
+      - path: Alias
+        value: "cpe-41"
+        writable: true
+      - path: PhysAddress
+        value: "5C:51:4F:00:00:03"
+      - path: IPAddress
+        value: "192.168.1.57"
+      - path: Layer1Interface
+        value: "Device.Ethernet.Interface.4"
+      - path: VendorClassID
+        value: "android-dhcp-11"
+      - path: HostName
+        value: "client-3"
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: LeaseStart
+        type: xsd:unsignedInt
+        value: "498675"
+      - path: LeaseDuration
+        type: xsd:unsignedInt
+        value: "43200"
+        writable: true
+      - path: InterfaceType
+        value: "Ethernet"
+      - path: WiFiInterface
+        value: "Primary"
+      - path: DetectedDeviceType
+        value: "Smartphone"
+      - path: UserFriendlyName
+        value: "client-3"
+      - path: UserHostName
+        value: "client-3"
+
+  - prefix: Device.Hosts.Host.4
+    parameters:
+      - path: Alias
+        value: "cpe-42"
+        writable: true
+      - path: PhysAddress
+        value: "5C:51:4F:00:00:01"
+      - path: IPAddress
+        value: "192.168.1.58"
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.1"
+      - path: VendorClassID
+        value: ""
+      - path: HostName
+        value: "client-4"
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: LeaseStart
+        type: xsd:unsignedInt
+        value: "44"
+      - path: LeaseDuration
+        type: xsd:unsignedInt
+        value: "430180749"
+        writable: true
+      - path: InterfaceType
+        value: "WiFi"
+      - path: WiFiInterface
+        value: "Unknown"
+      - path: DetectedDeviceType
+        value: ""
+      - path: UserFriendlyName
+        value: "client-4"
+      - path: UserHostName
+        value: "client-4"
+
+  - prefix: Device.Hosts.Host.5
+    parameters:
+      - path: Alias
+        value: "cpe-45"
+        writable: true
+      - path: PhysAddress
+        value: "5C:51:4F:00:00:08"
+      - path: IPAddress
+        value: "192.168.1.107"
+      - path: Layer1Interface
+        value: ""
+      - path: VendorClassID
+        value: ""
+      - path: HostName
+        value: "client-5"
+      - path: Active
+        type: xsd:boolean
+        value: "false"
+      - path: LeaseStart
+        type: xsd:unsignedInt
+        value: "511329"
+      - path: LeaseDuration
+        type: xsd:unsignedInt
+        value: "38649"
+        writable: true
+      - path: InterfaceType
+        value: "Ethernet"
+      - path: WiFiInterface
+        value: "Primary"
+      - path: DetectedDeviceType
+        value: "Smartphone"
+      - path: UserFriendlyName
+        value: "client-5"
+      - path: UserHostName
+        value: "client-5"
+
+  - prefix: Device.Hosts.Host.6
+    parameters:
+      - path: Alias
+        value: "cpe-74"
+        writable: true
+      - path: PhysAddress
+        value: "5C:51:4F:00:00:07"
+      - path: IPAddress
+        value: "192.168.1.117"
+      - path: Layer1Interface
+        value: ""
+      - path: VendorClassID
+        value: ""
+      - path: HostName
+        value: "client-6"
+      - path: Active
+        type: xsd:boolean
+        value: "false"
+      - path: LeaseStart
+        type: xsd:unsignedInt
+        value: "511477"
+      - path: LeaseDuration
+        type: xsd:unsignedInt
+        value: "35382"
+        writable: true
+      - path: InterfaceType
+        value: "Ethernet"
+      - path: WiFiInterface
+        value: "Primary"
+      - path: DetectedDeviceType
+        value: "Smartphone"
+      - path: UserFriendlyName
+        value: "client-6"
+      - path: UserHostName
+        value: "client-6"
+
+  - prefix: Device.Hosts.Host.7
+    parameters:
+      - path: Alias
+        value: "cpe-93"
+        writable: true
+      - path: PhysAddress
+        value: "5C:51:4F:00:00:09"
+      - path: IPAddress
+        value: "192.168.1.113"
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.8"
+      - path: VendorClassID
+        value: ""
+      - path: HostName
+        value: "client-7"
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: LeaseStart
+        type: xsd:unsignedInt
+        value: "604420"
+      - path: LeaseDuration
+        type: xsd:unsignedInt
+        value: "43200"
+        writable: true
+      - path: InterfaceType
+        value: "WiFi"
+      - path: WiFiInterface
+        value: "Unknown"
+      - path: DetectedDeviceType
+        value: ""
+      - path: UserFriendlyName
+        value: "client-7"
+      - path: UserHostName
+        value: "client-7"
+
+  - prefix: Device.Hosts.Host.8
+    parameters:
+      - path: Alias
+        value: "cpe-95"
+        writable: true
+      - path: PhysAddress
+        value: "5C:51:4F:00:00:06"
+      - path: IPAddress
+        value: "192.168.1.115"
+      - path: Layer1Interface
+        value: ""
+      - path: VendorClassID
+        value: ""
+      - path: HostName
+        value: "client-8"
+      - path: Active
+        type: xsd:boolean
+        value: "false"
+      - path: LeaseStart
+        type: xsd:unsignedInt
+        value: "632215"
+      - path: LeaseDuration
+        type: xsd:unsignedInt
+        value: "43200"
+        writable: true
+      - path: InterfaceType
+        value: "Ethernet"
+      - path: WiFiInterface
+        value: "Primary"
+      - path: DetectedDeviceType
+        value: "Smartphone"
+      - path: UserFriendlyName
+        value: "client-8"
+      - path: UserHostName
+        value: "client-8"
+
+  - prefix: Device.Hosts.Host.9
+    parameters:
+      - path: Alias
+        value: "cpe-106"
+        writable: true
+      - path: PhysAddress
+        value: "5C:51:4F:00:00:0A"
+      - path: IPAddress
+        value: "192.168.1.126"
+      - path: Layer1Interface
+        value: ""
+      - path: VendorClassID
+        value: "android-dhcp-16"
+      - path: HostName
+        value: "client-9"
+      - path: Active
+        type: xsd:boolean
+        value: "false"
+      - path: LeaseStart
+        type: xsd:unsignedInt
+        value: "102262"
+      - path: LeaseDuration
+        type: xsd:unsignedInt
+        value: "43200"
+        writable: true
+      - path: InterfaceType
+        value: "Ethernet"
+      - path: WiFiInterface
+        value: "Primary"
+      - path: DetectedDeviceType
+        value: "Smartphone"
+      - path: UserFriendlyName
+        value: "client-9"
+      - path: UserHostName
+        value: "client-9"
+
+  - prefix: Device.Hosts.Host.10
+    parameters:
+      - path: Alias
+        value: "cpe-137"
+        writable: true
+      - path: PhysAddress
+        value: "5C:51:4F:00:00:04"
+      - path: IPAddress
+        value: "192.168.1.156"
+      - path: Layer1Interface
+        value: ""
+      - path: VendorClassID
+        value: "android-dhcp-11"
+      - path: HostName
+        value: "client-10"
+      - path: Active
+        type: xsd:boolean
+        value: "false"
+      - path: LeaseStart
+        type: xsd:unsignedInt
+        value: "633661"
+      - path: LeaseDuration
+        type: xsd:unsignedInt
+        value: "43200"
+        writable: true
+      - path: InterfaceType
+        value: "Ethernet"
+      - path: WiFiInterface
+        value: "Primary"
+      - path: DetectedDeviceType
+        value: ""
+      - path: UserFriendlyName
+        value: "client-10"
+      - path: UserHostName
+        value: ""
+
+  - prefix: Device.Hosts.Host.11
+    parameters:
+      - path: Alias
+        value: "cpe-1"
+        writable: true
+      - path: PhysAddress
+        value: "5C:51:4F:00:00:0B"
+      - path: IPAddress
+        value: "192.168.1.33"
+      - path: Layer1Interface
+        value: "Device.Ethernet.Interface.4"
+      - path: VendorClassID
+        value: "eero"
+      - path: HostName
+        value: "client-11"
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: LeaseStart
+        type: xsd:unsignedInt
+        value: "684854"
+      - path: LeaseDuration
+        type: xsd:unsignedInt
+        value: "43200"
+        writable: true
+      - path: InterfaceType
+        value: "Ethernet"
+      - path: WiFiInterface
+        value: "Unknown"
+      - path: DetectedDeviceType
+        value: "Smartphone"
+      - path: UserFriendlyName
+        value: "client-11"
+      - path: UserHostName
+        value: "client-11"
+
+  - prefix: Device.Hosts.Host.12
+    parameters:
+      - path: Alias
+        value: "cpe-4"
+        writable: true
+      - path: PhysAddress
+        value: "5C:51:4F:00:00:0C"
+      - path: IPAddress
+        value: "192.168.1.105"
+      - path: Layer1Interface
+        value: "Device.Ethernet.Interface.4"
+      - path: VendorClassID
+        value: "eero"
+      - path: HostName
+        value: "client-12"
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: LeaseStart
+        type: xsd:unsignedInt
+        value: "671307"
+      - path: LeaseDuration
+        type: xsd:unsignedInt
+        value: "43200"
+        writable: true
+      - path: InterfaceType
+        value: "Ethernet"
+      - path: WiFiInterface
+        value: "Unknown"
+      - path: DetectedDeviceType
+        value: "Smartphone"
+      - path: UserFriendlyName
+        value: "client-12"
+      - path: UserHostName
+        value: "client-12"
+
+  - prefix: Device.Hosts.Host.13
+    parameters:
+      - path: Alias
+        value: "cpe-7"
+        writable: true
+      - path: PhysAddress
+        value: "5C:51:4F:00:00:0D"
+      - path: IPAddress
+        value: "192.168.1.20"
+      - path: Layer1Interface
+        value: "Device.Ethernet.Interface.1"
+      - path: VendorClassID
+        value: ""
+      - path: HostName
+        value: "client-13"
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: LeaseStart
+        type: xsd:unsignedInt
+        value: "669626"
+      - path: LeaseDuration
+        type: xsd:unsignedInt
+        value: "43200"
+        writable: true
+      - path: InterfaceType
+        value: "Ethernet"
+      - path: WiFiInterface
+        value: "Unknown"
+      - path: DetectedDeviceType
+        value: ""
+      - path: UserFriendlyName
+        value: "client-13"
+      - path: UserHostName
+        value: "client-13"
+
+  - prefix: Device.Hosts.Host.14
+    parameters:
+      - path: Alias
+        value: "cpe-8"
+        writable: true
+      - path: PhysAddress
+        value: "5C:51:4F:00:00:0E"
+      - path: IPAddress
+        value: "192.168.1.35"
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.1"
+      - path: VendorClassID
+        value: ""
+      - path: HostName
+        value: "client-14"
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: LeaseStart
+        type: xsd:unsignedInt
+        value: "669676"
+      - path: LeaseDuration
+        type: xsd:unsignedInt
+        value: "43200"
+        writable: true
+      - path: InterfaceType
+        value: "WiFi"
+      - path: WiFiInterface
+        value: "Primary"
+      - path: DetectedDeviceType
+        value: ""
+      - path: UserFriendlyName
+        value: "client-14"
+      - path: UserHostName
+        value: "client-14"

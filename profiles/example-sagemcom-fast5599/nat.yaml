@@ -1,0 +1,179 @@
+# Device.NAT: the surveyed unit's three port forwards, internal hosts
+# renumbered into the LAN range. Leaf set is what this firmware's
+# PortMapping table carries.
+
+parameters:
+  - path: Device.NAT.PortMappingNumberOfEntries
+    type: xsd:unsignedInt
+    value: "3"
+  - path: Device.NAT.InterfaceSettingNumberOfEntries
+    type: xsd:unsignedInt
+    value: "4"
+
+objects:
+  - path: Device.NAT.PortMapping
+    instances: 3
+    parameters:
+      - path: RemoteHost
+        value: ""
+        writable: true
+      - path: ExternalPortEndRange
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+
+groups:
+  - prefix: Device.NAT.PortMapping.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Status
+        value: "Disabled"
+      - path: Alias
+        value: "FT_API_DMZ"
+        writable: true
+      - path: LeaseDuration
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: ExternalPort
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: InternalPort
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: Protocol
+        value: "ALL"
+        writable: true
+      - path: InternalClient
+        value: ""
+        writable: true
+      - path: Description
+        value: ""
+        writable: true
+
+  - prefix: Device.NAT.PortMapping.2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: Alias
+        value: "cpe-36"
+        writable: true
+      - path: LeaseDuration
+        type: xsd:unsignedInt
+        value: "604800"
+        writable: true
+      - path: ExternalPort
+        type: xsd:unsignedInt
+        value: "7107"
+        writable: true
+      - path: InternalPort
+        type: xsd:unsignedInt
+        value: "7107"
+        writable: true
+      - path: Protocol
+        value: "UDP"
+        writable: true
+      - path: InternalClient
+        value: "192.168.1.144"
+        writable: true
+      - path: Description
+        value: "Microsoft Multiplayer"
+        writable: true
+
+  - prefix: Device.NAT.PortMapping.3
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: Alias
+        value: "cpe-43"
+        writable: true
+      - path: LeaseDuration
+        type: xsd:unsignedInt
+        value: "604800"
+        writable: true
+      - path: ExternalPort
+        type: xsd:unsignedInt
+        value: "3074"
+        writable: true
+      - path: InternalPort
+        type: xsd:unsignedInt
+        value: "3074"
+        writable: true
+      - path: Protocol
+        value: "UDP"
+        writable: true
+      - path: InternalClient
+        value: "192.168.1.144"
+        writable: true
+      - path: Description
+        value: "Microsoft Multiplayer"
+        writable: true
+
+  - prefix: Device.NAT.InterfaceSetting.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: Alias
+        value: "cpe-1"
+        writable: true
+      - path: Interface
+        value: "Device.IP.Interface.2"
+
+  - prefix: Device.NAT.InterfaceSetting.2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Error_Misconfigured"
+      - path: Alias
+        value: "cpe-2"
+        writable: true
+      - path: Interface
+        value: ""
+
+  - prefix: Device.NAT.InterfaceSetting.3
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Status
+        value: "Disabled"
+      - path: Alias
+        value: "cpe-3"
+        writable: true
+      - path: Interface
+        value: ""
+
+  - prefix: Device.NAT.InterfaceSetting.4
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Error_Misconfigured"
+      - path: Alias
+        value: "cpe-4"
+        writable: true
+      - path: Interface
+        value: ""

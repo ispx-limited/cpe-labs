@@ -1,0 +1,369 @@
+# Device.Ethernet: six interfaces. PHY1 to PHY5 are the switch ports
+# and PHY6 is the 10 Gbit/s uplink, Upstream=true, enumerated LAST,
+# which is what makes this model worth simulating: an ACS that assumes
+# Interface.1 is the WAN reads a switch port as the uplink. Two switch
+# ports carry a link, the rest are dormant, as on the surveyed unit.
+#
+# Per-port values (Upstream, Status, CurrentBitRate) are declared per
+# instance below: the loader rejects a group that redeclares a path a
+# table already materialized, so a value that differs per port cannot
+# be a table default with an override.
+
+parameters:
+  - path: Device.Ethernet.InterfaceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "6"
+  - path: Device.Ethernet.LinkNumberOfEntries
+    type: xsd:unsignedInt
+    value: "0"
+
+objects:
+  - path: Device.Ethernet.Interface
+    instances: 6
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: LastChange
+        type: xsd:unsignedInt
+        value: "0"
+      - path: LowerLayers
+        value: ""
+        writable: true
+      - path: MaxBitRate
+        type: xsd:int
+        value: "-1"
+        writable: true
+      - path: DuplexMode
+        value: "Auto"
+        writable: true
+      - path: EEECapability
+        type: xsd:boolean
+        value: "false"
+      - path: EEEEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Stats.ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.DiscardPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.DiscardPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.UnicastPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.UnicastPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.MulticastPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.MulticastPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BroadcastPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BroadcastPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.UnknownProtoPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+groups:
+  - prefix: Device.Ethernet.Interface.1
+    parameters:
+      - path: Status
+        value: "Up"
+      - path: Alias
+        value: "PHY1"
+        writable: true
+      - path: Name
+        value: "Device.Ethernet.Interface.1"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: MACAddress
+        value: "EC:FC:2F:{cpe:mac:2}:01"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "10"
+      - path: CurrentDuplexMode
+        value: "Half"
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 12000000
+          jitter: 0.2
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 24000000
+          jitter: 0.2
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 8000
+          jitter: 0.3
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 16000
+          jitter: 0.3
+
+  - prefix: Device.Ethernet.Interface.2
+    parameters:
+      - path: Status
+        value: "Dormant"
+      - path: Alias
+        value: "PHY2"
+        writable: true
+      - path: Name
+        value: "Device.Ethernet.Interface.2"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: MACAddress
+        value: "EC:FC:2F:{cpe:mac:2}:01"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "0"
+      - path: CurrentDuplexMode
+        value: "Unknown"
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.Ethernet.Interface.3
+    parameters:
+      - path: Status
+        value: "Dormant"
+      - path: Alias
+        value: "PHY3"
+        writable: true
+      - path: Name
+        value: "Device.Ethernet.Interface.3"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: MACAddress
+        value: "EC:FC:2F:{cpe:mac:2}:01"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "0"
+      - path: CurrentDuplexMode
+        value: "Unknown"
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.Ethernet.Interface.4
+    parameters:
+      - path: Status
+        value: "Up"
+      - path: Alias
+        value: "PHY4"
+        writable: true
+      - path: Name
+        value: "Device.Ethernet.Interface.4"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: MACAddress
+        value: "EC:FC:2F:{cpe:mac:2}:01"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "1000"
+      - path: CurrentDuplexMode
+        value: "Full"
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 12000000
+          jitter: 0.2
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 24000000
+          jitter: 0.2
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 8000
+          jitter: 0.3
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 16000
+          jitter: 0.3
+
+  - prefix: Device.Ethernet.Interface.5
+    parameters:
+      - path: Status
+        value: "Dormant"
+      - path: Alias
+        value: "PHY5"
+        writable: true
+      - path: Name
+        value: "Device.Ethernet.Interface.5"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: MACAddress
+        value: "EC:FC:2F:{cpe:mac:2}:01"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "0"
+      - path: CurrentDuplexMode
+        value: "Unknown"
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.Ethernet.Interface.6
+    parameters:
+      - path: Status
+        value: "Up"
+      - path: Alias
+        value: "PHY6"
+        writable: true
+      - path: Name
+        value: "Device.Ethernet.Interface.6"
+      - path: Upstream
+        type: xsd:boolean
+        value: "true"
+      - path: MACAddress
+        value: "EC:FC:2F:{cpe:mac:2}:02"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "10000"
+      - path: CurrentDuplexMode
+        value: "Full"
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 60000000
+          jitter: 0.2
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 120000000
+          jitter: 0.2
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 40000
+          jitter: 0.3
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 80000
+          jitter: 0.3

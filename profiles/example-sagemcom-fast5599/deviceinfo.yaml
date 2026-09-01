@@ -1,0 +1,77 @@
+# Device.DeviceInfo: identity and health. Manufacturer, OUI, model and
+# product class are the real strings; SerialNumber is the fleet base
+# the serial pattern in _top.yaml expands. SoftwareVersion is the build
+# the profile was surveyed from.
+
+parameters:
+  - path: Device.RootDataModelVersion
+    value: "2.12"
+
+groups:
+  - prefix: Device.DeviceInfo
+    parameters:
+      - path: DeviceCategory
+        value: ""
+      - path: Manufacturer
+        value: "Sagemcom"
+      - path: ManufacturerOUI
+        value: "ECFC2F"
+      - path: ModelName
+        value: "FAST5599"
+      - path: ModelNumber
+        value: "F5599"
+      - path: Description
+        value: ""
+        writable: true
+      - path: ProductClass
+        value: "FAST5599"
+      - path: SerialNumber
+        value: "BASE"
+      - path: HardwareVersion
+        value: "1.0"
+      - path: SoftwareVersion
+        value: "SGNB330000074"
+      - path: ActiveFirmwareImage
+        value: ""
+      - path: BootFirmwareImage
+        value: ""
+      - path: AdditionalHardwareVersion
+        value: "1.00"
+      - path: AdditionalSoftwareVersion
+        value: ""
+      - path: ProvisioningCode
+        value: ""
+        writable: true
+      - path: UpTime
+        type: xsd:unsignedInt
+        value: "686044"
+        writable: true
+        generator:
+          type: uptime
+          interval: 1s
+      - path: FirstUseDate
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: RebootCount
+        type: xsd:unsignedInt
+        value: "90"
+      - path: BuildDate
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: BootloaderVersion
+        value: ""
+
+  - prefix: Device.DeviceInfo.MemoryStatus
+    parameters:
+      - path: Total
+        type: xsd:unsignedInt
+        value: "937328"
+      - path: Free
+        type: xsd:unsignedInt
+        value: "200708"
+
+  - prefix: Device.DeviceInfo.ProcessStatus
+    parameters:
+      - path: CPUUsage
+        type: xsd:unsignedInt
+        value: "5"
