@@ -1,0 +1,109 @@
+# The household. Nine hosts: five on the router's own radios, one on
+# its switch, two behind the AiMesh node in the lounge and one wired
+# to the node in the study. Which node a host sits behind is read from
+# X_ASUS_AiMesh.Node.{i}.Client, not from here: this table only knows
+# a Layer1Interface, and for a mesh client that is the router's SSID.
+parameters:
+  - path: Device.Hosts.HostNumberOfEntries
+    type: xsd:unsignedInt
+    value: "9"
+
+objects:
+  - path: Device.Hosts.Host
+    instances: 9
+    parameters:
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: IPAddress
+        value: "192.168.50.{i}0"
+      - path: AddressSource
+        value: "DHCP"
+      - path: LeaseTimeRemaining
+        type: xsd:int
+        value: "86400"
+      - path: Layer3Interface
+        value: "Device.IP.Interface.2"
+      - path: Alias
+        value: "host-{i}"
+        writable: true
+      - path: IPv4AddressNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+      - path: IPv6AddressNumberOfEntries
+        type: xsd:unsignedInt
+        value: "0"
+
+groups:
+  - prefix: Device.Hosts.Host.1
+    parameters:
+      - path: PhysAddress
+        value: "02:A1:B2:00:01:01"
+      - path: HostName
+        value: "thermostat"
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.1"
+  - prefix: Device.Hosts.Host.2
+    parameters:
+      - path: PhysAddress
+        value: "02:A1:B2:00:01:02"
+      - path: HostName
+        value: "printer"
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.1"
+  - prefix: Device.Hosts.Host.3
+    parameters:
+      - path: PhysAddress
+        value: "02:A1:B2:00:02:01"
+      - path: HostName
+        value: "laptop"
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.2"
+  - prefix: Device.Hosts.Host.4
+    parameters:
+      - path: PhysAddress
+        value: "02:A1:B2:00:02:02"
+      - path: HostName
+        value: "phone"
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.2"
+  - prefix: Device.Hosts.Host.5
+    parameters:
+      - path: PhysAddress
+        value: "02:A1:B2:00:02:03"
+      - path: HostName
+        value: "tv"
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.2"
+  - prefix: Device.Hosts.Host.6
+    parameters:
+      - path: PhysAddress
+        value: "02:A1:B2:00:05:01"
+      - path: HostName
+        value: "desktop"
+      - path: Layer1Interface
+        value: "Device.Ethernet.Interface.1"
+  - prefix: Device.Hosts.Host.7
+    parameters:
+      - path: PhysAddress
+        value: "02:A1:B2:00:03:01"
+      - path: HostName
+        value: "tablet"
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.2"
+  - prefix: Device.Hosts.Host.8
+    parameters:
+      - path: PhysAddress
+        value: "02:A1:B2:00:03:02"
+      - path: HostName
+        value: "console"
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.2"
+  - prefix: Device.Hosts.Host.9
+    parameters:
+      - path: PhysAddress
+        value: "02:A1:B2:00:04:01"
+      - path: HostName
+        value: "nas"
+      - path: Layer1Interface
+        value: "Device.Ethernet.Interface.2"

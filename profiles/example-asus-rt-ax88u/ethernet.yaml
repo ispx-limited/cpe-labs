@@ -1,0 +1,302 @@
+# Nine ports. Interfaces 1 to 8 are the LAN switch and Interface 9 is
+# the WAN, which is how this hardware enumerates them: the WAN is eth0
+# in the firmware and lands last in the table. TR-181 says which port
+# is the uplink in Upstream, not in the instance number, so an ACS that
+# assumes Interface.1 is the WAN reads a switch port's counters as the
+# uplink's. Two of the switch ports have something plugged in.
+parameters:
+  - path: Device.Ethernet.InterfaceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "9"
+  - path: Device.Ethernet.LinkNumberOfEntries
+    type: xsd:unsignedInt
+    value: "9"
+
+objects:
+  - path: Device.Ethernet.Interface
+    instances: 9
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Alias
+        value: "PHY{i}"
+        writable: true
+      - path: LastChange
+        type: xsd:unsignedInt
+        value: "0"
+      - path: LowerLayers
+        value: ""
+        writable: true
+      - path: MACAddress
+        value: "00:00:5E:{cpe:hex:2}:A0:0{i}"
+      - path: MaxBitRate
+        type: xsd:int
+        value: "1000"
+        writable: true
+      - path: DuplexMode
+        value: "Auto"
+        writable: true
+      - path: EEEEnable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: EEECapability
+        type: xsd:boolean
+        value: "true"
+
+# Name, Upstream, Status and CurrentBitRate differ per port, and the
+# loader rejects a group that redeclares a path the table already
+# materialised, so they are declared per instance here.
+groups:
+  - prefix: Device.Ethernet.Interface.1
+    parameters:
+      - path: Name
+        value: "eth1"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: Status
+        value: "Up"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "1000"
+  - prefix: Device.Ethernet.Interface.2
+    parameters:
+      - path: Name
+        value: "eth2"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: Status
+        value: "Up"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "1000"
+  - prefix: Device.Ethernet.Interface.3
+    parameters:
+      - path: Name
+        value: "eth3"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: Status
+        value: "Down"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "0"
+  - prefix: Device.Ethernet.Interface.4
+    parameters:
+      - path: Name
+        value: "eth4"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: Status
+        value: "Down"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "0"
+  - prefix: Device.Ethernet.Interface.5
+    parameters:
+      - path: Name
+        value: "eth5"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: Status
+        value: "Down"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "0"
+  - prefix: Device.Ethernet.Interface.6
+    parameters:
+      - path: Name
+        value: "eth6"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: Status
+        value: "Down"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "0"
+  - prefix: Device.Ethernet.Interface.7
+    parameters:
+      - path: Name
+        value: "eth7"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: Status
+        value: "Down"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "0"
+  - prefix: Device.Ethernet.Interface.8
+    parameters:
+      - path: Name
+        value: "eth8"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: Status
+        value: "Down"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "0"
+  - prefix: Device.Ethernet.Interface.9
+    parameters:
+      - path: Name
+        value: "eth0"
+      - path: Upstream
+        type: xsd:boolean
+        value: "true"
+      - path: Status
+        value: "Up"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "1000"
+
+  # The uplink carries the household's traffic; the error counters
+  # move slowly, which is what an error-rate score needs to see a
+  # healthy line.
+  - prefix: Device.Ethernet.Interface.9.Stats
+    parameters:
+      - path: BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 14000000
+          jitter: 0.2
+      - path: BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 48000000
+          jitter: 0.2
+      - path: PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 9000
+          jitter: 0.3
+      - path: PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 21000
+          jitter: 0.3
+      - path: ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 120s
+          min: 0
+          max: 4294967295
+          step: 1
+          jitter: 0.9
+      - path: DiscardPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: DiscardPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+  - prefix: Device.Ethernet.Interface.1.Stats
+    parameters:
+      - path: BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 6000000
+          jitter: 0.3
+      - path: BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 2500000
+          jitter: 0.3
+      - path: PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
+  - prefix: Device.Ethernet.Interface.2.Stats
+    parameters:
+      - path: BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 900000
+          jitter: 0.4
+      - path: BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 400000
+          jitter: 0.4
+      - path: PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
