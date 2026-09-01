@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.8.0](https://github.com/ispx-limited/cpe-labs/compare/v0.7.0...v0.8.0) (2026-09-01)
+
+
+### Added
+
+* **profiles:** a Sagemcom FAST5599 whose uplink is the last port and whose accounts are not Device.Users ([#57](https://github.com/ispx-limited/cpe-labs/issues/57)) ([4bc650a](https://github.com/ispx-limited/cpe-labs/commit/4bc650a70495dacf36ad78ac23ebddda23425c0d))
+* **profiles:** a TR-098 gateway that supports bulk data collection ([#58](https://github.com/ispx-limited/cpe-labs/issues/58)) ([43f8716](https://github.com/ispx-limited/cpe-labs/commit/43f871649230d5456d4d7250c121a9dd151b7da7))
+* **profiles:** an ASUS RT-AX88U that keeps its mesh, site survey and remote access under vendor trees ([#56](https://github.com/ispx-limited/cpe-labs/issues/56)) ([8a04ff3](https://github.com/ispx-limited/cpe-labs/commit/8a04ff374813bcf607ebaf56bb1bd772edd231e1))
+
+
+### Fixed
+
+* **profiles:** every example declares where its ACS credentials live ([#60](https://github.com/ispx-limited/cpe-labs/issues/60)) ([d35d347](https://github.com/ispx-limited/cpe-labs/commit/d35d347c9ba36c8cc09623d8ffcdc39609ba393f))
+
 ## [0.7.0](https://github.com/ispx-limited/cpe-labs/compare/v0.6.0...v0.7.0) (2026-08-24)
 
 
