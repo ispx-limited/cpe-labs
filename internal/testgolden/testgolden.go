@@ -11,7 +11,7 @@
 //	}
 //
 // Run normally to verify: go test ./...
-// Regenerate fixtures:    go test -update ./...
+// Regenerate fixtures:    make golden, or go test -update on one package
 package testgolden
 
 import (
