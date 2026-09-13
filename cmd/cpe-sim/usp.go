@@ -21,10 +21,7 @@ import (
 // protocol is visible to the other, which is what a dual-stack CPE actually
 // does.
 func startUSPAgent(ctx context.Context, cfg cpeconfig.Config, st *cpeStack, logger *slog.Logger) error {
-	identity, err := uspIdentity(st)
-	if err != nil {
-		return err
-	}
+	identity := st.uspIdentity
 
 	log := logger.With("cpe_id", st.id, "endpoint_id", identity.EndpointID)
 
@@ -110,8 +107,7 @@ func startUSPAgent(ctx context.Context, cfg cpeconfig.Config, st *cpeStack, logg
 // uspIdentity reads the agent's identity out of the tree using the same
 // deviceIdPaths the profile declares for CWMP's Inform DeviceId. One identity
 // per CPE, one source of truth, so a fleet keys identically on both protocols.
-func uspIdentity(st *cpeStack) (uspagent.Identity, error) {
-	paths := st.uspIdentityPaths
+func uspIdentity(tree *paramtree.Tree, paths paramtree.DeviceIDPaths) (uspagent.Identity, error) {
 	if paths.OUI == "" || paths.SerialNumber == "" {
 		return uspagent.Identity{}, fmt.Errorf(
 			"profile declares no deviceIdPaths for OUI and serial, which USP needs for its endpoint id")
@@ -121,7 +117,7 @@ func uspIdentity(st *cpeStack) (uspagent.Identity, error) {
 		if path == "" {
 			return "", nil
 		}
-		v, err := st.tree.Get(path)
+		v, err := tree.Get(path)
 		if err != nil {
 			return "", fmt.Errorf("read %q: %w", path, err)
 		}
@@ -144,8 +140,12 @@ func uspIdentity(st *cpeStack) (uspagent.Identity, error) {
 		return uspagent.Identity{}, fmt.Errorf("OUI or serial is empty in the tree, cannot build an endpoint id")
 	}
 
+	endpointID, err := uspagent.EndpointIDFor(oui, serial)
+	if err != nil {
+		return uspagent.Identity{}, err
+	}
 	return uspagent.Identity{
-		EndpointID:   uspagent.EndpointIDFor(oui, serial),
+		EndpointID:   endpointID,
 		OUI:          oui,
 		ProductClass: productClass,
 		SerialNumber: serial,

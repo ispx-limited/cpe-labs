@@ -23,10 +23,8 @@ const AgentSupportedProtocolVersions = "1.3"
 // The trailing "!" is part of the data-model name for an event, not decoration.
 const BootEventName = "Boot!"
 
-// Identity is who the agent says it is. EndpointID follows TR-369 2.2: an
-// authority scheme, then "::", then a scheme-specific id. The `os` scheme is
-// <OUI><SerialNumber>, which is what obuspa and Herder both expect, so a
-// simulated fleet keys the same way a real one does.
+// Identity is who the agent says it is. EndpointID follows TR-369 2.2 and is
+// built by EndpointIDFor.
 type Identity struct {
 	EndpointID   string
 	OUI          string
@@ -34,9 +32,47 @@ type Identity struct {
 	SerialNumber string
 }
 
+// maxInstanceIDLength is the TR-369 2.2.2 (R-ARC.6) limit on an instance id.
+// R-ARC.5 defines the instance id as the encoded string, so the limit counts
+// an escaped octet as three characters.
+const maxInstanceIDLength = 50
+
 // EndpointIDFor builds the `os` scheme endpoint id for an OUI and serial.
-func EndpointIDFor(oui, serial string) string {
-	return "os::" + oui + serial
+//
+// TR-369 2.2.1 (R-ARC.2a) defines the `os` instance id as <OUI> "-"
+// <SerialNumber>. TR-369 2.2.2 (R-ARC.5) limits an instance id to ALPHA,
+// DIGIT, "-", "." and "_", with every other octet percent-encoded, so each
+// part is encoded before the join. An OUI is hex, so the first "-" is the
+// separator. An instance id over the R-ARC.6 limit is refused, not truncated,
+// since a truncated serial can collide with another CPE's.
+func EndpointIDFor(oui, serial string) (string, error) {
+	instance := escapeInstanceID(oui) + "-" + escapeInstanceID(serial)
+	if len(instance) > maxInstanceIDLength {
+		return "", fmt.Errorf("serial %q is too long for a USP endpoint id: instance id %q is %d characters, TR-369 R-ARC.6 allows %d",
+			serial, instance, len(instance), maxInstanceIDLength)
+	}
+	return "os::" + instance, nil
+}
+
+// escapeInstanceID percent-encodes s for an endpoint instance id. The R-ARC.5
+// unreserved set is RFC 3986's without "~", so net/url's escapers do not fit.
+func escapeInstanceID(s string) string {
+	const hexDigits = "0123456789ABCDEF"
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case 'A' <= c && c <= 'Z', 'a' <= c && c <= 'z', '0' <= c && c <= '9',
+			c == '-', c == '.', c == '_':
+			b.WriteByte(c)
+		default:
+			b.WriteByte('%')
+			b.WriteByte(hexDigits[c>>4])
+			b.WriteByte(hexDigits[c&0x0f])
+		}
+	}
+	return b.String()
 }
 
 // NewOnBoardRequest builds the Notify a controller treats as first contact.

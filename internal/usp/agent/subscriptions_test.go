@@ -32,7 +32,7 @@ objects:
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if err := EnsureLocalAgent(prof.Tree, "os::TEST0001", "self::controller"); err != nil {
+	if err := EnsureLocalAgent(prof.Tree, "os::0000C5-TEST0001", "self::controller"); err != nil {
 		t.Fatalf("ensure local agent: %v", err)
 	}
 	return prof.Tree

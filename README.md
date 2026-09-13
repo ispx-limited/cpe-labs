@@ -63,7 +63,7 @@ TR-369 (USP) over MQTT. Runs standalone (no ACS required) or alongside CWMP:
 | Subscriptions | Wildcard reference lists, so one subscription covers every instance including those created later |
 | Commands | Device.Reboot() re-fires Boot!, Device.FactoryReset() re-fires OnBoardRequest and Boot!, the way a restarted or wiped device re-introduces itself; FirmwareImage.{i}.Download() and Activate(), and the software module commands InstallDU(), Update() and Uninstall(), run asynchronously with a Request row, OperationComplete and their events |
 | MTP | MQTT 3.1.1 with the R-MQTT.24 reply-to-in-topic convention, which is what brokers without MQTT 5 user properties require |
-| Identity | TR-369 2.2 endpoint ids (`os::<OUI><Serial>`), derived from the same profile fields CWMP uses for its Inform DeviceId |
+| Identity | TR-369 2.2 endpoint ids (`os::<OUI>-<SerialNumber>`, percent-encoded where a serial needs it), derived from the same profile fields CWMP uses for its Inform DeviceId |
 
 TR-069 (CWMP) over HTTP and SOAP, standards-faithful by default, sharing the
 same parameter tree:

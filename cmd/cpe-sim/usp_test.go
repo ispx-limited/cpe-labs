@@ -129,6 +129,38 @@ func TestBuildCPEStackUSPOnlySkipsCWMP(t *testing.T) {
 	}
 }
 
+// TestUSPIdentityLengthLimit pins TR-369 R-ARC.6 at stack build, so a run
+// refuses before any CPE connects. "0000C5-" is seven characters, so a 43
+// character serial makes an instance id of exactly 50.
+func TestUSPIdentityLengthLimit(t *testing.T) {
+	cfg := cpeconfig.Config{ProfilePath: writeUSPTestProfile(t), USPBroker: "127.0.0.1:9"}
+	build := func(serial string) (*cpeStack, error) {
+		return buildCPEStack(cfg, loadTemplate(t, cfg.ProfilePath), cpeStackInputs{
+			id:        "cpe-1",
+			serial:    serial,
+			instance:  1,
+			rngSource: cperng.New(1),
+			logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
+		})
+	}
+
+	fits := strings.Repeat("S", 43)
+	st, err := build(fits)
+	if err != nil {
+		t.Fatalf("50 character instance id refused: %v", err)
+	}
+	if want := "os::0000C5-" + fits; st.uspIdentity.EndpointID != want {
+		t.Errorf("EndpointID = %q, want %q", st.uspIdentity.EndpointID, want)
+	}
+
+	tooLong := strings.Repeat("S", 44)
+	if _, err := build(tooLong); err == nil {
+		t.Error("51 character instance id accepted")
+	} else if !strings.Contains(err.Error(), tooLong) || !strings.Contains(err.Error(), "allows 50") {
+		t.Errorf("error should name the serial and the limit: %v", err)
+	}
+}
+
 type fakeAnnouncer struct {
 	boots     []string
 	announces []string
@@ -221,7 +253,7 @@ func TestEndpointIDLoggedExactlyOncePerLine(t *testing.T) {
 	// The runner side, wired the way startUSPAgent wires it.
 	runner, err := uspagent.NewRunner(uspagent.Config{
 		Identity: uspagent.Identity{
-			EndpointID:   "os::0000C5TEST0001",
+			EndpointID:   "os::0000C5-TEST0001",
 			OUI:          "0000C5",
 			SerialNumber: "TEST0001",
 		},
@@ -242,7 +274,7 @@ func TestEndpointIDLoggedExactlyOncePerLine(t *testing.T) {
 
 	// The operate side, which relies on the endpoint-bound logger.
 	buf.Reset()
-	boundLog := logger.With("cpe_id", "cpe-1", "endpoint_id", "os::0000C5TEST0001")
+	boundLog := logger.With("cpe_id", "cpe-1", "endpoint_id", "os::0000C5-TEST0001")
 	fake := &fakeAnnouncer{}
 	op := uspOperateFunc(&cpeStack{}, boundLog, func() uspAnnouncer { return fake }, func() uspFirmwareAgent { return nil })
 	if _, err := op("Device.Reboot()", "k1", nil); err != nil {

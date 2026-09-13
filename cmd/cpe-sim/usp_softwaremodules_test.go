@@ -124,7 +124,7 @@ func newSMHarness(t *testing.T) *fwHarness {
 	announcer := func() uspAnnouncer { return runner }
 	fwAgent := func() uspFirmwareAgent { return runner }
 	runner, err = uspagent.NewRunner(uspagent.Config{
-		Identity:     uspagent.Identity{EndpointID: "os::0000C5TEST0001", OUI: "0000C5", SerialNumber: "TEST0001"},
+		Identity:     uspagent.Identity{EndpointID: "os::0000C5-TEST0001", OUI: "0000C5", SerialNumber: "TEST0001"},
 		ControllerID: "self::controller",
 		Tree:         st.tree,
 		Transport:    tr,
