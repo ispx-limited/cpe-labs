@@ -30,18 +30,33 @@ parameters:
 	return prof.Tree
 }
 
+// A controller takes the OUI up to the first hyphen, and topics, record ids and
+// the MQTT client id carry the endpoint id verbatim, so the form and the
+// encoding have to be exact.
 func TestEndpointIDFor(t *testing.T) {
-	// The `os` scheme is <OUI><SerialNumber> with no separator: a controller
-	// splits the first six characters back off as the OUI, so an extra
-	// separator here would break identity extraction on the other side.
-	if got := EndpointIDFor("AABBCC", "DDEEFF"); got != "os::AABBCCDDEEFF" {
-		t.Errorf("EndpointIDFor = %q", got)
+	cases := []struct {
+		name, oui, serial, want string
+	}{
+		{"spec example", "00256D", "0123456789", "os::00256D-0123456789"},
+		{"unreserved kept", "0000C5", "SN-1.a_B", "os::0000C5-SN-1.a_B"},
+		{"space and slash", "0000C5", "SN 1/2", "os::0000C5-SN%201%2F2"},
+		{"mqtt wildcards", "0000C5", "A+B#", "os::0000C5-A%2BB%23"},
+		{"tilde and colon", "0000C5", "A~B:C", "os::0000C5-A%7EB%3AC"},
+		{"percent", "0000C5", "100%", "os::0000C5-100%25"},
+		{"non-ascii", "0000C5", "é1", "os::0000C5-%C3%A91"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := EndpointIDFor(tc.oui, tc.serial); got != tc.want {
+				t.Errorf("EndpointIDFor(%q, %q) = %q, want %q", tc.oui, tc.serial, got, tc.want)
+			}
+		})
 	}
 }
 
 func TestNewOnBoardRequestCarriesIdentityTriple(t *testing.T) {
 	id := Identity{
-		EndpointID:   "os::AABBCC0001",
+		EndpointID:   "os::AABBCC-0001",
 		OUI:          "AABBCC",
 		ProductClass: "SimRouter",
 		SerialNumber: "0001",
@@ -183,9 +198,9 @@ func TestHandleGetUnknownPathIsPerPathError(t *testing.T) {
 // it is the test that catches an envelope the controller cannot read.
 func TestWrapAndDecodeRoundTrip(t *testing.T) {
 	msg := NewOnBoardRequest("m4", Identity{
-		EndpointID: "os::AABBCC0001", OUI: "AABBCC", SerialNumber: "0001",
+		EndpointID: "os::AABBCC-0001", OUI: "AABBCC", SerialNumber: "0001",
 	})
-	envelope, err := codec.WrapMessage(msg, "os::AABBCC0001", "self::controller")
+	envelope, err := codec.WrapMessage(msg, "os::AABBCC-0001", "self::controller")
 	if err != nil {
 		t.Fatalf("wrap: %v", err)
 	}
@@ -194,7 +209,7 @@ func TestWrapAndDecodeRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode record: %v", err)
 	}
-	if rec.GetFromId() != "os::AABBCC0001" || rec.GetToId() != "self::controller" {
+	if rec.GetFromId() != "os::AABBCC-0001" || rec.GetToId() != "self::controller" {
 		t.Errorf("envelope ids wrong: from=%q to=%q", rec.GetFromId(), rec.GetToId())
 	}
 	if rec.GetVersion() != codec.RecordVersion {

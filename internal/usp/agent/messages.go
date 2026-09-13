@@ -23,10 +23,8 @@ const AgentSupportedProtocolVersions = "1.3"
 // The trailing "!" is part of the data-model name for an event, not decoration.
 const BootEventName = "Boot!"
 
-// Identity is who the agent says it is. EndpointID follows TR-369 2.2: an
-// authority scheme, then "::", then a scheme-specific id. The `os` scheme is
-// <OUI><SerialNumber>, which is what obuspa and Herder both expect, so a
-// simulated fleet keys the same way a real one does.
+// Identity is who the agent says it is. EndpointID follows TR-369 2.2 and is
+// built by EndpointIDFor.
 type Identity struct {
 	EndpointID   string
 	OUI          string
@@ -35,8 +33,35 @@ type Identity struct {
 }
 
 // EndpointIDFor builds the `os` scheme endpoint id for an OUI and serial.
+//
+// TR-369 2.2.1 (R-ARC.2a) defines the `os` instance id as <OUI> "-"
+// <SerialNumber>. TR-369 2.2.2 (R-ARC.5) limits an instance id to ALPHA,
+// DIGIT, "-", "." and "_", with every other octet percent-encoded, so each
+// part is encoded before the join. An OUI is hex, so the first "-" is the
+// separator.
 func EndpointIDFor(oui, serial string) string {
-	return "os::" + oui + serial
+	return "os::" + escapeInstanceID(oui) + "-" + escapeInstanceID(serial)
+}
+
+// escapeInstanceID percent-encodes s for an endpoint instance id. The R-ARC.5
+// unreserved set is RFC 3986's without "~", so net/url's escapers do not fit.
+func escapeInstanceID(s string) string {
+	const hexDigits = "0123456789ABCDEF"
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case 'A' <= c && c <= 'Z', 'a' <= c && c <= 'z', '0' <= c && c <= '9',
+			c == '-', c == '.', c == '_':
+			b.WriteByte(c)
+		default:
+			b.WriteByte('%')
+			b.WriteByte(hexDigits[c>>4])
+			b.WriteByte(hexDigits[c&0x0f])
+		}
+	}
+	return b.String()
 }
 
 // NewOnBoardRequest builds the Notify a controller treats as first contact.

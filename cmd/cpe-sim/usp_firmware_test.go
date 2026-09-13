@@ -62,7 +62,7 @@ func (f *fwTransport) Disconnect() {
 
 func (f *fwTransport) inject(t *testing.T, msg *usp.Msg) {
 	t.Helper()
-	payload, err := codec.WrapMessage(msg, "self::controller", "os::0000C5TEST0001")
+	payload, err := codec.WrapMessage(msg, "self::controller", "os::0000C5-TEST0001")
 	if err != nil {
 		t.Fatalf("wrap inbound: %v", err)
 	}
@@ -175,7 +175,7 @@ func newFWHarness(t *testing.T) *fwHarness {
 	fwAgent := func() uspFirmwareAgent { return runner }
 	runner, err = uspagent.NewRunner(uspagent.Config{
 		Identity: uspagent.Identity{
-			EndpointID:   "os::0000C5TEST0001",
+			EndpointID:   "os::0000C5-TEST0001",
 			OUI:          "0000C5",
 			SerialNumber: "TEST0001",
 		},

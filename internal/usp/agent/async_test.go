@@ -50,7 +50,7 @@ func newAsyncTestRunner(t *testing.T, operate OperateFunc) (*Runner, *lockedTran
 	tr := &lockedTransport{}
 	r, err := NewRunner(Config{
 		Identity: Identity{
-			EndpointID:   "os::0000C5TEST0001",
+			EndpointID:   "os::0000C5-TEST0001",
 			OUI:          "0000C5",
 			SerialNumber: "TEST0001",
 		},
@@ -322,7 +322,7 @@ func TestOperateWithoutRespStillCreatesRequest(t *testing.T) {
 			ReqType: &usp.Request_Operate{Operate: op},
 		}}},
 	}
-	payload, err := codec.WrapMessage(msg, "self::controller", "os::0000C5TEST0001")
+	payload, err := codec.WrapMessage(msg, "self::controller", "os::0000C5-TEST0001")
 	if err != nil {
 		t.Fatalf("wrap: %v", err)
 	}

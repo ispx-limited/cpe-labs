@@ -26,7 +26,7 @@ func newTestRunner(t *testing.T) (*Runner, *captureTransport) {
 	tr := &captureTransport{}
 	r, err := NewRunner(Config{
 		Identity: Identity{
-			EndpointID:   "os::0000C5TEST0001",
+			EndpointID:   "os::0000C5-TEST0001",
 			OUI:          "0000C5",
 			SerialNumber: "TEST0001",
 		},

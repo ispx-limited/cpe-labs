@@ -129,6 +129,27 @@ func TestBuildCPEStackUSPOnlySkipsCWMP(t *testing.T) {
 	}
 }
 
+func TestUSPIdentityFromTree(t *testing.T) {
+	cfg := cpeconfig.Config{ProfilePath: writeUSPTestProfile(t)}
+	st, err := buildCPEStack(cfg, loadTemplate(t, cfg.ProfilePath), cpeStackInputs{
+		id:        "cpe-1",
+		serial:    "TEST0001",
+		instance:  1,
+		rngSource: cperng.New(1),
+		logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
+	})
+	if err != nil {
+		t.Fatalf("buildCPEStack: %v", err)
+	}
+	id, err := uspIdentity(st)
+	if err != nil {
+		t.Fatalf("uspIdentity: %v", err)
+	}
+	if id.EndpointID != "os::0000C5-TEST0001" {
+		t.Errorf("EndpointID = %q, want os::0000C5-TEST0001", id.EndpointID)
+	}
+}
+
 type fakeAnnouncer struct {
 	boots     []string
 	announces []string
@@ -221,7 +242,7 @@ func TestEndpointIDLoggedExactlyOncePerLine(t *testing.T) {
 	// The runner side, wired the way startUSPAgent wires it.
 	runner, err := uspagent.NewRunner(uspagent.Config{
 		Identity: uspagent.Identity{
-			EndpointID:   "os::0000C5TEST0001",
+			EndpointID:   "os::0000C5-TEST0001",
 			OUI:          "0000C5",
 			SerialNumber: "TEST0001",
 		},
@@ -242,7 +263,7 @@ func TestEndpointIDLoggedExactlyOncePerLine(t *testing.T) {
 
 	// The operate side, which relies on the endpoint-bound logger.
 	buf.Reset()
-	boundLog := logger.With("cpe_id", "cpe-1", "endpoint_id", "os::0000C5TEST0001")
+	boundLog := logger.With("cpe_id", "cpe-1", "endpoint_id", "os::0000C5-TEST0001")
 	fake := &fakeAnnouncer{}
 	op := uspOperateFunc(&cpeStack{}, boundLog, func() uspAnnouncer { return fake }, func() uspFirmwareAgent { return nil })
 	if _, err := op("Device.Reboot()", "k1", nil); err != nil {

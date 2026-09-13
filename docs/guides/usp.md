@@ -44,17 +44,27 @@ the `--usp-*` flags for CWMP-only.
 ## Endpoint identity
 
 Endpoint ids follow TR-369 2.2: an authority scheme, `::`, then a
-scheme-specific id. The Agent uses the `os` scheme, so the id is
-`os::<OUI><SerialNumber>` with no separator inside it.
+scheme-specific id. The Agent uses the `os` scheme, whose id is the OUI and the
+serial number joined by a hyphen: `os::<OUI>-<SerialNumber>`.
 
 For `(OUI=ECFC2F, Serial=XU2033K7Q2M4RB)` the Agent registers as
-`os::ECFC2FXU2033K7Q2M4RB`.
+`os::ECFC2F-XU2033K7Q2M4RB`.
 
-Both values are read from the same `deviceIdPaths` the profile already declares
-for CWMP's Inform DeviceId. An operator who has said what their device's OUI and
-serial are should not have to say it twice per protocol, and reading one source
-means a CPE cannot present one identity over CWMP and a different one over USP.
-Per-CPE differentiation therefore works exactly as it does for CWMP:
+TR-369 allows only letters, digits, `-`, `.` and `_` in that id, so any other
+character in a serial is percent-encoded: a serial of `SN 1/2` gives
+`os::ECFC2F-SN%201%2F2`. An OUI is hex, so a Controller can split it off at the
+first hyphen.
+
+The same id is the MQTT client id, the default MQTT username, the
+`<endpoint-id>` in the topics below, and the value of
+`Device.LocalAgent.EndpointID`.
+
+The OUI and serial are read from the same `deviceIdPaths` the profile already
+declares for CWMP's Inform DeviceId. An operator who has said what their
+device's OUI and serial are should not have to say it twice per protocol, and
+reading one source means a CPE cannot present one identity over CWMP and a
+different one over USP. Per-CPE differentiation therefore works exactly as it
+does for CWMP:
 `fleet.serialPattern` and the `{cpe:*}` placeholders stamp unique serials, and
 endpoint ids follow automatically. See [Multi-CPE Fleets](multi-cpe.md).
 

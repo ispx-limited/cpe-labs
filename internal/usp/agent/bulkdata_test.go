@@ -277,7 +277,7 @@ func (f *failingTransport) Publish(p []byte) error {
 func TestBulkDataRetainsFailedReportsAcrossADeadMTP(t *testing.T) {
 	tr := &failingTransport{}
 	r, err := NewRunner(Config{
-		Identity:     Identity{EndpointID: "os::0000C5TEST0001", OUI: "0000C5", SerialNumber: "TEST0001"},
+		Identity:     Identity{EndpointID: "os::0000C5-TEST0001", OUI: "0000C5", SerialNumber: "TEST0001"},
 		ControllerID: "self::controller",
 		Tree:         subTree(t),
 		Transport:    tr,
