@@ -129,24 +129,35 @@ func TestBuildCPEStackUSPOnlySkipsCWMP(t *testing.T) {
 	}
 }
 
-func TestUSPIdentityFromTree(t *testing.T) {
-	cfg := cpeconfig.Config{ProfilePath: writeUSPTestProfile(t)}
-	st, err := buildCPEStack(cfg, loadTemplate(t, cfg.ProfilePath), cpeStackInputs{
-		id:        "cpe-1",
-		serial:    "TEST0001",
-		instance:  1,
-		rngSource: cperng.New(1),
-		logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
-	})
-	if err != nil {
-		t.Fatalf("buildCPEStack: %v", err)
+// TestUSPIdentityLengthLimit pins TR-369 R-ARC.6 at stack build, so a run
+// refuses before any CPE connects. "0000C5-" is seven characters, so a 43
+// character serial makes an instance id of exactly 50.
+func TestUSPIdentityLengthLimit(t *testing.T) {
+	cfg := cpeconfig.Config{ProfilePath: writeUSPTestProfile(t), USPBroker: "127.0.0.1:9"}
+	build := func(serial string) (*cpeStack, error) {
+		return buildCPEStack(cfg, loadTemplate(t, cfg.ProfilePath), cpeStackInputs{
+			id:        "cpe-1",
+			serial:    serial,
+			instance:  1,
+			rngSource: cperng.New(1),
+			logger:    slog.New(slog.NewTextHandler(io.Discard, nil)),
+		})
 	}
-	id, err := uspIdentity(st)
+
+	fits := strings.Repeat("S", 43)
+	st, err := build(fits)
 	if err != nil {
-		t.Fatalf("uspIdentity: %v", err)
+		t.Fatalf("50 character instance id refused: %v", err)
 	}
-	if id.EndpointID != "os::0000C5-TEST0001" {
-		t.Errorf("EndpointID = %q, want os::0000C5-TEST0001", id.EndpointID)
+	if want := "os::0000C5-" + fits; st.uspIdentity.EndpointID != want {
+		t.Errorf("EndpointID = %q, want %q", st.uspIdentity.EndpointID, want)
+	}
+
+	tooLong := strings.Repeat("S", 44)
+	if _, err := build(tooLong); err == nil {
+		t.Error("51 character instance id accepted")
+	} else if !strings.Contains(err.Error(), tooLong) || !strings.Contains(err.Error(), "allows 50") {
+		t.Errorf("error should name the serial and the limit: %v", err)
 	}
 }
 

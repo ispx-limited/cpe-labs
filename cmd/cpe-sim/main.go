@@ -42,6 +42,7 @@ import (
 	"github.com/ispx-limited/cpe-labs/internal/generators"
 	"github.com/ispx-limited/cpe-labs/internal/paramtree"
 	"github.com/ispx-limited/cpe-labs/internal/softwaremodules"
+	uspagent "github.com/ispx-limited/cpe-labs/internal/usp/agent"
 	"github.com/ispx-limited/cpe-labs/internal/version"
 )
 
@@ -85,12 +86,12 @@ type cpeStack struct {
 	crEndpointPath string
 	crPublishPath  string
 
-	// uspIdentityPaths and uspBootParams are captured from the profile so the
-	// USP agent can derive its endpoint id and Boot! parameter map from the
-	// same declarations CWMP's Inform uses. Both empty when the profile
-	// declares no deviceIdPaths.
-	uspIdentityPaths paramtree.DeviceIDPaths
-	uspBootParams    []string
+	// uspIdentity and uspBootParams come from the same profile declarations
+	// CWMP's Inform uses, so the USP agent keys and boots the way the CWMP
+	// side does. uspIdentity is resolved when the stack is built and is zero
+	// when USP is off.
+	uspIdentity   uspagent.Identity
+	uspBootParams []string
 
 	// firmware is the profile's transfer.firmware block, shared by the CWMP
 	// Download sequence and the USP FirmwareImage commands. Nil disables
@@ -943,6 +944,18 @@ func buildCPEStack(cfg cpeconfig.Config, template *paramtree.Profile, in cpeStac
 		return nil, fmt.Errorf("fleet placeholder substitution: %w", subErr)
 	}
 
+	// The USP identity is resolved here, with the tree final and nothing
+	// registered yet, not when the agent starts: a dual-stack agent starts
+	// after CWMP bootstrap, so a serial TR-369 cannot carry would otherwise be
+	// refused only after the fleet had reached the ACS.
+	var uspID uspagent.Identity
+	if cfg.USPBroker != "" {
+		uspID, err = uspIdentity(prof.Tree, prof.DeviceIDPaths)
+		if err != nil {
+			return nil, fmt.Errorf("usp: %w", err)
+		}
+	}
+
 	// Generators: per-CPE Runner with its own Tree + RNG. Built regardless of
 	// protocol: generators drive the tree, and the tree is what produces USP
 	// ValueChange notifies, so a USP-only run still needs its values moving.
@@ -1261,10 +1274,10 @@ func buildCPEStack(cfg cpeconfig.Config, template *paramtree.Profile, in cpeStac
 		crEndpointPath: crEndpointPath,
 		crPublishPath:  crPublishPath,
 
-		uspIdentityPaths: prof.DeviceIDPaths,
-		uspBootParams:    uspBootParameters(prof),
-		firmware:         prof.Transfer.Firmware,
-		softwareModules:  smManager,
+		uspIdentity:     uspID,
+		uspBootParams:   uspBootParameters(prof),
+		firmware:        prof.Transfer.Firmware,
+		softwareModules: smManager,
 	}, nil
 }
 

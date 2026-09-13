@@ -47,8 +47,40 @@ func TestEndpointIDFor(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := EndpointIDFor(tc.oui, tc.serial); got != tc.want {
+			got, err := EndpointIDFor(tc.oui, tc.serial)
+			if err != nil {
+				t.Fatalf("EndpointIDFor(%q, %q): %v", tc.oui, tc.serial, err)
+			}
+			if got != tc.want {
 				t.Errorf("EndpointIDFor(%q, %q) = %q, want %q", tc.oui, tc.serial, got, tc.want)
+			}
+		})
+	}
+}
+
+// The limit counts the encoded instance id, so an escaped octet is three
+// characters. "0000C5-" is seven, leaving 43 for the serial.
+func TestEndpointIDForLengthLimit(t *testing.T) {
+	cases := []struct {
+		name   string
+		serial string
+		ok     bool
+	}{
+		{"50 characters", strings.Repeat("A", 43), true},
+		{"51 characters", strings.Repeat("A", 44), false},
+		{"50 once encoded", strings.Repeat("A", 40) + " ", true},
+		{"51 once encoded", strings.Repeat("A", 41) + " ", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := EndpointIDFor("0000C5", tc.serial)
+			switch {
+			case tc.ok && err != nil:
+				t.Errorf("refused: %v", err)
+			case !tc.ok && err == nil:
+				t.Error("accepted")
+			case !tc.ok && (!strings.Contains(err.Error(), tc.serial) || !strings.Contains(err.Error(), "allows 50")):
+				t.Errorf("error should name the serial and the limit: %v", err)
 			}
 		})
 	}

@@ -55,6 +55,11 @@ character in a serial is percent-encoded: a serial of `SN 1/2` gives
 `os::ECFC2F-SN%201%2F2`. An OUI is hex, so a Controller can split it off at the
 first hyphen.
 
+The part after `os::` is capped at 50 characters, counted after encoding
+(R-ARC.6), so a six character OUI leaves 43 for the serial. With `--usp-broker`
+set, a serial that would go over stops the run at startup, and the error names
+the serial.
+
 The same id is the MQTT client id, the default MQTT username, the
 `<endpoint-id>` in the topics below, and the value of
 `Device.LocalAgent.EndpointID`.

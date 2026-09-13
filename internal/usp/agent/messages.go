@@ -32,15 +32,26 @@ type Identity struct {
 	SerialNumber string
 }
 
+// maxInstanceIDLength is the TR-369 2.2.2 (R-ARC.6) limit on an instance id.
+// R-ARC.5 defines the instance id as the encoded string, so the limit counts
+// an escaped octet as three characters.
+const maxInstanceIDLength = 50
+
 // EndpointIDFor builds the `os` scheme endpoint id for an OUI and serial.
 //
 // TR-369 2.2.1 (R-ARC.2a) defines the `os` instance id as <OUI> "-"
 // <SerialNumber>. TR-369 2.2.2 (R-ARC.5) limits an instance id to ALPHA,
 // DIGIT, "-", "." and "_", with every other octet percent-encoded, so each
 // part is encoded before the join. An OUI is hex, so the first "-" is the
-// separator.
-func EndpointIDFor(oui, serial string) string {
-	return "os::" + escapeInstanceID(oui) + "-" + escapeInstanceID(serial)
+// separator. An instance id over the R-ARC.6 limit is refused, not truncated,
+// since a truncated serial can collide with another CPE's.
+func EndpointIDFor(oui, serial string) (string, error) {
+	instance := escapeInstanceID(oui) + "-" + escapeInstanceID(serial)
+	if len(instance) > maxInstanceIDLength {
+		return "", fmt.Errorf("serial %q is too long for a USP endpoint id: instance id %q is %d characters, TR-369 R-ARC.6 allows %d",
+			serial, instance, len(instance), maxInstanceIDLength)
+	}
+	return "os::" + instance, nil
 }
 
 // escapeInstanceID percent-encodes s for an endpoint instance id. The R-ARC.5
