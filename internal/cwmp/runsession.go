@@ -30,6 +30,11 @@ type RunSessionOptions struct {
 	// accounting (incrementing the count and arming the retry timer)
 	// belongs to the orchestrator, which owns timers.
 	Retry *RetryState
+
+	// AfterSession is optional. When set, RunSession runs its queue as
+	// soon as Session.Run returns, whether or not the session ended
+	// cleanly: the CPE committed those changes when it answered them.
+	AfterSession *AfterSession
 }
 
 // RunSession runs one CWMP session: pulls events + parameter lists
@@ -94,7 +99,11 @@ func RunSession(ctx context.Context, opts RunSessionOptions, trigger Trigger) er
 	}
 	opts.Session.setRetryCount(retryCount)
 
-	if err := opts.Session.Run(ctx, events); err != nil {
+	err = opts.Session.Run(ctx, events)
+	if opts.AfterSession != nil {
+		opts.AfterSession.Run()
+	}
+	if err != nil {
 		requeueUndelivered(opts.Tracker, events)
 		requeueTransferCompletes(opts.Tracker, transferCompletes)
 		requeueDUStateCompletes(opts.Tracker, duStateCompletes)

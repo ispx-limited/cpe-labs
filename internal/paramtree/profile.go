@@ -37,6 +37,7 @@ type Profile struct {
 	ConnectionRequest   ConnectionRequestConfig
 	PeriodicInformPaths PeriodicInformPaths
 	ACSCredentialPaths  ACSCredentialPaths
+	DeferredParameters  []string
 	Generators          []GeneratorConfig
 	Fleet               FleetConfig
 	EventSchedule       EventScheduleConfig
@@ -522,6 +523,7 @@ func LoadProfileFromReader(r io.Reader, path string) (*Profile, error) {
 		ConnectionRequest:   mc.ConnectionRequest,
 		PeriodicInformPaths: mc.PeriodicInformPaths,
 		ACSCredentialPaths:  mc.ACSCredentialPaths,
+		DeferredParameters:  mc.DeferredParameters,
 		Generators:          mc.Generators,
 		Diagnostics:         mc.Diagnostics,
 		Fleet:               mc.Fleet,
@@ -544,6 +546,7 @@ type profile struct {
 	ConnectionRequest   *rawConnectionRequest   `yaml:"connectionRequest"`
 	PeriodicInformPaths *rawPeriodicInformPaths `yaml:"periodicInformPaths"`
 	ACSCredentialPaths  *rawACSCredentialPaths  `yaml:"acsCredentialPaths"`
+	DeferredParameters  []string                `yaml:"deferredParameters"`
 	Generators          []rawGenerator          `yaml:"generators"`
 	Fleet               *rawFleet               `yaml:"fleet"`
 	EventSchedule       *rawEventSchedule       `yaml:"eventSchedule"`
@@ -888,6 +891,7 @@ func loadProfileDir(dir string) (*Profile, error) {
 		ConnectionRequest:   mc.ConnectionRequest,
 		PeriodicInformPaths: mc.PeriodicInformPaths,
 		ACSCredentialPaths:  mc.ACSCredentialPaths,
+		DeferredParameters:  mc.DeferredParameters,
 		Generators:          mc.Generators,
 		Diagnostics:         mc.Diagnostics,
 		Fleet:               mc.Fleet,
@@ -920,6 +924,7 @@ type mergedConfig struct {
 	ConnectionRequest   ConnectionRequestConfig
 	PeriodicInformPaths PeriodicInformPaths
 	ACSCredentialPaths  ACSCredentialPaths
+	DeferredParameters  []string
 	Generators          []GeneratorConfig
 	Fleet               FleetConfig
 	EventSchedule       EventScheduleConfig
@@ -1293,6 +1298,28 @@ func mergeFiles(tree *Tree, files []*loadedFile) (mergedConfig, error) {
 		acsCredSource = lf.path
 	}
 
+	// Merge deferredParameters as a union across files. Each entry must
+	// name a writable leaf, the only thing SetParameterValues can write.
+	var deferred []string
+	seenDeferred := map[string]bool{}
+	for _, lf := range files {
+		for _, path := range lf.prof.DeferredParameters {
+			v, gerr := tree.Get(path)
+			if gerr != nil {
+				return mergedConfig{}, cpeerr.Wrap("paramtree.LoadProfile", cpeerr.KindInvalidArgument,
+					fmt.Errorf("%s: deferredParameters references unknown path %q: %w", lf.path, path, gerr))
+			}
+			if !v.Writable {
+				return mergedConfig{}, cpeerr.Wrap("paramtree.LoadProfile", cpeerr.KindInvalidArgument,
+					fmt.Errorf("%s: deferredParameters path %q must be writable", lf.path, path))
+			}
+			if !seenDeferred[path] {
+				seenDeferred[path] = true
+				deferred = append(deferred, path)
+			}
+		}
+	}
+
 	// Merge eventSchedule with conflict detection. All three duration
 	// fields parse via time.ParseDuration; negative values reject. Zero
 	// preserves the simulator's existing immediate behavior for the
@@ -1568,6 +1595,7 @@ func mergeFiles(tree *Tree, files []*loadedFile) (mergedConfig, error) {
 		ConnectionRequest:   crCfg,
 		PeriodicInformPaths: periodicCfg,
 		ACSCredentialPaths:  acsCredCfg,
+		DeferredParameters:  deferred,
 		Generators:          generators,
 		Fleet:               fleetCfg,
 		EventSchedule:       eventScheduleCfg,

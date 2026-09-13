@@ -84,6 +84,7 @@ func LoadAppManifest(r io.Reader, source string) (*AppManifest, error) {
 		"connectionRequest":   lf.prof.ConnectionRequest != nil,
 		"periodicInformPaths": lf.prof.PeriodicInformPaths != nil,
 		"acsCredentialPaths":  lf.prof.ACSCredentialPaths != nil,
+		"deferredParameters":  len(lf.prof.DeferredParameters) > 0,
 		"fleet":               lf.prof.Fleet != nil,
 		"eventSchedule":       lf.prof.EventSchedule != nil,
 		"diagnostics":         len(lf.prof.Diagnostics) > 0,

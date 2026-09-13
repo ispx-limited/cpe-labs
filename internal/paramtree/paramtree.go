@@ -407,14 +407,49 @@ func (t *Tree) SetBatch(setters []Setter) ([]BatchResult, error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	// Pre-flight: detect duplicates, resolve every path, check
-	// writability + type stability + value validity. No mutation.
-	type prepared struct {
-		node *Node
-		old  Value
-		new  Value
+	resolved, err := t.preflight(setters)
+	if err != nil {
+		return nil, err
 	}
-	resolved := make([]prepared, 0, len(setters))
+
+	// No faults means resolved is 1:1 with setters (every entry either
+	// faulted and returned above, or resolved), so indexing setters[i]
+	// below is aligned.
+	results := make([]BatchResult, len(resolved))
+	for i, r := range resolved {
+		*r.node.leaf = r.new
+		results[i] = BatchResult{
+			Path:     setters[i].Path,
+			OldValue: r.old,
+			NewValue: r.new,
+			Changed:  r.old.Raw != r.new.Raw,
+		}
+	}
+	return results, nil
+}
+
+// CheckBatch runs SetBatch's pre-flight without applying anything. It
+// returns the *SetBatchError SetBatch would return, or nil when SetBatch
+// would apply every entry against the tree as it stands now.
+func (t *Tree) CheckBatch(setters []Setter) error {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	_, err := t.preflight(setters)
+	return err
+}
+
+// batchEntry is one pre-flighted SetBatch entry.
+type batchEntry struct {
+	node *Node
+	old  Value
+	new  Value
+}
+
+// preflight detects duplicates, resolves every path, and checks
+// writability, type stability and value validity, mutating nothing.
+// The caller holds t.mu.
+func (t *Tree) preflight(setters []Setter) ([]batchEntry, error) {
+	resolved := make([]batchEntry, 0, len(setters))
 	seen := make(map[string]struct{}, len(setters))
 
 	// Pre-flight collects EVERY failing entry rather than aborting on
@@ -460,28 +495,14 @@ func (t *Tree) SetBatch(setters []Setter) ([]BatchResult, error) {
 			addFault(s.Path, FailureInvalidValue, err)
 			continue
 		}
-		resolved = append(resolved, prepared{node: n, old: *n.leaf, new: s.Value})
+		resolved = append(resolved, batchEntry{node: n, old: *n.leaf, new: s.Value})
 	}
 
 	if len(faults) > 0 {
 		first := faults[0]
 		return nil, &SetBatchError{Path: first.Path, Code: first.Code, Err: first.Err, All: faults}
 	}
-
-	// No faults means resolved is 1:1 with setters (every entry either
-	// faulted and returned above, or resolved), so indexing setters[i]
-	// below is aligned.
-	results := make([]BatchResult, len(resolved))
-	for i, r := range resolved {
-		*r.node.leaf = r.new
-		results[i] = BatchResult{
-			Path:     setters[i].Path,
-			OldValue: r.old,
-			NewValue: r.new,
-			Changed:  r.old.Raw != r.new.Raw,
-		}
-	}
-	return results, nil
+	return resolved, nil
 }
 
 // Names returns parameter paths visible under prefix.
