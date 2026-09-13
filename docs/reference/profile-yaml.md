@@ -20,6 +20,8 @@ objects:              # multi-instance objects (table-shaped)
 groups:               # single-instance prefix groupings
 informParameters:     # per-event-code parameter lists for Inform builder
 periodicInformPaths:  # leaves the per-CPE periodic Inform timer reads
+acsCredentialPaths:   # leaves holding the credential the CPE presents to the ACS
+deferredParameters:   # writable leaves applied only after the session that sets them
 generators:           # top-level generators list
 fleet:                # fleet count + offset + pools + serial pattern
 connectionRequest:    # CR listener auth + throttle
@@ -172,6 +174,25 @@ acsCredentialPaths:
 ```
 
 When omitted, the fleet authenticates with the global static credentials from CLI/env, and ACS-driven rotation has no effect (the pre-#81 behavior).
+
+## `deferredParameters`
+
+Lists leaves the CPE commits when an ACS writes them but applies only after the session ends. A `SetParameterValues` that touches any listed leaf is validated in full, answered with `Status` 1, and applied as one batch once the session closes. A request that touches none applies at once with `Status` 0. Real CPEs answer both ways, so an ACS has to handle both.
+
+Each entry is the path of a writable leaf. In a multi-file profile, every file's entries join one list.
+
+The batch applies even when the session ends in error, because the CPE committed it when it answered. If a later write in the same session leaves the batch invalid, none of it applies.
+
+```yaml
+acsCredentialPaths:
+  username: Device.ManagementServer.Username
+  password: Device.ManagementServer.Password
+deferredParameters:
+  - Device.ManagementServer.Username
+  - Device.ManagementServer.Password
+```
+
+With both blocks, an ACS that rotates the credential gets `Status` 1, and the CPE authenticates with the new credential from its next session.
 
 ## `generators` (top-level)
 
@@ -492,6 +513,7 @@ The loader rejects loudly. Every error names the source file and offending key:
 - `instances: N` on a non-`{i}` path.
 - Inform parameters referencing paths that don't exist in the tree.
 - `periodicInformPaths` leaves with the wrong type or non-writable.
+- `deferredParameters` entries that don't exist in the tree or aren't writable.
 - `connectionRequest` with `scheme` set but missing `realm` / `usernameParameter` / `passwordParameter`.
 - `eventSchedule` durations that don't parse via Go's `time.ParseDuration`, or that parse to a negative value.
 - `transfer.firmware` with a missing `versionPath`, a `versionPath` that doesn't exist or isn't `xsd:string`, or an `applyDelay` that doesn't parse or is negative.

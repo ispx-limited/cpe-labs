@@ -59,6 +59,7 @@ func TestLoadAppManifestRejects(t *testing.T) {
 		"bad name":      "app:\n  name: \"home hub\"\n  version: 1\nparameters:\n  - path: Device.X.Y\n",
 		"no version":    "app:\n  name: hub\nparameters:\n  - path: Device.X.Y\n",
 		"profile block": "app:\n  name: hub\n  version: 1\nfleet:\n  count: 2\nparameters:\n  - path: Device.X.Y\n",
+		"deferred list": "app:\n  name: hub\n  version: 1\ndeferredParameters:\n  - Device.X.Y\nparameters:\n  - path: Device.X.Y\n    writable: true\n",
 		"no data model": "app:\n  name: hub\n  version: 1\n",
 		"bad generator": "app:\n  name: hub\n  version: 1\nparameters:\n  - path: Device.X.Y\ngenerators:\n  - path: Device.X.Y\n    type: counter\n    interval: 1s\n",
 		"stray key":     "app:\n  name: hub\n  version: 1\n  colour: red\nparameters:\n  - path: Device.X.Y\n",

@@ -1034,11 +1034,13 @@ func buildCPEStack(cfg cpeconfig.Config, template *paramtree.Profile, in cpeStac
 		// split per concern, same pattern as ":generators", so retry waits
 		// replay deterministically under --seed without perturbing jitter.
 		retryState := cwmp.NewRetryState(in.rngSource.ForCPE(in.id + ":retry"))
+		afterSession := &cwmp.AfterSession{}
 		runOpts = &cwmp.RunSessionOptions{
 			Tracker:       tracker,
 			Tree:          prof.Tree,
 			DeviceIDPaths: builderOpts.DeviceIDPaths,
 			Retry:         retryState,
+			AfterSession:  afterSession,
 		}
 		runner = &sessionRunner{
 			cpeID:   in.id,
@@ -1138,9 +1140,9 @@ func buildCPEStack(cfg cpeconfig.Config, template *paramtree.Profile, in cpeStac
 				// and an ACS triggers a diagnostic by writing a parameter
 				// nobody has set notification on. Background context
 				// because a run outlives the session that started it.
-				handlers.NewSetParameterValuesWithHook(prof.Tree, valueChange, func(path string) {
+				handlers.NewSetParameterValuesDeferring(prof.Tree, valueChange, func(path string) {
 					diagRunner.OnWrite(context.Background(), path)
-				}),
+				}, prof.DeferredParameters, afterSession),
 				handlers.NewSetParameterAttributes(prof.Tree),
 				handlers.NewAddObject(prof.Tree),
 				handlers.NewDeleteObject(prof.Tree),

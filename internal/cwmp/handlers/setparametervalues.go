@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 
 	"github.com/ispx-limited/cpe-labs/internal/cwmp"
 	"github.com/ispx-limited/cpe-labs/internal/cwmp/soap"
@@ -25,6 +26,10 @@ type spvHandler struct {
 	// the CPE still has to act on it.
 	onSet       func(path string)
 	valueChange func(path string)
+	// deferred names the leaves this CPE applies only after the session
+	// that wrote them; afterSession is where those writes wait.
+	deferred     map[string]bool
+	afterSession *cwmp.AfterSession
 }
 
 // NewSetParameterValues returns a cwmp.Handler implementing
@@ -44,6 +49,20 @@ func NewSetParameterValues(tree *paramtree.Tree, valueChange func(path string)) 
 // two-argument form.
 func NewSetParameterValuesWithHook(tree *paramtree.Tree, valueChange, onSet func(path string)) cwmp.Handler {
 	return &spvHandler{tree: tree, valueChange: valueChange, onSet: onSet}
+}
+
+// NewSetParameterValuesDeferring is NewSetParameterValuesWithHook for a
+// CPE that applies some parameters only after the session that set them.
+// A request touching any path in deferred is validated in full, answered
+// with Status 1 (TR-069 A.3.2.1), and applied as one batch when
+// afterSession runs; valueChange and onSet fire then. Every other request
+// applies at once with Status 0.
+func NewSetParameterValuesDeferring(tree *paramtree.Tree, valueChange, onSet func(path string), deferred []string, afterSession *cwmp.AfterSession) cwmp.Handler {
+	set := make(map[string]bool, len(deferred))
+	for _, p := range deferred {
+		set[p] = true
+	}
+	return &spvHandler{tree: tree, valueChange: valueChange, onSet: onSet, deferred: set, afterSession: afterSession}
 }
 
 func (h *spvHandler) Method() string { return "SetParameterValues" }
@@ -67,9 +86,37 @@ func (h *spvHandler) Handle(_ context.Context, req xml.TokenReader, w io.Writer)
 		return err
 	}
 
-	results, err := h.tree.SetBatch(prepared)
-	if err != nil {
+	if h.defers(prepared) {
+		if err := h.tree.CheckBatch(prepared); err != nil {
+			return mapSetBatchError(err)
+		}
+		// The batch was valid when accepted. Only a later write in the
+		// same session can invalidate it, and a real CPE drops a change
+		// it can no longer apply just the same.
+		h.afterSession.Add(func() { _ = h.apply(prepared) })
+		return writef(w, "      <Status>1</Status>\n")
+	}
+
+	if err := h.apply(prepared); err != nil {
 		return mapSetBatchError(err)
+	}
+	return writef(w, "      <Status>0</Status>\n")
+}
+
+// defers reports whether the request touches a parameter this CPE
+// applies only after the session.
+func (h *spvHandler) defers(setters []paramtree.Setter) bool {
+	if h.afterSession == nil {
+		return false
+	}
+	return slices.ContainsFunc(setters, func(s paramtree.Setter) bool { return h.deferred[s.Path] })
+}
+
+// apply writes the batch and fires the change callbacks.
+func (h *spvHandler) apply(setters []paramtree.Setter) error {
+	results, err := h.tree.SetBatch(setters)
+	if err != nil {
+		return err
 	}
 
 	for _, r := range results {
@@ -92,8 +139,7 @@ func (h *spvHandler) Handle(_ context.Context, req xml.TokenReader, w io.Writer)
 			}
 		}
 	}
-
-	return writef(w, "      <Status>0</Status>\n")
+	return nil
 }
 
 // spvEntry is one decoded ParameterValueStruct from the request.
