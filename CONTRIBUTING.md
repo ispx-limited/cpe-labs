@@ -31,9 +31,10 @@ automatically.
 
 Tests that compare against recorded wire output use golden files under
 `testdata/`. When a deliberate change alters the expected output, regenerate
-with `go test ./... -update` and review the resulting diff as part of your
-change; a golden file updated without a reason in the PR description will be
-questioned.
+with `make golden` and review the resulting diff as part of your change; a
+golden file updated without a reason in the PR description will be questioned.
+To regenerate one package, run `go test -update` on it, for example
+`go test ./internal/cwmp/soap -update`.
 
 ## Commits and branches
 

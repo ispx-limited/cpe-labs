@@ -12,7 +12,7 @@ LDFLAGS := -X $(MODULE)/internal/version.Version=$(VERSION) \
            -X $(MODULE)/internal/version.Commit=$(COMMIT) \
            -X $(MODULE)/internal/version.Date=$(DATE)
 
-.PHONY: all build test test-race lint fmt vet tidy clean
+.PHONY: all build test test-race golden lint fmt vet tidy clean
 
 all: build
 
@@ -25,6 +25,14 @@ test:
 
 test-race:
 	go test -race ./...
+
+# Only packages whose tests import the golden helper define -update, and go
+# test fails a package given a flag it does not define.
+GOLDEN_PKGS = $(shell go list -f '{{.ImportPath}} {{join .TestImports " "}} {{join .XTestImports " "}}' ./... | \
+	awk '{for (i = 2; i <= NF; i++) if ($$i == "$(MODULE)/internal/testgolden") {print $$1; next}}')
+
+golden:
+	go test $(GOLDEN_PKGS) -update
 
 lint:
 	golangci-lint run
