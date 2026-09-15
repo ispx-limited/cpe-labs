@@ -548,8 +548,8 @@ func TestRunSessionFailureRequeuesBoot(t *testing.T) {
 }
 
 // TestRunSessionFailureDoesNotRequeueConnectionRequest locks Table 7's
-// "6 CONNECTION REQUEST": the CPE MUST NOT retry delivery. The
-// PERIODIC ride-along from the CR session persists.
+// "6 CONNECTION REQUEST": the CPE MUST NOT retry delivery, so a failed
+// connection request session leaves nothing queued.
 func TestRunSessionFailureDoesNotRequeueConnectionRequest(t *testing.T) {
 	t.Parallel()
 
@@ -571,8 +571,8 @@ func TestRunSessionFailureDoesNotRequeueConnectionRequest(t *testing.T) {
 	}, cwmp.TriggerConnectionRequest)
 
 	got := tr.NextSessionEvents(cwmp.TriggerRetry)
-	if len(got) != 1 || got[0].EventCode != inform.EventPeriodic {
-		t.Errorf("retry events = %v, want [2 PERIODIC] only (no 6 CONNECTION REQUEST)", got)
+	if len(got) != 0 {
+		t.Errorf("retry events = %v, want none (no 6 CONNECTION REQUEST)", got)
 	}
 }
 

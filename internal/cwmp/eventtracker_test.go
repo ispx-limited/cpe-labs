@@ -65,10 +65,8 @@ func TestNextSessionEventsConnectionRequest(t *testing.T) {
 	tr := cwmp.NewEventTracker(nil)
 	deliverBootstrap(tr)
 	got := tr.NextSessionEvents(cwmp.TriggerConnectionRequest)
-	if len(got) != 2 ||
-		got[0].EventCode != inform.EventConnectionRequest ||
-		got[1].EventCode != inform.EventPeriodic {
-		t.Errorf("got %v, want [6 CR, 2 PERIODIC]", got)
+	if len(got) != 1 || got[0].EventCode != inform.EventConnectionRequest {
+		t.Errorf("got %v, want [6 CONNECTION REQUEST]", got)
 	}
 }
 

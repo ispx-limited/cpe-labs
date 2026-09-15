@@ -100,10 +100,11 @@ func (t *EventTracker) NextSessionEvents(trigger Trigger) []inform.Event {
 	case TriggerPeriodic:
 		events = append(events, inform.Event{EventCode: inform.EventPeriodic})
 	case TriggerConnectionRequest:
-		events = append(events,
-			inform.Event{EventCode: inform.EventConnectionRequest},
-			inform.Event{EventCode: inform.EventPeriodic},
-		)
+		// Only the connection request itself. "2 PERIODIC" announces a
+		// session the periodic timer started (Table 7), and an ACS that
+		// tells a bare wake from the CPE's own inform by its event codes
+		// would otherwise treat every wake as a periodic session.
+		events = append(events, inform.Event{EventCode: inform.EventConnectionRequest})
 	case TriggerValueChange:
 		events = append(events, inform.Event{EventCode: inform.EventValueChange})
 	case TriggerTransferComplete:
