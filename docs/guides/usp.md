@@ -84,8 +84,8 @@ case is R-MQTT.24: the sender appends its own reply topic to the topic it
 publishes on.
 
 ```
-usp/v1/agent/<endpoint-id>/reply-to=<url-encoded controller topic>
-usp/v1/controller/<endpoint-id>/reply-to=<url-encoded agent topic>
+usp/v1/agent/<endpoint-id>/reply-to=<controller topic, each / written %2F>
+usp/v1/controller/<endpoint-id>/reply-to=<agent topic, each / written %2F>
 ```
 
 Two consequences are worth knowing, because both look like bugs when they

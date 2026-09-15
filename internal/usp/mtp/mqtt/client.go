@@ -8,7 +8,7 @@
 //     among them), and 3.1.1 has no user properties. The fallback the spec
 //     defines for 3.1.1 is the reply-to-in-topic convention below.
 //   - R-MQTT.24 reply-to. A controller publishes to
-//     "<agent-topic>/reply-to=<url-encoded controller topic>", so an agent
+//     "<agent-topic>/reply-to=<controller topic, each / written %2F>", so an agent
 //     cannot know its inbound topics up front and MUST subscribe with a
 //     wildcard. We publish the mirror image so the controller learns where to
 //     answer us.
@@ -23,6 +23,7 @@ import (
 	"log/slog"
 	"net"
 	"net/url"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -274,29 +275,28 @@ func (c *Client) handleMessage(m paho.Message) {
 	}
 }
 
+// replyToMarker precedes the reply-to topic at the end of an MQTT 3.1.1
+// topic name (R-MQTT.24).
+const replyToMarker = "/reply-to="
+
+// withReplyTo appends replyTo to topic as R-MQTT.24 requires: each "/" in
+// the reply-to topic is written "%2F" and nothing else is escaped, so a
+// receiver that reverses only that (R-MQTT.25) gets the topic back exactly.
+// Escaping more breaks an endpoint ID: ":" would reach the controller as
+// "%3A".
+func withReplyTo(topic, replyTo string) string {
+	return topic + replyToMarker + strings.ReplaceAll(replyTo, "/", "%2F")
+}
+
 // parseReplyTo extracts the controller topic a controller appended to our
-// inbox topic. Returns "" when the topic carries no reply-to segment.
+// inbox topic: what follows the last "/reply-to=", with each "%2F" read as
+// "/" (R-MQTT.25). Returns "" when the topic carries no reply-to segment.
 func parseReplyTo(topic string) string {
-	const marker = "/reply-to="
-	i := indexOf(topic, marker)
+	i := strings.LastIndex(topic, replyToMarker)
 	if i < 0 {
 		return ""
 	}
-	raw := topic[i+len(marker):]
-	decoded, err := url.QueryUnescape(raw)
-	if err != nil {
-		return raw
-	}
-	return decoded
-}
-
-func indexOf(s, sub string) int {
-	for i := 0; i+len(sub) <= len(s); i++ {
-		if s[i:i+len(sub)] == sub {
-			return i
-		}
-	}
-	return -1
+	return strings.ReplaceAll(topic[i+len(replyToMarker):], "%2F", "/")
 }
 
 // Publish sends one USP record to the controller.
@@ -324,7 +324,7 @@ func (c *Client) Publish(payload []byte) error {
 	if base == "" {
 		base = c.cfg.ControllerTopic
 	}
-	topic := base + "/reply-to=" + url.QueryEscape(AgentTopic(c.cfg.EndpointID))
+	topic := withReplyTo(base, AgentTopic(c.cfg.EndpointID))
 
 	token := c.client.Publish(topic, 1, false, payload)
 	if !token.WaitTimeout(publishTimeout) {
