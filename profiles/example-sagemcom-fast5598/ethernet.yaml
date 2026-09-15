@@ -1,6 +1,9 @@
 # Device.Ethernet.*, physical ports + L2 stats.
 # Real device exposes 4 LAN + 1 WAN port; we model 5 entries with WAN
-# at instance 1 (matches the CSV's PHY1_WAN naming).
+# at instance 1 (matches the CSV's PHY1_WAN naming). Upstream is
+# declared per instance, true on the WAN only, because it differs per
+# port and the loader rejects a table default with an override; an ACS
+# reading the flag sees one WAN and four LAN ports.
 
 parameters:
   - path: Device.Ethernet.InterfaceNumberOfEntries
@@ -29,9 +32,6 @@ objects:
       - path: LowerLayers
         value: ""
         writable: true
-      - path: Upstream
-        type: xsd:boolean
-        value: "false"
       - path: MACAddress
         value: "EC:FC:2F:{cpe:hex:2}:00:0{i}"
       - path: MaxBitRate
@@ -58,6 +58,9 @@ objects:
 groups:
   - prefix: Device.Ethernet.Interface.1
     parameters:
+      - path: Upstream
+        type: xsd:boolean
+        value: "true"
       - path: Status
         value: "Up"
       - path: CurrentBitRate
@@ -66,6 +69,9 @@ groups:
 
   - prefix: Device.Ethernet.Interface.2
     parameters:
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
       - path: Status
         value: "Up"
       - path: CurrentBitRate
@@ -74,6 +80,9 @@ groups:
 
   - prefix: Device.Ethernet.Interface.3
     parameters:
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
       - path: Status
         value: "Up"
       - path: CurrentBitRate
@@ -82,6 +91,9 @@ groups:
 
   - prefix: Device.Ethernet.Interface.4
     parameters:
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
       - path: Status
         value: "Down"
       - path: CurrentBitRate
@@ -90,6 +102,9 @@ groups:
 
   - prefix: Device.Ethernet.Interface.5
     parameters:
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
       - path: Status
         value: "Down"
       - path: CurrentBitRate
