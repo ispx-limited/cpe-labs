@@ -9,10 +9,6 @@
           <EventCode>6 CONNECTION REQUEST</EventCode>
           <CommandKey></CommandKey>
         </EventStruct>
-        <EventStruct>
-          <EventCode>2 PERIODIC</EventCode>
-          <CommandKey></CommandKey>
-        </EventStruct>
       </Event>
       <MaxEnvelopes>1</MaxEnvelopes>
       <CurrentTime>2026-04-28T12:00:00Z</CurrentTime>

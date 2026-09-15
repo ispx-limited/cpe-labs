@@ -75,11 +75,8 @@ func TestRenderGoldens(t *testing.T) {
 			name:    "connection_request",
 			fixture: "inform_connection_request.xml",
 			inf: inform.Inform{
-				DeviceID: deviceID(),
-				Events: []inform.Event{
-					{EventCode: inform.EventConnectionRequest},
-					{EventCode: inform.EventPeriodic},
-				},
+				DeviceID:     deviceID(),
+				Events:       []inform.Event{{EventCode: inform.EventConnectionRequest}},
 				MaxEnvelopes: 1,
 				CurrentTime:  fixedTime,
 				RetryCount:   0,

@@ -100,10 +100,11 @@ func (t *EventTracker) NextSessionEvents(trigger Trigger) []inform.Event {
 	case TriggerPeriodic:
 		events = append(events, inform.Event{EventCode: inform.EventPeriodic})
 	case TriggerConnectionRequest:
-		events = append(events,
-			inform.Event{EventCode: inform.EventConnectionRequest},
-			inform.Event{EventCode: inform.EventPeriodic},
-		)
+		// Only the connection request itself. "2 PERIODIC" announces a
+		// session the periodic timer started (Table 7), and an ACS that
+		// tells a bare wake from the CPE's own inform by its event codes
+		// would otherwise treat every wake as a periodic session.
+		events = append(events, inform.Event{EventCode: inform.EventConnectionRequest})
 	case TriggerValueChange:
 		events = append(events, inform.Event{EventCode: inform.EventValueChange})
 	case TriggerTransferComplete:
@@ -258,6 +259,16 @@ func (t *EventTracker) requeueEvent(e inform.Event) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.pendingEvents = append(t.pendingEvents, e)
+}
+
+// QueuePeriodic queues "2 PERIODIC" for the next session. The runner
+// calls it when a periodic tick is displaced by a higher-priority
+// trigger while a session is in flight: Table 7 says the CPE MUST NOT
+// discard an undelivered PERIODIC, so the tick announces itself on
+// whatever session runs next, and the dedupe in NextSessionEvents
+// collapses it with a natural tick that lands first.
+func (t *EventTracker) QueuePeriodic() {
+	t.requeueEvent(inform.Event{EventCode: inform.EventPeriodic})
 }
 
 // RecordValueChange queues a parameter path for the next VALUE CHANGE
