@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.9.0](https://github.com/ispx-limited/cpe-labs/compare/v0.8.0...v0.9.0) (2026-09-15)
+
+
+### ⚠ BREAKING CHANGES
+
+* **usp:** every simulated USP agent now presents a different endpoint ID, for example os::0000C5-TEST0001 where it was os::0000C5TEST0001. A controller that already knows the agents sees them under new identities, and broker ACLs or credentials keyed on the old ID, or on a password derived from it, need updating.
+
+### Fixed
+
+* **cwmp:** a connection request session carries only its own event ([#67](https://github.com/ispx-limited/cpe-labs/issues/67)) ([8593368](https://github.com/ispx-limited/cpe-labs/commit/85933683d2756ceb2ea742c86b20a40b83ed4da7))
+* **usp:** endpoint IDs use the TR-369 os form, &lt;OUI&gt;-&lt;SerialNumber&gt; ([#62](https://github.com/ispx-limited/cpe-labs/issues/62)) ([524431f](https://github.com/ispx-limited/cpe-labs/commit/524431f5d14b024e80daeda190821c1aed3219c3))
+* **usp:** the MQTT reply-to escapes only slashes, as R-MQTT.24 requires ([#65](https://github.com/ispx-limited/cpe-labs/issues/65)) ([fa54080](https://github.com/ispx-limited/cpe-labs/commit/fa540803fda9b1242c53d48fba1ce9e5a1e33177))
+
 ## [0.8.0](https://github.com/ispx-limited/cpe-labs/compare/v0.7.0...v0.8.0) (2026-09-13)
 
 
