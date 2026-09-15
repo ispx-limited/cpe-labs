@@ -1644,6 +1644,17 @@ func (r *sessionRunner) setOnline() {
 func (r *sessionRunner) request(ctx context.Context, trigger cwmp.Trigger) (ran bool, err error) {
 	r.mu.Lock()
 	if r.busy || r.offline {
+		// A displaced periodic tick still has to announce itself:
+		// the winner's session carries 2 PERIODIC from the queue.
+		if r.hasDeferred {
+			loser := trigger
+			if triggerPriority(trigger) > triggerPriority(r.deferred) {
+				loser = r.deferred
+			}
+			if loser == cwmp.TriggerPeriodic && r.runOpts != nil && r.runOpts.Tracker != nil {
+				r.runOpts.Tracker.QueuePeriodic()
+			}
+		}
 		if !r.hasDeferred || triggerPriority(trigger) > triggerPriority(r.deferred) {
 			r.deferred = trigger
 		}
@@ -1686,10 +1697,10 @@ func (r *sessionRunner) request(ctx context.Context, trigger cwmp.Trigger) (ran 
 // the primary event differs between deferred sessions (queued events
 // ride along regardless), so the ranking prefers the trigger whose
 // primary event carries the most meaning: a reboot must announce
-// 1 BOOT, a CR must answer the ACS (its session also carries
-// 2 PERIODIC, which is why it outranks a plain tick), and a retry
-// outranks a tick because its session redelivers without announcing a
-// fresh PERIODIC.
+// 1 BOOT, a CR must answer the ACS, and a retry outranks a tick
+// because its session redelivers. A displaced tick loses only its
+// place as the primary event; request queues its 2 PERIODIC so the
+// winner's session still announces it.
 func triggerPriority(t cwmp.Trigger) int {
 	switch t {
 	case cwmp.TriggerStartup:

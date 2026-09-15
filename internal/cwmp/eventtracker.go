@@ -261,6 +261,16 @@ func (t *EventTracker) requeueEvent(e inform.Event) {
 	t.pendingEvents = append(t.pendingEvents, e)
 }
 
+// QueuePeriodic queues "2 PERIODIC" for the next session. The runner
+// calls it when a periodic tick is displaced by a higher-priority
+// trigger while a session is in flight: Table 7 says the CPE MUST NOT
+// discard an undelivered PERIODIC, so the tick announces itself on
+// whatever session runs next, and the dedupe in NextSessionEvents
+// collapses it with a natural tick that lands first.
+func (t *EventTracker) QueuePeriodic() {
+	t.requeueEvent(inform.Event{EventCode: inform.EventPeriodic})
+}
+
 // RecordValueChange queues a parameter path for the next VALUE CHANGE
 // session. Multiple calls accumulate; empty paths are silently
 // ignored, and a path already pending stays queued once, so a write

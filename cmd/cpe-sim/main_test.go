@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -23,6 +24,7 @@ import (
 
 	"github.com/ispx-limited/cpe-labs/internal/cperng"
 	"github.com/ispx-limited/cpe-labs/internal/cwmp"
+	"github.com/ispx-limited/cpe-labs/internal/cwmp/inform"
 	"github.com/ispx-limited/cpe-labs/internal/paramtree"
 )
 
@@ -2234,6 +2236,40 @@ parameters:
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatal("run did not return within 5s of ctx cancel")
+	}
+}
+
+// TestRequestDisplacedPeriodicQueuesItsEvent locks what coalescing
+// does to a periodic tick: displaced as the primary trigger, it still
+// announces 2 PERIODIC on the session that wins, in either arrival
+// order, and never twice.
+func TestRequestDisplacedPeriodicQueuesItsEvent(t *testing.T) {
+	t.Parallel()
+
+	for _, order := range [][]cwmp.Trigger{
+		{cwmp.TriggerConnectionRequest, cwmp.TriggerPeriodic},
+		{cwmp.TriggerPeriodic, cwmp.TriggerConnectionRequest},
+	} {
+		tr := cwmp.NewEventTracker(nil)
+		tr.NextSessionEvents(cwmp.TriggerStartup)
+		tr.Acknowledge()
+		r := &sessionRunner{
+			runOpts: &cwmp.RunSessionOptions{Tracker: tr},
+			logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
+			busy:    true,
+		}
+		for _, trig := range order {
+			if ran, _ := r.request(context.Background(), trig); ran {
+				t.Fatalf("order %v: %v ran while busy", order, trig)
+			}
+		}
+		if r.deferred != cwmp.TriggerConnectionRequest {
+			t.Fatalf("order %v: deferred = %v, want connection request", order, r.deferred)
+		}
+		got := tr.NextSessionEvents(r.deferred)
+		if len(got) != 2 || got[0].EventCode != inform.EventConnectionRequest || got[1].EventCode != inform.EventPeriodic {
+			t.Errorf("order %v: events = %v, want [6 CONNECTION REQUEST, 2 PERIODIC]", order, got)
+		}
 	}
 }
 
