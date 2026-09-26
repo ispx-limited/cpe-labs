@@ -1,11 +1,15 @@
 package scheduler
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"math/rand"
 	"strconv"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -470,5 +474,172 @@ func TestSchedulerScheduleDuplicateRejected(t *testing.T) {
 	}
 	if err := s.Schedule(reg); err == nil {
 		t.Fatal("duplicate Schedule should error")
+	}
+}
+
+// logBuffer collects log output written from the drain goroutine so a
+// test can read it without a race.
+type logBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *logBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *logBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+func debugLogger(buf *logBuffer) *slog.Logger {
+	return slog.New(slog.NewTextHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+}
+
+// waitForLogCount blocks until substr occurs at least n times in buf.
+// Re-arming happens on the drain goroutine after OnTick returns, so a
+// test that advances the fake clock again before the arm landed would
+// find nothing due; the armed line is the synchronization point.
+func waitForLogCount(t *testing.T, buf *logBuffer, substr string, n int) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if strings.Count(buf.String(), substr) >= n {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatalf("log did not show %q %d times; log:\n%s", substr, n, buf.String())
+}
+
+func TestSchedulerLogsEveryArm(t *testing.T) {
+	t.Parallel()
+
+	clock := newFakeClock()
+	tree := newTestTree(t, 30, true)
+	buf := &logBuffer{}
+	tickCh := make(chan struct{}, 4)
+	s := NewScheduler(Options{Logger: debugLogger(buf), Clock: clock})
+	t.Cleanup(func() { stopScheduler(t, s) })
+
+	if err := s.Schedule(Registration{
+		CPEID: "cpe-1", Tree: tree, Paths: defaultPaths(),
+		OnTick: func(_ context.Context) error { tickCh <- struct{}{}; return nil },
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	waitForLogCount(t, buf, `msg="scheduler: armed"`, 1)
+	if got := buf.String(); !strings.Contains(got, "cpe_id=cpe-1 delay=30s") {
+		t.Fatalf("arm line missing cpe_id and delay:\n%s", got)
+	}
+
+	clock.Advance(30 * time.Second)
+	select {
+	case <-tickCh:
+	case <-time.After(time.Second):
+		t.Fatal("first tick did not fire")
+	}
+	waitForLogCount(t, buf, `msg="scheduler: tick"`, 1)
+	waitForLogCount(t, buf, `msg="scheduler: armed"`, 2)
+}
+
+func TestSchedulerTickRearmsWhenCallbackFails(t *testing.T) {
+	t.Parallel()
+
+	clock := newFakeClock()
+	tree := newTestTree(t, 30, true)
+	buf := &logBuffer{}
+	tickCh := make(chan struct{}, 4)
+	s := NewScheduler(Options{Logger: debugLogger(buf), Clock: clock})
+	t.Cleanup(func() { stopScheduler(t, s) })
+
+	if err := s.Schedule(Registration{
+		CPEID: "cpe-1", Tree: tree, Paths: defaultPaths(),
+		OnTick: func(_ context.Context) error {
+			tickCh <- struct{}{}
+			return errors.New("session failed")
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 1; i <= 3; i++ {
+		waitForLogCount(t, buf, `msg="scheduler: armed"`, i)
+		clock.Advance(30 * time.Second)
+		select {
+		case <-tickCh:
+		case <-time.After(time.Second):
+			t.Fatalf("tick %d did not fire after a failing callback", i)
+		}
+	}
+}
+
+func TestSchedulerTickRearmsWhenTreeReadFails(t *testing.T) {
+	t.Parallel()
+
+	// The interval leaf is typed string so the test can store a value
+	// the scheduler cannot parse; an unsignedInt leaf would reject it in
+	// Set before the scheduler ever read it.
+	const intervalPath = "Device.ManagementServer.PeriodicInformInterval"
+	tree := paramtree.New()
+	if err := tree.Mount(intervalPath, paramtree.NewLeaf(paramtree.Value{
+		Type: paramtree.TypeString, Raw: "30", Writable: true,
+	})); err != nil {
+		t.Fatal(err)
+	}
+	if err := tree.Mount("Device.ManagementServer.PeriodicInformEnable", paramtree.NewLeaf(paramtree.Value{
+		Type: paramtree.TypeBoolean, Raw: "true", Writable: true,
+	})); err != nil {
+		t.Fatal(err)
+	}
+
+	clock := newFakeClock()
+	buf := &logBuffer{}
+	tickCh := make(chan struct{}, 4)
+	s := NewScheduler(Options{Logger: debugLogger(buf), Clock: clock})
+	t.Cleanup(func() { stopScheduler(t, s) })
+
+	if err := s.Schedule(Registration{
+		CPEID: "cpe-1", Tree: tree, Paths: defaultPaths(),
+		OnTick: func(_ context.Context) error { tickCh <- struct{}{}; return nil },
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	waitForLogCount(t, buf, `msg="scheduler: armed"`, 1)
+
+	// Poison the leaf, then tick: the read after this tick fails.
+	if err := tree.Set(intervalPath, paramtree.Value{
+		Type: paramtree.TypeString, Raw: "soon", Writable: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	clock.Advance(30 * time.Second)
+	select {
+	case <-tickCh:
+	case <-time.After(time.Second):
+		t.Fatal("first tick did not fire")
+	}
+	waitForLogCount(t, buf, `msg="scheduler: refresh failed`, 1)
+	waitForLogCount(t, buf, `msg="scheduler: armed"`, 2)
+
+	// The previous interval is kept and the timer runs on.
+	clock.Advance(30 * time.Second)
+	select {
+	case <-tickCh:
+	case <-time.After(time.Second):
+		t.Fatal("timer was not re-armed after the tree read failed")
 	}
 }

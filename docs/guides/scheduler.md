@@ -34,9 +34,23 @@ Each registered CPE runs in its own goroutine watching one `*time.Timer`. On tic
 1. The registered `OnTick` callback runs synchronously. `cmd/cpe-sim` wires it into the per-CPE session runner, which requests a `TriggerPeriodic` session.
 2. The session runner serializes: if no session is in flight, the tick's session runs immediately. If one is in flight (a CR session, a one-shot TransferComplete, a previous tick), the tick is **deferred**, not dropped: it latches into a one-slot deferred latch and runs as its own session the moment the running one completes (success or failure). TR-069 requires a connection request or timer event that lands mid-session to trigger a new session after the current one ends, and that is exactly what happens.
 3. Multiple mid-session arrivals coalesce into one deferred session, keeping the highest-priority trigger (startup > connection request > transfer complete > retry > periodic > value change). Nothing is lost by coalescing: M-events, TransferComplete records, the bootstrap latch, and re-queued undelivered events all ride whatever session runs next, and a periodic tick displaced by a higher-priority trigger queues its `2 PERIODIC` so the deferred session announces it; the trigger only decides the primary event.
-4. After `OnTick` returns, the scheduler re-reads `interval` from the tree (in case it changed) and arms the next tick.
+4. After `OnTick` returns, the scheduler re-reads `interval` and `enable` from the tree (in case they changed) and arms the next tick. The re-arm happens whatever the tick did: session ran, session deferred, session failed. If the tree cannot be read, the scheduler warns and keeps the previous values rather than leaving the timer unarmed.
 
 Errors from `OnTick` are logged but do not stop the loop. Subsequent ticks proceed.
+
+## Reading a quiet fleet
+
+A fleet that informed every minute and then stopped is almost always a fleet whose ACS rewrote `PeriodicInformInterval`; the simulator honours the new value exactly as real hardware does. The scheduler logs enough to tell that apart from a fault:
+
+| Line | Level | When |
+| --- | --- | --- |
+| `scheduler: rescheduled` (`interval_s`, `enabled`) | info | the ACS wrote the interval or enable leaf |
+| `scheduler: armed` (`delay`) | debug | every time a CPE's timer is armed: at start, after each tick, after each reschedule |
+| `scheduler: tick` | debug | a timer fired |
+| `scheduler: timer stopped, periodic inform disabled` | debug | `enable` is false |
+| `scheduler: refresh failed; keeping previous interval/enable` | warn | the tree read failed after a tick or an SPV |
+
+Every line carries `cpe_id`. At debug level a CPE that will not inform for another 17 minutes reads as `scheduler: armed cpe_id=cpe-7 delay=17m3s`, so no waiting is needed to know whether it is idle by instruction or stuck.
 
 ## Session retry backoff (TR-069 3.2.1.1)
 
