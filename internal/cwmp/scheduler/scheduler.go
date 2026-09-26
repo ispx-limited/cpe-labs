@@ -236,8 +236,9 @@ func (s *Scheduler) armEntry(e *cpeEntry) {
 		return
 	}
 	e.mu.Lock()
-	e.armTimerLocked(s.clock)
+	delay, armed := e.armTimerLocked(s.clock)
 	e.mu.Unlock()
+	s.logArmed(e.cpeID, delay, armed)
 
 	s.wg.Add(1)
 	go s.drain(e)
@@ -277,23 +278,35 @@ func (s *Scheduler) drain(e *cpeEntry) {
 			}
 			e.mu.Lock()
 			e.stopTimerLocked()
-			e.armTimerLocked(s.clock)
+			delay, armed := e.armTimerLocked(s.clock)
+			interval, enabled := e.interval, e.enabled
 			e.mu.Unlock()
-			s.logger.Debug("scheduler: rescheduled",
+			// Info, not debug: an ACS rewriting the interval is the
+			// usual reason a fleet that was informing every minute goes
+			// quiet, and the operator reading the default log level
+			// needs to see that the CPE was told to.
+			s.logger.Info("scheduler: rescheduled",
 				"cpe_id", e.cpeID,
-				"interval_s", int(e.interval/time.Second),
-				"enabled", e.enabled)
+				"interval_s", int(interval/time.Second),
+				"enabled", enabled)
+			s.logArmed(e.cpeID, delay, armed)
 
 		case <-tickC:
-			// Periodic tick fired.
+			s.logger.Debug("scheduler: tick", "cpe_id", e.cpeID)
 			s.handleTick(e)
-			// Re-read tree (interval may have changed since last arm) and
-			// arm the next tick.
-			if err := e.refreshFromTree(); err == nil {
-				e.mu.Lock()
-				e.armTimerLocked(s.clock)
-				e.mu.Unlock()
+			// The timer is re-armed whatever the tick did (the callback
+			// ran its session, deferred it behind one in flight, or
+			// failed): a tick that does not re-arm is a CPE that never
+			// informs again. A tree that cannot be read keeps the
+			// previous interval/enable for the same reason.
+			if err := e.refreshFromTree(); err != nil {
+				s.logger.Warn("scheduler: refresh failed; keeping previous interval/enable",
+					"cpe_id", e.cpeID, "err", err.Error())
 			}
+			e.mu.Lock()
+			delay, armed := e.armTimerLocked(s.clock)
+			e.mu.Unlock()
+			s.logArmed(e.cpeID, delay, armed)
 		}
 	}
 }
@@ -309,6 +322,19 @@ func (s *Scheduler) handleTick(e *cpeEntry) {
 		s.logger.Warn("scheduler: tick callback failed",
 			"cpe_id", e.cpeID, "err", err.Error())
 	}
+}
+
+// logArmed follows every arm. It is the line that makes a quiet fleet
+// readable at debug level: the delay says when the CPE's next tick is
+// due, and the stopped variant says why there is none.
+func (s *Scheduler) logArmed(cpeID string, delay time.Duration, armed bool) {
+	if !armed {
+		s.logger.Debug("scheduler: timer stopped, periodic inform disabled", "cpe_id", cpeID)
+		return
+	}
+	s.logger.Debug("scheduler: armed",
+		"cpe_id", cpeID,
+		"delay", delay.Round(time.Millisecond).String())
 }
 
 // OnIntervalChange tells the scheduler that the interval or enable leaf
@@ -474,19 +500,21 @@ func (e *cpeEntry) refreshFromTree() error {
 	return nil
 }
 
-// armTimerLocked arms (or stops) the timer based on e.enabled / e.interval.
-// e.mu must be held.
-func (e *cpeEntry) armTimerLocked(clock Clock) {
+// armTimerLocked arms (or stops) the timer based on e.enabled / e.interval
+// and reports the delay it armed, or armed=false when the timer was
+// stopped because periodic informs are disabled. e.mu must be held.
+func (e *cpeEntry) armTimerLocked(clock Clock) (delay time.Duration, armed bool) {
 	if !e.enabled {
 		e.stopTimerLocked()
-		return
+		return 0, false
 	}
-	delay := e.nextDelayLocked(clock.Now())
+	delay = e.nextDelayLocked(clock.Now())
 	if e.timer == nil {
 		e.timer = clock.NewTimer(delay)
-		return
+	} else {
+		e.timer.Reset(delay)
 	}
-	e.timer.Reset(delay)
+	return delay, true
 }
 
 // stopTimerLocked stops the timer if armed. e.mu must be held.
