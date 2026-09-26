@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/ispx-limited/cpe-labs/compare/v0.9.0...v0.9.1) (2026-09-26)
+
+
+### Fixed
+
+* **cwmp:** the periodic timer is re-armed after every tick and says so ([#68](https://github.com/ispx-limited/cpe-labs/issues/68)) ([d9e4f10](https://github.com/ispx-limited/cpe-labs/commit/d9e4f104c29d597ff61ca3de3463d347247e8d65))
+
 ## [0.9.0](https://github.com/ispx-limited/cpe-labs/compare/v0.8.0...v0.9.0) (2026-09-15)
 
 
