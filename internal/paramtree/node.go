@@ -14,6 +14,11 @@ type Node struct {
 	leaf     *Value
 	attrs    *Attributes
 	table    *tableMeta
+
+	// owner is the generation of the one Tree allowed to write this
+	// node in place. Every other tree that reaches it copies it first;
+	// see Tree.own.
+	owner uint64
 }
 
 // tableMeta carries the template Tree.AddObject clones for new

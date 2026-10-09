@@ -32,10 +32,9 @@ func (t *Tree) Graft(other *Tree) ([]string, error) {
 	defer other.mu.RUnlock()
 
 	type graftPoint struct {
-		parent *Node
-		name   string
-		node   *Node
-		path   []string
+		name string
+		node *Node
+		path []string
 	}
 	var points []graftPoint
 	var collect func(dst, src *Node, prefix []string) error
@@ -44,7 +43,7 @@ func (t *Tree) Graft(other *Tree) ([]string, error) {
 			path := append(append([]string{}, prefix...), name)
 			existing, ok := dst.children[name]
 			if !ok {
-				points = append(points, graftPoint{parent: dst, name: name, node: child, path: path})
+				points = append(points, graftPoint{name: name, node: child, path: path})
 				continue
 			}
 			if existing.isLeaf() || child.isLeaf() {
@@ -67,8 +66,13 @@ func (t *Tree) Graft(other *Tree) ([]string, error) {
 	sort.Slice(points, func(i, j int) bool { return joinPath(points[i].path) < joinPath(points[j].path) })
 	roots := make([]string, 0, len(points))
 	for _, p := range points {
+		parent, err := t.lookupMut(p.path[:len(p.path)-1])
+		if err != nil {
+			t.mu.Unlock()
+			return nil, cpeerr.Wrap("paramtree.Graft", cpeerr.KindInvalidArgument, err)
+		}
 		n := p.node.clone()
-		p.parent.children[p.name] = n
+		parent.children[p.name] = n
 		path := joinPath(p.path)
 		if n.isLeaf() {
 			roots = append(roots, path)
@@ -104,7 +108,7 @@ func (t *Tree) Unmount(path string) error {
 
 	var deleted string
 	t.mu.Lock()
-	parent, err := t.lookup(segments[:len(segments)-1])
+	parent, err := t.lookupMut(segments[:len(segments)-1])
 	if err != nil {
 		t.mu.Unlock()
 		return cpeerr.Wrap("paramtree.Unmount", cpeerr.KindNotFound, err)

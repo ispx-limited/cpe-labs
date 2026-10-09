@@ -15,20 +15,93 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/ispx-limited/cpe-labs/internal/cpeerr"
 )
 
 // Tree is the in-memory parameter tree for one simulated CPE.
+//
+// Trees share nodes. Clone hands the copy the same root, and a write
+// copies only the nodes on its own path that the writing tree does not
+// own (Tree.own), so a fleet of clones holds one copy of everything its
+// CPEs never change and a private copy of what each one does: its
+// serial, its placeholders, the leaves its generators tick, the values
+// an ACS has set. A realistic gateway profile is hundreds of leaves and
+// a CPE changes a fraction of them; copying the whole tree per CPE made
+// the tree most of what a simulated CPE cost.
 type Tree struct {
 	mu   sync.RWMutex
 	root *Node
 	obs  observers
+
+	// gen is this tree's generation, the owner value of the nodes it
+	// may write in place. Clone gives both trees a new one, so neither
+	// can write a node the other can still reach.
+	gen uint64
 }
+
+// generations hands out tree generations. Zero is never issued, so a
+// node built outside any tree (owner zero) is never written in place.
+var generations atomic.Uint64
+
+func nextGeneration() uint64 { return generations.Add(1) }
 
 // New returns an empty tree.
 func New() *Tree {
-	return &Tree{root: NewBranch()}
+	gen := nextGeneration()
+	return &Tree{root: &Node{children: make(map[string]*Node), owner: gen}, gen: gen}
+}
+
+// own returns n when t may write it in place, and otherwise a shallow
+// copy that t owns: the same children, a private leaf value and
+// attribute set. The caller holds the write lock and must put the copy
+// where n was. Table templates are shared, because nothing writes one;
+// AddObject places the template itself and lets the first write to the
+// new instance copy it.
+func (t *Tree) own(n *Node) *Node {
+	if t.gen == 0 {
+		t.gen = nextGeneration()
+	}
+	if n.owner == t.gen {
+		return n
+	}
+	cp := &Node{owner: t.gen, table: n.table}
+	if n.leaf != nil {
+		v := *n.leaf
+		cp.leaf = &v
+	}
+	if n.attrs != nil {
+		a := *n.attrs
+		cp.attrs = &a
+	}
+	if n.children != nil {
+		cp.children = make(map[string]*Node, len(n.children))
+		for k, c := range n.children {
+			cp.children[k] = c
+		}
+	}
+	return cp
+}
+
+// lookupMut is lookup for a writer: it resolves segments and makes t
+// the owner of every node on the path, so the returned node and its
+// ancestors can be written in place. The caller holds the write lock.
+func (t *Tree) lookupMut(segments []string) (*Node, error) {
+	if _, err := t.lookup(segments); err != nil {
+		return nil, err
+	}
+	t.root = t.own(t.root)
+	n := t.root
+	for _, seg := range segments {
+		c := n.children[seg]
+		if owned := t.own(c); owned != c {
+			n.children[seg] = owned
+			c = owned
+		}
+		n = c
+	}
+	return n, nil
 }
 
 // Mount places n at the given path in the tree, creating any missing
@@ -47,6 +120,7 @@ func (t *Tree) Mount(path string, n *Node) error {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
+	t.root = t.own(t.root)
 	parent := t.root
 	for _, seg := range segments[:len(segments)-1] {
 		if parent.isLeaf() {
@@ -55,9 +129,11 @@ func (t *Tree) Mount(path string, n *Node) error {
 		}
 		child, ok := parent.children[seg]
 		if !ok {
-			child = NewBranch()
-			parent.children[seg] = child
+			child = &Node{children: make(map[string]*Node), owner: t.gen}
+		} else {
+			child = t.own(child)
 		}
+		parent.children[seg] = child
 		parent = child
 	}
 
@@ -137,6 +213,9 @@ func (t *Tree) Set(path string, v Value) error {
 		return err
 	}
 	old := *n.leaf
+	if n, err = t.lookupMut(segments); err != nil {
+		return cpeerr.Wrap("paramtree.Set", cpeerr.KindNotFound, err)
+	}
 	*n.leaf = v
 	if t.hasObservers() && old.Raw != v.Raw {
 		change = &Change{Path: path, Old: old, New: v, Kind: ChangeValue}
@@ -179,6 +258,9 @@ func (t *Tree) SetSystem(path, raw string) error {
 		return err
 	}
 	old := *n.leaf
+	if n, err = t.lookupMut(segments); err != nil {
+		return cpeerr.Wrap("paramtree.SetSystem", cpeerr.KindNotFound, err)
+	}
 	n.leaf.Raw = raw
 	if t.hasObservers() && old.Raw != raw {
 		change = &Change{Path: path, Old: old, New: *n.leaf, Kind: ChangeValue}
@@ -203,16 +285,25 @@ func (t *Tree) Reset(other *Tree) error {
 		return cpeerr.Wrap("paramtree.Reset", cpeerr.KindInvalidArgument,
 			fmt.Errorf("other tree is nil"))
 	}
+	// other is drained, but it still holds the root: a new generation
+	// stops it writing nodes t now shares.
+	if other != t {
+		other.mu.Lock()
+		other.gen = nextGeneration()
+		other.mu.Unlock()
+	}
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.root = other.root
+	t.gen = nextGeneration()
 	return nil
 }
 
-// Clone returns a deep copy of the tree: every interior node, leaf
-// value, attribute set and table template is copied, so nothing mutable
-// is shared with the receiver and a write to either side is invisible
-// to the other.
+// Clone returns a tree with the receiver's contents that is written
+// independently of it: a write to either side is invisible to the
+// other. The two share every node until one of them writes, and then
+// only the written path is copied (see Tree), so a clone costs nothing
+// up front and a CPE pays only for what it changes.
 //
 // This exists because building a fleet by re-parsing the profile once
 // per CPE does not scale. A realistic residential-gateway profile is a
@@ -226,13 +317,14 @@ func (t *Tree) Reset(other *Tree) error {
 // notifier, for instance), and silently carrying them onto a copy would
 // have one CPE's writes firing another CPE's notifications.
 //
-// Clone takes the read lock, so it is safe to call while other
-// goroutines read the same tree, and safe to call concurrently from
-// several goroutines building different CPEs from one template.
+// Clone takes the write lock, because it gives the receiver a new
+// generation; it is safe to call concurrently from several goroutines
+// building different CPEs from one template.
 func (t *Tree) Clone() *Tree {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-	return &Tree{root: t.root.clone()}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.gen = nextGeneration()
+	return &Tree{root: t.root, gen: nextGeneration()}
 }
 
 // GetAttributes returns the Attributes stored at path. If no
@@ -293,6 +385,9 @@ func (t *Tree) SetAttributes(path string, attrs Attributes) error {
 	stored := attrs
 	if attrs.AccessList != nil {
 		stored.AccessList = append([]string(nil), attrs.AccessList...)
+	}
+	if n, err = t.lookupMut(segments); err != nil {
+		return cpeerr.Wrap("paramtree.SetAttributes", cpeerr.KindNotFound, err)
 	}
 	n.attrs = &stored
 	return nil
@@ -417,7 +512,11 @@ func (t *Tree) SetBatch(setters []Setter) ([]BatchResult, error) {
 	// below is aligned.
 	results := make([]BatchResult, len(resolved))
 	for i, r := range resolved {
-		*r.node.leaf = r.new
+		n, err := t.lookupMut(r.segments)
+		if err != nil {
+			return nil, cpeerr.Wrap("paramtree.SetBatch", cpeerr.KindNotFound, err)
+		}
+		*n.leaf = r.new
 		results[i] = BatchResult{
 			Path:     setters[i].Path,
 			OldValue: r.old,
@@ -440,9 +539,9 @@ func (t *Tree) CheckBatch(setters []Setter) error {
 
 // batchEntry is one pre-flighted SetBatch entry.
 type batchEntry struct {
-	node *Node
-	old  Value
-	new  Value
+	segments []string
+	old      Value
+	new      Value
 }
 
 // preflight detects duplicates, resolves every path, and checks
@@ -495,7 +594,7 @@ func (t *Tree) preflight(setters []Setter) ([]batchEntry, error) {
 			addFault(s.Path, FailureInvalidValue, err)
 			continue
 		}
-		resolved = append(resolved, batchEntry{node: n, old: *n.leaf, new: s.Value})
+		resolved = append(resolved, batchEntry{segments: segments, old: *n.leaf, new: s.Value})
 	}
 
 	if len(faults) > 0 {
@@ -711,6 +810,7 @@ func (t *Tree) AddTable(parentPath string, template *Node) error {
 	defer t.mu.Unlock()
 
 	// Mount an empty branch for the table parent if it doesn't exist.
+	t.root = t.own(t.root)
 	parent := t.root
 	for _, seg := range segments {
 		if parent.isLeaf() {
@@ -719,9 +819,11 @@ func (t *Tree) AddTable(parentPath string, template *Node) error {
 		}
 		child, ok := parent.children[seg]
 		if !ok {
-			child = NewBranch()
-			parent.children[seg] = child
+			child = &Node{children: make(map[string]*Node), owner: t.gen}
+		} else {
+			child = t.own(child)
 		}
+		parent.children[seg] = child
 		parent = child
 	}
 	if parent.isLeaf() {
@@ -768,6 +870,9 @@ func (t *Tree) AddObject(parentPath string) (int, error) {
 		return 0, cpeerr.Wrap("paramtree.AddObject", cpeerr.KindInvalidArgument,
 			fmt.Errorf("path %q is not a table", parentPath))
 	}
+	if n, err = t.lookupMut(segments); err != nil {
+		return 0, cpeerr.Wrap("paramtree.AddObject", cpeerr.KindNotFound, err)
+	}
 
 	used := make(map[int]struct{}, len(n.children))
 	for k := range n.children {
@@ -782,7 +887,14 @@ func (t *Tree) AddObject(parentPath string) (int, error) {
 		}
 		instance++
 	}
-	n.children[strconv.Itoa(instance)] = n.table.template.clone()
+	// The template itself, not a copy: every instance shares it until
+	// a write gives the instance its own nodes. A template this tree
+	// owns would be written in place, so that one is copied.
+	inst := n.table.template
+	if inst.owner == t.gen {
+		inst = inst.clone()
+	}
+	n.children[strconv.Itoa(instance)] = inst
 	counter = t.syncEntryCount(segments, n)
 	if t.hasObservers() {
 		created = strings.TrimSuffix(parentPath, ".") + "." + strconv.Itoa(instance) + "."
@@ -801,7 +913,7 @@ func (t *Tree) syncEntryCount(tableSegs []string, table *Node) *Change {
 	if len(tableSegs) == 0 {
 		return nil
 	}
-	parent, err := t.lookup(tableSegs[:len(tableSegs)-1])
+	parent, err := t.lookupMut(tableSegs[:len(tableSegs)-1])
 	if err != nil {
 		return nil
 	}
@@ -821,6 +933,8 @@ func (t *Tree) syncEntryCount(tableSegs []string, table *Node) *Change {
 		return nil
 	}
 	old := *c.leaf
+	c = t.own(c)
+	parent.children[name] = c
 	c.leaf.Raw = raw
 	if !t.hasObservers() {
 		return nil
@@ -869,7 +983,7 @@ func (t *Tree) DeleteObject(path string) error {
 	}
 
 	parentSegs := segments[:len(segments)-1]
-	parent, err := t.lookup(parentSegs)
+	parent, err := t.lookupMut(parentSegs)
 	if err != nil {
 		return cpeerr.Wrap("paramtree.DeleteObject", cpeerr.KindNotFound, err)
 	}
