@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.1](https://github.com/ispx-limited/cpe-labs/compare/v0.10.0...v0.10.1) (2026-10-09)
+
+
+### Fixed
+
+* **harness:** the NAT container's UDP conntrack timeout is set the way Docker honours ([#73](https://github.com/ispx-limited/cpe-labs/issues/73)) ([46af458](https://github.com/ispx-limited/cpe-labs/commit/46af458c6ec7dcb072c49f779fdf6720f046a422))
+
 ## [0.10.0](https://github.com/ispx-limited/cpe-labs/compare/v0.9.1...v0.10.0) (2026-10-09)
 
 
