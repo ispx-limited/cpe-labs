@@ -101,7 +101,7 @@ func newFakeServer(t *testing.T, mapped *net.UDPAddr) *fakeServer {
 	}
 	s := &fakeServer{conn: conn, mapped: mapped}
 	go s.serve()
-	t.Cleanup(func() { conn.Close() })
+	t.Cleanup(func() { _ = conn.Close() })
 	return s
 }
 

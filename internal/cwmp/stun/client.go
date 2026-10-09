@@ -208,10 +208,10 @@ func (c *Client) loop(ctx context.Context, s settings) {
 		log.Warn("stun socket", "err", err.Error())
 		return
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	go func() {
 		<-ctx.Done()
-		conn.Close()
+		_ = conn.Close()
 	}()
 	local := localAddress(serverAddr, conn.LocalAddr().(*net.UDPAddr).Port)
 	log.Info("stun client started", "local", local.String())
@@ -425,7 +425,7 @@ func localAddress(server *net.UDPAddr, port int) *net.UDPAddr {
 	if err != nil {
 		return &net.UDPAddr{IP: net.IPv4zero, Port: port}
 	}
-	defer probe.Close()
+	defer func() { _ = probe.Close() }()
 	ip := probe.LocalAddr().(*net.UDPAddr).IP
 	return &net.UDPAddr{IP: ip, Port: port}
 }
