@@ -51,6 +51,8 @@ services:
         ipv4_address: 10.200.0.10
     environment:
       ACS_URL: ${ACS_URL:?the ACS URL as the NAT's outer leg reaches it}
+      ACS_USERNAME: ${ACS_USERNAME-iopsys}
+      ACS_PASSWORD: ${ACS_PASSWORD-iopsys}
       STUN_SERVER: ${STUN_SERVER:?the STUN server address, the ACS address}
       STUN_PORT: ${STUN_PORT:-3478}
       STUN_MIN_KEEPALIVE: ${STUN_MIN_KEEPALIVE:-10}

@@ -343,12 +343,14 @@ func (c *Client) connectionRequest(d datagram, log *slog.Logger) {
 	c.mu.Lock()
 	lastTS, lastID, seen := c.lastTS, c.lastID, c.seen
 	c.mu.Unlock()
+	// The ACS sends several identical copies, so a repeat is the normal
+	// case and not worth an operator's attention.
 	switch {
 	case ts <= lastTS:
-		log.Info("udp connection request ignored: timestamp not later than the last accepted", "ts", ts, "last_ts", lastTS)
+		log.Debug("udp connection request ignored: timestamp not later than the last accepted", "ts", ts, "last_ts", lastTS)
 		return
 	case seen && id == lastID:
-		log.Info("udp connection request ignored: message id repeats the last accepted", "id", id)
+		log.Debug("udp connection request ignored: message id repeats the last accepted", "id", id)
 		return
 	case q.Get("un") != username:
 		log.Info("udp connection request ignored: username mismatch", "un", q.Get("un"))

@@ -8,7 +8,9 @@ mkdir -p /var/run /var/state/icwmp
 
 [ -n "$ACS_URL" ] && uci set cwmp.acs.url="$ACS_URL"
 [ -n "$ACS_USERNAME" ] && uci set cwmp.acs.userid="$ACS_USERNAME"
-[ -n "$ACS_PASSWORD" ] && uci set cwmp.acs.passwd="$ACS_PASSWORD"
+# Set-but-empty is a password too: an ACS whose factory rule expects an
+# empty one cannot be reached by a client that keeps the fixture's.
+[ -n "${ACS_PASSWORD+x}" ] && uci set cwmp.acs.passwd="$ACS_PASSWORD"
 uci set cwmp.acs.periodic_inform_enable='1'
 uci set cwmp.acs.periodic_inform_interval="${INFORM_INTERVAL:-60}"
 # The connection request credential the client challenges with over
