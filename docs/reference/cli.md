@@ -32,6 +32,7 @@ For TR-369 (USP) mode, `--acs-url` may be omitted as long as `--usp-broker` is s
 | `--cr-path` | `CPE_SIM_CR_PATH` | `crPath` | `/cr` | URL path the listener serves. With `fleet.count > 1`, each CPE gets `/<cr-path>/<cpe-id>`. |
 | `--cr-publish-path` | `CPE_SIM_CR_PUBLISH_PATH` | `crPublishPath` | (required when `--cr-bind-addr` is set) | Tree path the listener URL is written to. |
 | `--cr-advertise-host` | `CPE_SIM_CR_ADVERTISE_HOST` | `crAdvertiseHost` | "" | Host (or `host:port`) to publish in the `ConnectionRequestURL` instead of the bound address. Empty derives the host from the socket, which publishes `127.0.0.1` when the bind address is a wildcard, so the ACS cannot reach a single CPE from a container or another host. A bare host keeps the bound port. A value containing a scheme or a path rejects at startup. |
+| `--pprof-addr` | `CPE_SIM_PPROF_ADDR` | `pprofAddr` | "" | Address to serve Go runtime profiles on (`/debug/pprof/`), for measuring what a fleet costs on the host that runs it. Empty serves nothing. Bind it to a loopback or private address: the profiles describe the process, not the simulated CPEs. |
 
 See [Connection Request Listener](../guides/connection-request.md) for a deeper treatment.
 
