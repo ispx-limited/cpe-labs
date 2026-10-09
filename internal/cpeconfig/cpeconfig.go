@@ -50,6 +50,12 @@ type Config struct {
 	// this to the address the ACS should dial.
 	CRAdvertiseHost string `yaml:"crAdvertiseHost"`
 
+	// PprofAddr serves Go's runtime profiles (net/http/pprof) on this
+	// address when set. Off by default. It is how a fleet's memory and
+	// CPU are measured on the host that runs it, rather than inferred
+	// from a test that builds trees and runs no sessions.
+	PprofAddr string `yaml:"pprofAddr"`
+
 	// FleetOffset shifts every instance index this process produces, so
 	// N processes running ONE profile carve disjoint fleets out of the
 	// same [1, total] index space. Nil means "not set here", which lets
@@ -290,6 +296,9 @@ func applyEnv(env map[string]string, cfg *Config) error {
 	if v, ok := env[envPrefix+"CR_ADVERTISE_HOST"]; ok && v != "" {
 		cfg.CRAdvertiseHost = v
 	}
+	if v, ok := env[envPrefix+"PPROF_ADDR"]; ok && v != "" {
+		cfg.PprofAddr = v
+	}
 	if v, ok := env[envPrefix+"FLEET_OFFSET"]; ok && v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil {
@@ -344,6 +353,7 @@ func applyFlags(args []string, cfg *Config) error {
 	crPath := fs.String("cr-path", cfg.CRPath, "URL path the connection-request listener serves")
 	crPublishPath := fs.String("cr-publish-path", cfg.CRPublishPath, "parameter-tree path where the listener URL is published")
 	crAdvertiseHost := fs.String("cr-advertise-host", cfg.CRAdvertiseHost, "host to publish in the ConnectionRequestURL instead of the bound address")
+	pprofAddr := fs.String("pprof-addr", cfg.PprofAddr, "serve Go runtime profiles on this address (empty disables)")
 	fleetOffset := fs.Int("fleet-offset", derefInt(cfg.FleetOffset), "shift every instance index by this amount so shards produce disjoint fleets")
 	bootRamp := fs.Duration("boot-ramp", derefDuration(cfg.BootRamp), "spread the fleet's bootstrap Informs evenly across this window (e.g. 10m)")
 	uspBroker := fs.String("usp-broker", cfg.USPBroker, "USP MQTT broker host:port (enables the TR-369 agent)")
@@ -388,6 +398,7 @@ func applyFlags(args []string, cfg *Config) error {
 	cfg.CRPath = *crPath
 	cfg.CRPublishPath = *crPublishPath
 	cfg.CRAdvertiseHost = *crAdvertiseHost
+	cfg.PprofAddr = *pprofAddr
 	cfg.USPBroker = *uspBroker
 	cfg.USPControllerID = *uspControllerID
 	cfg.USPMQTTSecret = *uspMQTTSecret
