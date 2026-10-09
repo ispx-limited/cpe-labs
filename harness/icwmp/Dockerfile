@@ -38,6 +38,23 @@ RUN mkdir -p build && cd build && \
     ln -sf /opt/dev/icwmp/build/bbf_plugin/libcwmpdm.so /usr/share/bbfdm/micro_services/icwmp.so && \
     test -x /usr/sbin/icwmpd
 
+# stunc, the iopsys TR-069 Annex G client: binding discovery against the
+# ACS's STUN server, keepalives, and the listener that validates the
+# UDP Connection Requests the ACS sends back through the binding and
+# tells icwmpd to inform over ubus. Its bbfdm plugin serves the
+# Device.ManagementServer.STUN* leaves; icwmp's own plugin serves
+# UDPConnectionRequestAddress and NATDetected from the state stunc
+# writes. Pinned for the same reason icwmp is.
+ARG STUNC_COMMIT=741ef6aa2f07e77bb4e5d12f3c3bc6cad8d04a61
+RUN git clone https://dev.iopsys.eu/bbf/stunc.git /opt/dev/stunc && \
+    cd /opt/dev/stunc && git checkout ${STUNC_COMMIT} && \
+    cd src && make && \
+    install -m 755 stunc /usr/sbin/stunc && \
+    install -m 644 libstunc.so /usr/share/bbfdm/micro_services/stunc.so && \
+    cp /opt/dev/stunc/test/files/etc/config/stunc /etc/config/stunc && \
+    sed 's/icwmp/stunc/g' /etc/bbfdm/services/icwmp.json > /etc/bbfdm/services/stunc.json && \
+    test -x /usr/sbin/stunc
+
 # uci config, board-db identity and the dummy sysupgrade from the CI
 # fixture tree. start.sh overrides identity per container from env.
 RUN cp -rf test/files/* / && cp test/dummy/sysupgrade /sbin/ && chmod 777 /sbin/sysupgrade && \

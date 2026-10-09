@@ -114,3 +114,49 @@ curl -i -u user:pass --digest http://127.0.0.1:7547/cr
 # 3. Multi-CPE routing.
 curl -i -u user:pass --digest http://127.0.0.1:7547/cr/cpe-3
 ```
+
+## UDP connection requests (STUN, TR-069 Annex G)
+
+A CPE behind a NAT cannot be reached on its ConnectionRequestURL. Annex
+G has it keep a UDP binding open to the ACS's STUN server and the ACS
+send its connection request through that binding. A profile that models
+the `ManagementServer` STUN leaves (`STUNEnable`, `STUNServerAddress`,
+`STUNServerPort`, `STUNUsername`, `STUNPassword`, the two keepalive
+periods, `UDPConnectionRequestAddress`, `NATDetected`; the shipped
+Sagemcom FAST5599 does) gets a STUN client per CPE, driven by the tree
+the way a real device is:
+
+- Nothing happens until the ACS writes `STUNEnable` true. A profile
+  without the leaves has no client, which is also what its firmware has.
+- The client binds a UDP socket, sends a Binding Request to
+  `STUNServerAddress:STUNServerPort` (the ACS URL's host when the
+  address is empty, as the Annex says) carrying the
+  CONNECTION-REQUEST-BINDING attribute, BINDING-CHANGE on the first
+  request and whenever the binding moves, and USERNAME when
+  `STUNUsername` is set, with the RFC 3489 retransmission schedule.
+- The MAPPED-ADDRESS in the response, compared with the local address,
+  sets `NATDetected`; `UDPConnectionRequestAddress` is written with the
+  public address behind a NAT and the local one otherwise. Both are
+  device-internal writes, so an active notification set on them by the
+  ACS opens a session the way real firmware does.
+- The binding is kept alive at `STUNMinimumKeepAlivePeriod` (bounded
+  by the maximum when that is lower). Timeout discovery is left to the
+  vendor by the Annex, and this vendor keeps the shortest period.
+- A datagram on the socket that is not STUN is read as a UDP
+  Connection Request and validated as G.2.1.4 requires: a GET, a
+  timestamp later than the last accepted, a message id different from
+  the last accepted, the connection request username, and an HMAC-SHA1
+  signature keyed with the connection request password. One that
+  passes runs a session with `6 CONNECTION REQUEST`; one that fails is
+  ignored and leaves no record, so the ACS's retransmitted copies and a
+  wrong credential are both silent.
+- Changing any STUN leaf restarts the client with the new values;
+  `STUNEnable` false stops it.
+
+A 401 Binding Error Response is logged and not answered: the
+MESSAGE-INTEGRITY exchange of G.2.1.1 is not implemented yet.
+
+The credential the request is validated against is the profile's
+`connectionRequest.usernameParameter` and `passwordParameter` when the
+HTTP listener is configured, and `ManagementServer.ConnectionRequestUsername`
+and `ConnectionRequestPassword` under the same root otherwise.

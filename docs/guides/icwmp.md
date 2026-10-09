@@ -54,6 +54,50 @@ as an unknown vendor would.
 | `ACS_URL` | ACS URL | http://acs:7547 |
 | `ACS_USERNAME` / `ACS_PASSWORD` | ACS Basic auth | iopsys / iopsys |
 | `INFORM_INTERVAL` | Periodic inform seconds | 60 |
+| `CR_USERNAME` / `CR_PASSWORD` | Connection request credential, the one the client challenges with over HTTP and validates UDP connection requests against | iopsys / iopsys |
+| `STUN_SERVER` | STUN server address; set, it enables stunc | unset, STUN off |
+| `STUN_PORT` | STUN server port | 3478 |
+| `STUN_MIN_KEEPALIVE` / `STUN_MAX_KEEPALIVE` | Keepalive bounds in seconds | 30 / 120 |
+| `STUN_CLIENT_PORT` | The UDP port stunc binds, where UDP connection requests arrive | 7547 |
+| `GATEWAY` | Default route, for a container behind a NAT container | unset |
+
+## STUN and a NAT (TR-069 Annex G)
+
+The image carries iopsys `stunc`, the Annex G client of the same
+stack: binding discovery against the STUN server in its uci, keepalives
+between the bounds, BINDING-CHANGE and CONNECTION-REQUEST-BINDING on
+the requests, the 401 and MESSAGE-INTEGRITY exchange, and the listener
+that validates a UDP Connection Request (timestamp, id, username,
+signature) and tells `icwmpd` to inform with `6 CONNECTION REQUEST`
+over ubus. `icwmpd`'s data model serves `UDPConnectionRequestAddress`
+and `NATDetected` from the state stunc writes, and stunc's own plugin
+serves the `STUN*` leaves, so the ACS reads what a real unit reports.
+
+STUN is switched on from env (`STUN_SERVER`) rather than by the ACS
+writing `STUNEnable`, because SetParameterValues does not persist in
+this container (see Limitations). A loop in `start.sh` restarts stunc
+whenever its uci changes, since there is no procd to do it.
+
+`docker-compose.nat.yml` puts the harness behind a NAT: an Alpine
+container masquerading an internal subscriber network, with the UDP
+conntrack timeout at 30 seconds so a keepalive that stops is a binding
+that closes, and the harness routing through it. Its
+ConnectionRequestURL is then unreachable from the ACS and the binding
+is the only way in.
+
+```bash
+ACS_URL=http://203.0.113.1:7547/ STUN_SERVER=203.0.113.1 \
+  docker compose -f harness/icwmp/docker-compose.nat.yml up --build
+```
+
+Pass is the ACS's wake arriving as an Inform with `6 CONNECTION
+REQUEST`: `docker compose -f harness/icwmp/docker-compose.nat.yml logs
+icwmp` shows stunc's "got new connection request" followed by the
+session, and `UDPConnectionRequestAddress` on the ACS side carries the
+NAT's outer address rather than 10.200.0.10. The credential the ACS
+signs with has to be the one in `CR_USERNAME` and `CR_PASSWORD`; the
+compose file's defaults are the OUI and serial joined by a hyphen,
+which is the pair an ACS derives for a device it has not issued one.
 
 ## Limitations
 
