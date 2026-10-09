@@ -39,9 +39,10 @@ func (t *Tree) Graft(other *Tree) ([]string, error) {
 	var points []graftPoint
 	var collect func(dst, src *Node, prefix []string) error
 	collect = func(dst, src *Node, prefix []string) error {
-		for name, child := range src.children {
+		for _, kv := range src.children {
+			name, child := kv.name, kv.node
 			path := append(append([]string{}, prefix...), name)
-			existing, ok := dst.children[name]
+			existing, ok := dst.children.get(name)
 			if !ok {
 				points = append(points, graftPoint{name: name, node: child, path: path})
 				continue
@@ -72,7 +73,7 @@ func (t *Tree) Graft(other *Tree) ([]string, error) {
 			return nil, cpeerr.Wrap("paramtree.Graft", cpeerr.KindInvalidArgument, err)
 		}
 		n := p.node.clone()
-		parent.children[p.name] = n
+		parent.children.set(p.name, n)
 		path := joinPath(p.path)
 		if n.isLeaf() {
 			roots = append(roots, path)
@@ -119,7 +120,7 @@ func (t *Tree) Unmount(path string) error {
 		return cpeerr.Wrap("paramtree.Unmount", cpeerr.KindInvalidArgument,
 			fmt.Errorf("path %q traverses a leaf", path))
 	}
-	n, ok := parent.children[last]
+	n, ok := parent.children.get(last)
 	if !ok {
 		t.mu.Unlock()
 		return cpeerr.Wrap("paramtree.Unmount", cpeerr.KindNotFound,
@@ -132,7 +133,7 @@ func (t *Tree) Unmount(path string) error {
 				fmt.Errorf("path %q is a table instance; use DeleteObject", path))
 		}
 	}
-	delete(parent.children, last)
+	parent.children.del(last)
 	if !n.isLeaf() && t.hasObservers() {
 		deleted = joinPath(segments) + "."
 	}

@@ -50,7 +50,7 @@ func nextGeneration() uint64 { return generations.Add(1) }
 // New returns an empty tree.
 func New() *Tree {
 	gen := nextGeneration()
-	return &Tree{root: &Node{children: make(map[string]*Node), owner: gen}, gen: gen}
+	return &Tree{root: &Node{children: kids{}, owner: gen}, gen: gen}
 }
 
 // own returns n when t may write it in place, and otherwise a shallow
@@ -76,10 +76,8 @@ func (t *Tree) own(n *Node) *Node {
 		cp.attrs = &a
 	}
 	if n.children != nil {
-		cp.children = make(map[string]*Node, len(n.children))
-		for k, c := range n.children {
-			cp.children[k] = c
-		}
+		cp.children = make(kids, len(n.children))
+		copy(cp.children, n.children)
 	}
 	return cp
 }
@@ -94,9 +92,9 @@ func (t *Tree) lookupMut(segments []string) (*Node, error) {
 	t.root = t.own(t.root)
 	n := t.root
 	for _, seg := range segments {
-		c := n.children[seg]
+		c, _ := n.children.get(seg)
 		if owned := t.own(c); owned != c {
-			n.children[seg] = owned
+			n.children.set(seg, owned)
 			c = owned
 		}
 		n = c
@@ -127,13 +125,13 @@ func (t *Tree) Mount(path string, n *Node) error {
 			return cpeerr.Wrap("paramtree.Mount", cpeerr.KindInvalidArgument,
 				fmt.Errorf("path %q traverses a leaf at %q", path, seg))
 		}
-		child, ok := parent.children[seg]
+		child, ok := parent.children.get(seg)
 		if !ok {
-			child = &Node{children: make(map[string]*Node), owner: t.gen}
+			child = &Node{children: kids{}, owner: t.gen}
 		} else {
 			child = t.own(child)
 		}
-		parent.children[seg] = child
+		parent.children.set(seg, child)
 		parent = child
 	}
 
@@ -142,11 +140,11 @@ func (t *Tree) Mount(path string, n *Node) error {
 		return cpeerr.Wrap("paramtree.Mount", cpeerr.KindInvalidArgument,
 			fmt.Errorf("path %q traverses a leaf", path))
 	}
-	if _, exists := parent.children[last]; exists {
+	if _, exists := parent.children.get(last); exists {
 		return cpeerr.Wrap("paramtree.Mount", cpeerr.KindInvalidArgument,
 			fmt.Errorf("path %q already occupied", path))
 	}
-	parent.children[last] = n
+	parent.children.set(last, n)
 	return nil
 }
 
@@ -209,7 +207,7 @@ func (t *Tree) Set(path string, v Value) error {
 		return cpeerr.Wrap("paramtree.Set", cpeerr.KindInvalidArgument,
 			fmt.Errorf("type mismatch at %q: have %s, got %s", path, n.leaf.Type, v.Type))
 	}
-	if err := Validate(v.Type, v.Raw); err != nil {
+	if err = Validate(v.Type, v.Raw); err != nil {
 		return err
 	}
 	old := *n.leaf
@@ -254,7 +252,7 @@ func (t *Tree) SetSystem(path, raw string) error {
 		return cpeerr.Wrap("paramtree.SetSystem", cpeerr.KindNotFound,
 			fmt.Errorf("path %q is an interior node, not a leaf", path))
 	}
-	if err := Validate(n.leaf.Type, raw); err != nil {
+	if err = Validate(n.leaf.Type, raw); err != nil {
 		return err
 	}
 	old := *n.leaf
@@ -641,7 +639,8 @@ func (t *Tree) Names(prefix string, partial bool) ([]string, error) {
 		return []string{joinPath(segments)}, nil
 	}
 	out := make([]string, 0, len(n.children))
-	for seg := range n.children {
+	for _, kv := range n.children {
+		seg := kv.name
 		out = append(out, joinPath(append(append([]string{}, segments...), seg)))
 	}
 	sort.Strings(out)
@@ -688,8 +687,8 @@ func (t *Tree) Children(prefix string) ([]ChildInfo, error) {
 	}
 
 	out := make([]ChildInfo, 0, len(n.children))
-	for _, seg := range sortedKeys(n.children) {
-		child := n.children[seg]
+	for _, seg := range n.children.names() {
+		child, _ := n.children.get(seg)
 		fullPath := joinPath(append(append([]string{}, segments...), seg))
 		if child.isLeaf() {
 			out = append(out, ChildInfo{Name: fullPath, Writable: child.leaf.Writable})
@@ -724,7 +723,7 @@ func (t *Tree) lookup(segments []string) (*Node, error) {
 			return nil, fmt.Errorf("path %q traverses a leaf at %q",
 				joinPath(segments), joinPath(segments[:i]))
 		}
-		child, ok := n.children[seg]
+		child, ok := n.children.get(seg)
 		if !ok {
 			return nil, fmt.Errorf("path %q not found", joinPath(segments))
 		}
@@ -740,7 +739,8 @@ func collectLeaves(n *Node, prefix []string, out *[]string) {
 		*out = append(*out, joinPath(prefix))
 		return
 	}
-	for seg, child := range n.children {
+	for _, kv := range n.children {
+		seg, child := kv.name, kv.node
 		next := append(append([]string{}, prefix...), seg)
 		collectLeaves(child, next, out)
 	}
@@ -753,9 +753,9 @@ func walk(n *Node, prefix []string, depth int, fn func(path string, v Value) err
 	}
 	if depth == 1 {
 		// emit only immediate-child leaves
-		segs := sortedKeys(n.children)
+		segs := n.children.names()
 		for _, seg := range segs {
-			child := n.children[seg]
+			child, _ := n.children.get(seg)
 			if child.isLeaf() {
 				if err := fn(joinPath(append(append([]string{}, prefix...), seg)), *child.leaf); err != nil {
 					return err
@@ -768,23 +768,14 @@ func walk(n *Node, prefix []string, depth int, fn func(path string, v Value) err
 	if depth > 1 {
 		next = depth - 1
 	}
-	segs := sortedKeys(n.children)
+	segs := n.children.names()
 	for _, seg := range segs {
-		child := n.children[seg]
+		child, _ := n.children.get(seg)
 		if err := walk(child, append(append([]string{}, prefix...), seg), next, fn); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-func sortedKeys(m map[string]*Node) []string {
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	sort.Strings(out)
-	return out
 }
 
 // AddTable declares parentPath as a variable-arity table whose
@@ -817,13 +808,13 @@ func (t *Tree) AddTable(parentPath string, template *Node) error {
 			return cpeerr.Wrap("paramtree.AddTable", cpeerr.KindInvalidArgument,
 				fmt.Errorf("path %q traverses a leaf", parentPath))
 		}
-		child, ok := parent.children[seg]
+		child, ok := parent.children.get(seg)
 		if !ok {
-			child = &Node{children: make(map[string]*Node), owner: t.gen}
+			child = &Node{children: kids{}, owner: t.gen}
 		} else {
 			child = t.own(child)
 		}
-		parent.children[seg] = child
+		parent.children.set(seg, child)
 		parent = child
 	}
 	if parent.isLeaf() {
@@ -875,7 +866,8 @@ func (t *Tree) AddObject(parentPath string) (int, error) {
 	}
 
 	used := make(map[int]struct{}, len(n.children))
-	for k := range n.children {
+	for _, kv := range n.children {
+		k := kv.name
 		if i, err := strconv.Atoi(k); err == nil && i > 0 {
 			used[i] = struct{}{}
 		}
@@ -894,7 +886,7 @@ func (t *Tree) AddObject(parentPath string) (int, error) {
 	if inst.owner == t.gen {
 		inst = inst.clone()
 	}
-	n.children[strconv.Itoa(instance)] = inst
+	n.children.set(strconv.Itoa(instance), inst)
 	counter = t.syncEntryCount(segments, n)
 	if t.hasObservers() {
 		created = strings.TrimSuffix(parentPath, ".") + "." + strconv.Itoa(instance) + "."
@@ -918,12 +910,13 @@ func (t *Tree) syncEntryCount(tableSegs []string, table *Node) *Change {
 		return nil
 	}
 	name := tableSegs[len(tableSegs)-1] + "NumberOfEntries"
-	c, ok := parent.children[name]
+	c, ok := parent.children.get(name)
 	if !ok || !c.isLeaf() {
 		return nil
 	}
 	count := 0
-	for k := range table.children {
+	for _, kv := range table.children {
+		k := kv.name
 		if i, err := strconv.Atoi(k); err == nil && i > 0 {
 			count++
 		}
@@ -934,7 +927,7 @@ func (t *Tree) syncEntryCount(tableSegs []string, table *Node) *Change {
 	}
 	old := *c.leaf
 	c = t.own(c)
-	parent.children[name] = c
+	parent.children.set(name, c)
 	c.leaf.Raw = raw
 	if !t.hasObservers() {
 		return nil
@@ -991,11 +984,11 @@ func (t *Tree) DeleteObject(path string) error {
 		return cpeerr.Wrap("paramtree.DeleteObject", cpeerr.KindInvalidArgument,
 			fmt.Errorf("path %q does not name a table instance (parent is not a table)", path))
 	}
-	if _, exists := parent.children[last]; !exists {
+	if _, exists := parent.children.get(last); !exists {
 		return cpeerr.Wrap("paramtree.DeleteObject", cpeerr.KindNotFound,
 			fmt.Errorf("instance %s of %s not found", last, joinPath(parentSegs)))
 	}
-	delete(parent.children, last)
+	parent.children.del(last)
 	counter = t.syncEntryCount(parentSegs, parent)
 	if t.hasObservers() {
 		deleted = path

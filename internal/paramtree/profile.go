@@ -2008,7 +2008,7 @@ func buildInstanceTemplate(rows []*profileParam) *Node {
 					Writable: row.Writable,
 				}))
 			} else {
-				child, ok := current.children[seg]
+				child, ok := current.children.get(seg)
 				if !ok {
 					child = NewBranch()
 					_ = current.Attach(seg, child)
