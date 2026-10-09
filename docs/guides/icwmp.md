@@ -54,6 +54,51 @@ as an unknown vendor would.
 | `ACS_URL` | ACS URL | http://acs:7547 |
 | `ACS_USERNAME` / `ACS_PASSWORD` | ACS Basic auth | iopsys / iopsys |
 | `INFORM_INTERVAL` | Periodic inform seconds | 60 |
+| `CR_USERNAME` / `CR_PASSWORD` | Connection request credential, the one the client challenges with over HTTP and validates UDP connection requests against | iopsys / iopsys |
+| `STUN_SERVER` | STUN server address; set, it enables stunc | unset, STUN off |
+| `STUN_PORT` | STUN server port | 3478 |
+| `STUN_MIN_KEEPALIVE` / `STUN_MAX_KEEPALIVE` | Keepalive bounds in seconds | 30 / 120 |
+| `STUN_CLIENT_PORT` | The UDP port stunc binds, where UDP connection requests arrive | 7547 |
+| `GATEWAY` | Default route, for a container behind a NAT container | unset |
+
+## STUN and a NAT (TR-069 Annex G)
+
+The image carries iopsys `stunc`, the Annex G client of the same
+stack: binding discovery against the STUN server in its uci, keepalives
+between the bounds, BINDING-CHANGE and CONNECTION-REQUEST-BINDING on
+the requests, the 401 and MESSAGE-INTEGRITY exchange, and the listener
+that validates a UDP Connection Request (timestamp, id, username,
+signature) and tells `icwmpd` to inform with `6 CONNECTION REQUEST`
+over ubus. `icwmpd`'s data model serves `UDPConnectionRequestAddress`
+and `NATDetected` from the state stunc writes, and stunc's own plugin
+serves the `STUN*` leaves, so the ACS reads what a real unit reports.
+
+STUN is switched on from env (`STUN_SERVER`) rather than by the ACS
+writing `STUNEnable`, because SetParameterValues does not persist in
+this container (see Limitations). A loop in `start.sh` restarts stunc
+whenever its uci changes, since there is no procd to do it.
+
+`docker-compose.nat.yml` puts the harness behind a NAT: an Alpine
+container masquerading an internal subscriber network, with the UDP
+conntrack timeout at 30 seconds so a keepalive that stops is a binding
+that closes, and the harness routing through it. Its
+ConnectionRequestURL is then unreachable from the ACS and the binding
+is the only way in.
+
+```bash
+ACS_URL=http://203.0.113.1:7547/ STUN_SERVER=203.0.113.1 \
+  docker compose -f harness/icwmp/docker-compose.nat.yml up --build
+```
+
+Pass is the ACS's wake arriving as an Inform with `6 CONNECTION
+REQUEST`: `/var/log/syslog` in the container (a sink in `start.sh`
+collects what stunc and bbfdm log through syslog) shows stunc's "got
+new connection request" followed by the session in
+`/var/log/icwmpd.log`, and `UDPConnectionRequestAddress` on the ACS
+side carries the NAT's outer address rather than 10.200.0.10. The credential the ACS
+signs with has to be the one in `CR_USERNAME` and `CR_PASSWORD`; the
+compose file's defaults are the OUI and serial joined by a hyphen,
+which is the pair an ACS derives for a device it has not issued one.
 
 ## Limitations
 
@@ -94,6 +139,16 @@ All learned the hard way; the Dockerfile encodes them.
   Device.DeviceInfo.Manufacturer" and never Informs.
 - icwmp's `make install` expects binaries copied back into the source
   tree before it runs.
+- stunc is built with `-funsigned-char`. It formats its HMAC-SHA1 with
+  `%02X` from a plain `char`, which is unsigned on the ARM routers it
+  ships on and signed on x86, where every digest byte above 0x7F
+  printed as `FFFFFFxx` and every UDP connection request was refused
+  with "signature mismatched" against a correct signature.
+- stunc's plugin lives in `/usr/share/bbfdm/micro_services/icwmp/`, as
+  an extension of the icwmp micro-service. Registered as a service of
+  its own it claims `Device.ManagementServer.` beside icwmp, and every
+  leaf of the object faults 9005, `ConnectionRequestURL` included, so
+  icwmpd never informs.
 - Expect your ACS's post-boot parameter walk to log faults for paths
   this device does not implement (BulkData, some wildcard subtrees).
   That is authentic new-CPE behaviour, not a harness bug.

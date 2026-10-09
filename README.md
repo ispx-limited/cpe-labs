@@ -74,6 +74,7 @@ same parameter tree:
 | Events | Correct event codes per session, BOOTSTRAP delivered once, `M` method events queued, `7 TRANSFER COMPLETE` alongside its Download or Upload event, `11 DU STATE CHANGE COMPLETE` with its DUStateChangeComplete |
 | Sessions | One at a time per CPE, mid-session triggers deferred rather than dropped, retry with the TR-069 Table 3 backoff and a stamped RetryCount |
 | Connection requests | HTTP listener per CPE with Basic or Digest auth, throttling, and credentials read live from the parameter tree so ACS-driven rotation works |
+| STUN (TR-069 Annex G) | A STUN client per CPE whose profile models the leaves: binding discovery and keepalives once the ACS enables it, `UDPConnectionRequestAddress` and `NATDetected` reported, UDP connection requests validated and answered with a session |
 | Informs | Jittered periodic intervals, or phase-anchored to `PeriodicInformTime` per TR-069 3.2.1.2 when the ACS sets it |
 | Auth | Basic and Digest against the ACS, with the challenge answered from tree-sourced credentials |
 | Faults | Spec-accurate fault codes, including 9005 for unknown parameters and multi-fault SPV responses |

@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
+	"net/url"
 	"os"
 	"os/signal"
 	"runtime"
@@ -36,6 +37,7 @@ import (
 	"github.com/ispx-limited/cpe-labs/internal/cwmp/handlers"
 	"github.com/ispx-limited/cpe-labs/internal/cwmp/inform"
 	"github.com/ispx-limited/cpe-labs/internal/cwmp/scheduler"
+	"github.com/ispx-limited/cpe-labs/internal/cwmp/stun"
 	"github.com/ispx-limited/cpe-labs/internal/cwmp/transfer"
 	"github.com/ispx-limited/cpe-labs/internal/cwmp/transport"
 	"github.com/ispx-limited/cpe-labs/internal/diagnostics"
@@ -85,6 +87,11 @@ type cpeStack struct {
 	// listener binds, because the URL isn't knowable until then.
 	crEndpointPath string
 	crPublishPath  string
+
+	// stun is the Annex G client, when the profile models the
+	// ManagementServer STUN leaves and the CPE speaks CWMP. It runs
+	// only while the ACS has STUNEnable true.
+	stun *stun.Client
 
 	// uspIdentity and uspBootParams come from the same profile declarations
 	// CWMP's Inform uses, so the USP agent keys and boots the way the CWMP
@@ -373,6 +380,21 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 				return fmt.Errorf("generators.Start (cpe=%s): %w", st.id, startErr)
 			}
 		}
+	}
+
+	// STUN clients, one per CPE whose profile models the leaves. They
+	// observe the tree from here on and do nothing until the ACS
+	// enables STUN, so a run that never does pays one observer.
+	stunClients := 0
+	for _, st := range stacks {
+		if st.stun == nil {
+			continue
+		}
+		defer st.stun.Start(ctx)()
+		stunClients++
+	}
+	if stunClients > 0 {
+		logger.Info("stun clients armed", "count", stunClients)
 	}
 
 	// USP (TR-369) agents, one per simulated CPE, over the same tree the CWMP
@@ -995,6 +1017,7 @@ func buildCPEStack(cfg cpeconfig.Config, template *paramtree.Profile, in cpeStac
 		hasScheduler   bool
 		crEndpointPath string
 		crPublishPath  string
+		stunClient     *stun.Client
 	)
 	if cfg.ACSURL != "" {
 		transportCfg := transport.Config{
@@ -1247,6 +1270,33 @@ func buildCPEStack(cfg cpeconfig.Config, template *paramtree.Profile, in cpeStac
 			}
 		})
 
+		// Annex G: a STUN client for a profile that models the leaves. It
+		// idles until the ACS writes STUNEnable, then keeps a NAT binding
+		// open and answers UDP connection requests through it the way
+		// the HTTP listener answers TCP ones. A profile without the
+		// leaves has no client, which is also what its firmware has.
+		if paths, derr := stun.Detect(prof.Tree); derr == nil {
+			if prof.ConnectionRequest.UsernameParameter != "" {
+				paths.CRUsername = prof.ConnectionRequest.UsernameParameter
+				paths.CRPassword = prof.ConnectionRequest.PasswordParameter
+			}
+			stunClient = stun.New(stun.Options{
+				Tree:    prof.Tree,
+				Paths:   paths,
+				ACSHost: acsHost(cfg.ACSURL),
+				Logger:  in.logger.With("cpe_id", in.id),
+				OnConnectionRequest: func() {
+					go func() {
+						if _, serr := runner.request(context.Background(), cwmp.TriggerConnectionRequest); serr != nil {
+							in.logger.Warn("udp CR session failed", "cpe_id", in.id, "err", serr.Error())
+						}
+					}()
+				},
+			})
+		} else if !errors.Is(derr, stun.ErrNotModelled) {
+			return nil, derr
+		}
+
 		// CR listener registration (per-CPE path when count > 1). The URL
 		// itself is published by publishCRURLs once the listener has bound.
 		if in.listener != nil {
@@ -1273,6 +1323,7 @@ func buildCPEStack(cfg cpeconfig.Config, template *paramtree.Profile, in cpeStac
 		hasScheduler:   hasScheduler,
 		crEndpointPath: crEndpointPath,
 		crPublishPath:  crPublishPath,
+		stun:           stunClient,
 
 		uspIdentity:     uspID,
 		uspBootParams:   uspBootParameters(prof),
@@ -1507,6 +1558,16 @@ func registerCREndpoint(listener *cr.Listener, cfg cpeconfig.Config, prof *param
 	logger.Debug("connection-request endpoint registered",
 		"cpe_id", cpeID, "path", path)
 	return path, nil
+}
+
+// acsHost is the host of the ACS URL, which Annex G names as the STUN
+// server when the ACS sets none.
+func acsHost(acsURL string) string {
+	u, err := url.Parse(acsURL)
+	if err != nil {
+		return ""
+	}
+	return u.Hostname()
 }
 
 // publishCRURLs writes each CPE's connection-request URL into its tree,
