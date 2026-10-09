@@ -91,10 +91,11 @@ ACS_URL=http://203.0.113.1:7547/ STUN_SERVER=203.0.113.1 \
 ```
 
 Pass is the ACS's wake arriving as an Inform with `6 CONNECTION
-REQUEST`: `docker compose -f harness/icwmp/docker-compose.nat.yml logs
-icwmp` shows stunc's "got new connection request" followed by the
-session, and `UDPConnectionRequestAddress` on the ACS side carries the
-NAT's outer address rather than 10.200.0.10. The credential the ACS
+REQUEST`: `/var/log/syslog` in the container (a sink in `start.sh`
+collects what stunc and bbfdm log through syslog) shows stunc's "got
+new connection request" followed by the session in
+`/var/log/icwmpd.log`, and `UDPConnectionRequestAddress` on the ACS
+side carries the NAT's outer address rather than 10.200.0.10. The credential the ACS
 signs with has to be the one in `CR_USERNAME` and `CR_PASSWORD`; the
 compose file's defaults are the OUI and serial joined by a hyphen,
 which is the pair an ACS derives for a device it has not issued one.
@@ -138,6 +139,16 @@ All learned the hard way; the Dockerfile encodes them.
   Device.DeviceInfo.Manufacturer" and never Informs.
 - icwmp's `make install` expects binaries copied back into the source
   tree before it runs.
+- stunc is built with `-funsigned-char`. It formats its HMAC-SHA1 with
+  `%02X` from a plain `char`, which is unsigned on the ARM routers it
+  ships on and signed on x86, where every digest byte above 0x7F
+  printed as `FFFFFFxx` and every UDP connection request was refused
+  with "signature mismatched" against a correct signature.
+- stunc's plugin lives in `/usr/share/bbfdm/micro_services/icwmp/`, as
+  an extension of the icwmp micro-service. Registered as a service of
+  its own it claims `Device.ManagementServer.` beside icwmp, and every
+  leaf of the object faults 9005, `ConnectionRequestURL` included, so
+  icwmpd never informs.
 - Expect your ACS's post-boot parameter walk to log faults for paths
   this device does not implement (BulkData, some wildcard subtrees).
   That is authentic new-CPE behaviour, not a harness bug.

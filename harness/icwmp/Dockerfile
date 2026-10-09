@@ -49,11 +49,15 @@ RUN mkdir -p build && cd build && \
 # faulting 9005, ConnectionRequestURL included, and icwmpd never
 # informs. icwmp's own plugin serves UDPConnectionRequestAddress and
 # NATDetected from the state stunc writes. Pinned for the same reason
-# icwmp is.
+# icwmp is. Built with -funsigned-char because stunc prints its
+# HMAC-SHA1 with "%02X" from a plain char: unsigned on the ARM routers
+# it ships on, signed on x86, where every digest byte above 0x7F
+# became FFFFFFxx and every UDP connection request failed its
+# signature check.
 ARG STUNC_COMMIT=741ef6aa2f07e77bb4e5d12f3c3bc6cad8d04a61
 RUN git clone https://dev.iopsys.eu/bbf/stunc.git /opt/dev/stunc && \
     cd /opt/dev/stunc && git checkout ${STUNC_COMMIT} && \
-    cd src && make && \
+    cd src && make CFLAGS=-funsigned-char && \
     install -m 755 stunc /usr/sbin/stunc && \
     mkdir -p /usr/share/bbfdm/micro_services/icwmp && \
     install -m 755 libstunc.so /usr/share/bbfdm/micro_services/icwmp/libstunc.so && \

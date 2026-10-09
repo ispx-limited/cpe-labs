@@ -53,6 +53,22 @@ BOARD="uci -c /etc/board-db/config"
 [ -n "$SOFTWARE_VERSION" ] && $BOARD set device.deviceinfo.SoftwareVersion="$SOFTWARE_VERSION"
 $BOARD commit device
 
+# No syslog daemon runs here and stunc logs through syslog(3) alone, so
+# a sink on /dev/log keeps its lines, and bbfdm's, in /var/log/syslog.
+python3 -c '
+import os, socket
+try:
+    os.unlink("/dev/log")
+except FileNotFoundError:
+    pass
+s = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+s.bind("/dev/log")
+os.chmod("/dev/log", 0o666)
+with open("/var/log/syslog", "ab", buffering=0) as f:
+    while True:
+        f.write(s.recv(8192) + b"\n")
+' &
+
 ubusd &
 sleep 1
 rpcd &
@@ -77,10 +93,10 @@ done
 sleep 3
 
 # stunc reads its uci once at start and has no reload, and there is no
-# procd here to restart it on a config change, so a loop does: it
-# restarts stunc whenever /etc/config/stunc changes and runs it only
-# while enabled. icwmpd must be up first, since stunc announces a
-# connection request over ubus to it.
+# procd here to restart it on a config change or a crash, so a loop
+# does both: it restarts stunc whenever /etc/config/stunc changes and
+# keeps one running while enabled. icwmpd must be up first, since stunc
+# announces a connection request over ubus to it.
 stunc_supervise() {
     local last=""
     while true; do
@@ -89,9 +105,9 @@ stunc_supervise() {
         if [ "$sig" != "$last" ]; then
             last=$sig
             pkill -x stunc
-            if [ "$(uci -q get stunc.stunc.enabled)" = "1" ]; then
-                stunc &
-            fi
+        fi
+        if [ "$(uci -q get stunc.stunc.enabled)" = "1" ] && ! pgrep -x stunc >/dev/null; then
+            stunc &
         fi
         sleep 2
     done
