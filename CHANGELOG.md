@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/ispx-limited/cpe-labs/compare/v0.9.1...v0.10.0) (2026-10-09)
+
+
+### Added
+
+* **cwmp:** a STUN client keeps a NAT binding open and answers UDP connection requests (TR-069 Annex G) ([#71](https://github.com/ispx-limited/cpe-labs/issues/71)) ([5db1761](https://github.com/ispx-limited/cpe-labs/commit/5db17619e6944a6a08e78f93dc0bc15ad33d2fdb))
+
 ## [0.9.1](https://github.com/ispx-limited/cpe-labs/compare/v0.9.0...v0.9.1) (2026-09-26)
 
 
