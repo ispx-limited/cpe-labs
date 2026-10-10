@@ -155,6 +155,9 @@ func run(ctx context.Context, args []string, stdout, stderr *os.File) error {
 	if err != nil {
 		return err
 	}
+	if cfg.PprofAddr != "" {
+		servePprof(cfg.PprofAddr, logger)
+	}
 
 	if cfg.ACSURL == "" && cfg.USPBroker == "" {
 		return fmt.Errorf("--acs-url is required unless --usp-broker is set (TR-369 / USP-only mode)")

@@ -65,5 +65,25 @@ func (s *Source) ForCPE(cpeID string) *rand.Rand {
 	binary.BigEndian.PutUint64(buf[:], uint64(s.rootSeed)) //nolint:gosec // bit-pattern reinterpret, not signed-overflow
 	_, _ = h.Write(buf[:])
 	_, _ = h.Write([]byte(cpeID))
-	return rand.New(rand.NewSource(int64(h.Sum64()))) //nolint:gosec // see file header
+	return rand.New(&splitmix{state: h.Sum64()}) //nolint:gosec // see file header
 }
+
+// splitmix is SplitMix64 behind math/rand's Source interface. The
+// standard library's source keeps 607 words of state, about 5 KB, and
+// a fleet holds several streams per CPE: at 250k CPEs that alone was
+// gigabytes. SplitMix64 keeps one word, passes BigCrush, and is
+// deterministic per seed, which is all a simulated CPE's jitter and
+// generator noise need.
+type splitmix struct{ state uint64 }
+
+func (s *splitmix) Uint64() uint64 {
+	s.state += 0x9e3779b97f4a7c15
+	z := s.state
+	z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9
+	z = (z ^ (z >> 27)) * 0x94d049bb133111eb
+	return z ^ (z >> 31)
+}
+
+func (s *splitmix) Int63() int64 { return int64(s.Uint64() >> 1) } //nolint:gosec // top 63 bits, never negative
+
+func (s *splitmix) Seed(seed int64) { s.state = uint64(seed) } //nolint:gosec // bit-pattern reinterpret
