@@ -1,0 +1,70 @@
+name: announce-release
+
+# Posts a release's notes to the ispx Discord when they land on main.
+# release-notes/<version>.md is written after the Release PR merges and
+# lands by its own PR, so the notes file
+# arriving on main is the moment the release is told, and only a file
+# added by the push counts: an edit to existing notes is a wording fix,
+# not a release. The dispatch input re-posts one version by hand, which
+# is also how the webhook is tried out.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "release-notes/**"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version whose notes to post, for example 0.76.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: announce-release
+  cancel-in-progress: false
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Find the versions to post
+        id: versions
+        env:
+          BEFORE: ${{ github.event.before }}
+          REQUESTED: ${{ inputs.version }}
+        run: |
+          if [ -n "$REQUESTED" ]; then
+            versions="$REQUESTED"
+          else
+            git fetch --quiet --depth=1 origin "$BEFORE"
+            versions=$(git diff --name-only --diff-filter=A "$BEFORE" "$GITHUB_SHA" -- release-notes/ \
+              | sed -n 's#^release-notes/\(.*\)\.md$#\1#p' | sort -V | tr '\n' ' ')
+          fi
+          echo "list=$versions" >> "$GITHUB_OUTPUT"
+          echo "versions: ${versions:-none}"
+
+      - name: Post the notes
+        if: steps.versions.outputs.list != ''
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_RELEASES_WEBHOOK }}
+          VERSIONS: ${{ steps.versions.outputs.list }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "::warning::DISCORD_RELEASES_WEBHOOK is not set, nothing posted"
+            exit 0
+          fi
+          for v in $VERSIONS; do
+            python hooks/announce.py "$v"
+          done
