@@ -1,0 +1,157 @@
+# Device.Hosts.*: everything the gateway has leased an address to.
+# Nine clients and the two extenders. Clients 1 to 5 are on the
+# gateway's own radios, 6 is wired, 7 and 8 are on the landing extender
+# (over its 5 GHz backhaul, so the gateway sees them arrive on
+# SSID.2), 9 is on the office extender (wired backhaul, so it arrives
+# on the LAN port the extender is plugged into). Hosts 10 and 11 are
+# the extenders themselves, listed by the bridge MAC each one DHCPs
+# with; the same MACs identify them in multiap.yaml, so an ACS can tell
+# a host that is a mesh node from a host that is a phone.
+#
+# Client MACs are locally administered (A2:00:0k) so no real vendor's
+# OUI is implied, with the per-CPE tail keeping every home's clients
+# distinct from every other home's.
+
+parameters:
+  - path: Device.Hosts.HostNumberOfEntries
+    type: xsd:unsignedInt
+    value: "11"
+
+objects:
+  - path: Device.Hosts.Host
+    instances: 11
+    parameters:
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: AddressSource
+        value: "DHCP"
+      - path: LeaseTimeRemaining
+        type: xsd:int
+        value: "86400"
+      - path: Layer3Interface
+        value: "Device.IP.Interface.2"
+      - path: Alias
+        value: "host-{i}"
+        writable: true
+      - path: IPv4AddressNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+      - path: IPv6AddressNumberOfEntries
+        type: xsd:unsignedInt
+        value: "0"
+
+# Address, name and the interface a host is reached on differ per row
+# and are declared per instance. Layer1Interface is what separates a
+# wired client from a 2.4 GHz one from a 5 GHz one on a topology view.
+groups:
+  - prefix: Device.Hosts.Host.1
+    parameters:
+      - path: PhysAddress
+        value: "A2:00:01:{cpe:mac:3}"
+      - path: IPAddress
+        value: "192.168.1.21"
+      - path: HostName
+        value: "Pixel-8"
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.1"
+  - prefix: Device.Hosts.Host.2
+    parameters:
+      - path: PhysAddress
+        value: "A2:00:02:{cpe:mac:3}"
+      - path: IPAddress
+        value: "192.168.1.22"
+      - path: HostName
+        value: "Ring-Doorbell"
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.1"
+  - prefix: Device.Hosts.Host.3
+    parameters:
+      - path: PhysAddress
+        value: "A2:00:03:{cpe:mac:3}"
+      - path: IPAddress
+        value: "192.168.1.23"
+      - path: HostName
+        value: "MacBook-Pro"
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.2"
+  - prefix: Device.Hosts.Host.4
+    parameters:
+      - path: PhysAddress
+        value: "A2:00:04:{cpe:mac:3}"
+      - path: IPAddress
+        value: "192.168.1.24"
+      - path: HostName
+        value: "LivingRoomTV"
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.2"
+  - prefix: Device.Hosts.Host.5
+    parameters:
+      - path: PhysAddress
+        value: "A2:00:05:{cpe:mac:3}"
+      - path: IPAddress
+        value: "192.168.1.25"
+      - path: HostName
+        value: "iPhone"
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.2"
+  - prefix: Device.Hosts.Host.6
+    parameters:
+      - path: PhysAddress
+        value: "A2:00:06:{cpe:mac:3}"
+      - path: IPAddress
+        value: "192.168.1.26"
+      - path: HostName
+        value: "desktop-pc"
+      - path: Layer1Interface
+        value: "Device.Ethernet.Interface.2"
+  - prefix: Device.Hosts.Host.7
+    parameters:
+      - path: PhysAddress
+        value: "A2:00:07:{cpe:mac:3}"
+      - path: IPAddress
+        value: "192.168.1.27"
+      - path: HostName
+        value: "iPad"
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.2"
+  - prefix: Device.Hosts.Host.8
+    parameters:
+      - path: PhysAddress
+        value: "A2:00:08:{cpe:mac:3}"
+      - path: IPAddress
+        value: "192.168.1.28"
+      - path: HostName
+        value: "Nest-Thermostat"
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.2"
+  - prefix: Device.Hosts.Host.9
+    parameters:
+      - path: PhysAddress
+        value: "A2:00:09:{cpe:mac:3}"
+      - path: IPAddress
+        value: "192.168.1.29"
+      - path: HostName
+        value: "Office-Laptop"
+      - path: Layer1Interface
+        value: "Device.Ethernet.Interface.3"
+  - prefix: Device.Hosts.Host.10
+    parameters:
+      - path: PhysAddress
+        value: "12:00:5E:{cpe:mac:3}"
+      - path: IPAddress
+        value: "192.168.1.11"
+      - path: HostName
+        value: "WX3100-T0"
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.2"
+  - prefix: Device.Hosts.Host.11
+    parameters:
+      - path: PhysAddress
+        value: "16:00:5E:{cpe:mac:3}"
+      - path: IPAddress
+        value: "192.168.1.12"
+      - path: HostName
+        value: "WX3100-T0"
+      - path: Layer1Interface
+        value: "Device.Ethernet.Interface.3"

@@ -1,0 +1,90 @@
+# Device.NAT.*: two port forwards, a console and a camera, which is what
+# a lived-in home has and a gateway fresh out of the box does not. Leaf
+# set follows TR-181 2.21 Device.NAT.PortMapping.{i}; the forwards point
+# at the WAN data path, Device.IP.Interface.1.
+
+parameters:
+  - path: Device.NAT.InterfaceSettingNumberOfEntries
+    type: xsd:unsignedInt
+    value: "0"
+  - path: Device.NAT.PortMappingNumberOfEntries
+    type: xsd:unsignedInt
+    value: "2"
+  - path: Device.NAT.MaxNumberOfPortMappings
+    type: xsd:unsignedInt
+    value: "32"
+
+objects:
+  - path: Device.NAT.PortMapping
+    instances: 2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: Alias
+        value: "cpe-map-{i}"
+        writable: true
+      - path: Interface
+        value: "Device.IP.Interface.1"
+        writable: true
+      - path: AllInterfaces
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: LeaseDuration
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: RemainingLeaseTime
+        type: xsd:unsignedInt
+        value: "0"
+      - path: RemoteHost
+        value: ""
+        writable: true
+      - path: ExternalPortEndRange
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+
+groups:
+  - prefix: Device.NAT.PortMapping.1
+    parameters:
+      - path: Description
+        value: "Game console"
+        writable: true
+      - path: Protocol
+        value: "UDP"
+        writable: true
+      - path: ExternalPort
+        type: xsd:unsignedInt
+        value: "3074"
+        writable: true
+      - path: InternalPort
+        type: xsd:unsignedInt
+        value: "3074"
+        writable: true
+      - path: InternalClient
+        value: "192.168.1.24"
+        writable: true
+  - prefix: Device.NAT.PortMapping.2
+    parameters:
+      - path: Description
+        value: "Doorbell camera"
+        writable: true
+      - path: Protocol
+        value: "TCP"
+        writable: true
+      - path: ExternalPort
+        type: xsd:unsignedInt
+        value: "8554"
+        writable: true
+      - path: InternalPort
+        type: xsd:unsignedInt
+        value: "554"
+        writable: true
+      - path: InternalClient
+        value: "192.168.1.22"
+        writable: true

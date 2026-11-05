@@ -41,6 +41,12 @@ func TestFlagshipProfilesCoverACSTelemetry(t *testing.T) {
 			pathsFile:  "testdata/acs_telemetry_tr181_paths.txt",
 			root:       "Device",
 		},
+		{
+			name:       "example-zyxel-ex3301-tr181",
+			profileDir: "../../profiles/example-zyxel-ex3301",
+			pathsFile:  "testdata/acs_telemetry_tr181_paths.txt",
+			root:       "Device",
+		},
 	}
 
 	for _, tc := range cases {

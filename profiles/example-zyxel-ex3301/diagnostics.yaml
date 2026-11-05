@@ -1,0 +1,291 @@
+# Device.IP.Diagnostics: ping, traceroute, download and upload, the
+# four an ACS drives through DiagnosticsState. The triggered runs are
+# declared in _top.yaml; these are the leaves they read and write.
+# Results are the surveyed unit's last run.
+
+parameters:
+  - path: Device.IP.Diagnostics.TraceRoute.RouteHopsNumberOfEntries
+    type: xsd:unsignedInt
+    value: "0"
+
+groups:
+  - prefix: Device.IP.Diagnostics.IPPing
+    parameters:
+      - path: DiagnosticsState
+        value: "None"
+        writable: true
+      - path: Interface
+        value: ""
+        writable: true
+      - path: ProtocolVersion
+        value: "ANY"
+        writable: true
+      - path: Host
+        value: ""
+        writable: true
+      - path: NumberOfRepetitions
+        type: xsd:unsignedInt
+        value: "1"
+        writable: true
+      - path: Timeout
+        type: xsd:unsignedInt
+        value: "1"
+        writable: true
+      - path: DataBlockSize
+        type: xsd:unsignedInt
+        value: "56"
+        writable: true
+      - path: DSCP
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: IPAddressUsed
+        value: ""
+      - path: SuccessCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: FailureCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: AverageResponseTime
+        type: xsd:unsignedInt
+        value: "0"
+      - path: MinimumResponseTime
+        type: xsd:unsignedInt
+        value: "0"
+      - path: MaximumResponseTime
+        type: xsd:unsignedInt
+        value: "0"
+      - path: AverageResponseTimeDetailed
+        type: xsd:unsignedInt
+        value: "0"
+      - path: MinimumResponseTimeDetailed
+        type: xsd:unsignedInt
+        value: "0"
+      - path: MaximumResponseTimeDetailed
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.IP.Diagnostics.TraceRoute
+    parameters:
+      - path: DiagnosticsState
+        value: "None"
+        writable: true
+      - path: Interface
+        value: ""
+        writable: true
+      - path: ProtocolVersion
+        value: "ANY"
+        writable: true
+      - path: Host
+        value: ""
+        writable: true
+      - path: NumberOfTries
+        type: xsd:unsignedInt
+        value: "3"
+        writable: true
+      - path: Timeout
+        type: xsd:unsignedInt
+        value: "5000"
+        writable: true
+      - path: DataBlockSize
+        type: xsd:unsignedInt
+        value: "38"
+        writable: true
+      - path: DSCP
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: MaxHopCount
+        type: xsd:unsignedInt
+        value: "30"
+        writable: true
+      - path: IPAddressUsed
+        value: ""
+      - path: ResponseTime
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.IP.Diagnostics.DownloadDiagnostics
+    parameters:
+      - path: DiagnosticsState
+        value: "COMPLETED"
+        writable: true
+      - path: Interface
+        value: ""
+        writable: true
+      - path: DownloadURL
+        value: ""
+        writable: true
+      - path: DownloadTransports
+        value: "HTTP"
+      - path: DownloadDiagnosticMaxConnections
+        type: xsd:unsignedInt
+        value: "1"
+        writable: true
+      - path: DownloadDiagnosticsMaxIncrementalResult
+        type: xsd:unsignedInt
+        value: "1"
+      - path: DSCP
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: EthernetPriority
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: TimeBasedTestDuration
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: TimeBasedTestMeasurementInterval
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: TimeBasedTestMeasurementOffset
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: ProtocolVersion
+        value: "ANY"
+        writable: true
+      - path: NumberOfConnections
+        type: xsd:unsignedInt
+        value: "1"
+        writable: true
+      - path: IPAddressUsed
+        value: ""
+      - path: ROMTime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: BOMTime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: EOMTime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: TestBytesReceived
+        type: xsd:unsignedInt
+        value: "1073741824"
+      - path: TotalBytesSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: TotalBytesReceived
+        type: xsd:unsignedInt
+        value: "1073742089"
+      - path: TestBytesReceivedUnderFullLoading
+        type: xsd:unsignedInt
+        value: "1073741824"
+      - path: TotalBytesReceivedUnderFullLoading
+        type: xsd:unsignedInt
+        value: "1073742089"
+      - path: TotalBytesSentUnderFullLoading
+        type: xsd:unsignedInt
+        value: "0"
+      - path: PeriodOfFullLoading
+        type: xsd:unsignedInt
+        value: "0"
+      - path: TCPOpenRequestTime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: TCPOpenResponseTime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: EnablePerConnectionResults
+        type: xsd:boolean
+        value: "false"
+        writable: true
+
+  - prefix: Device.IP.Diagnostics.UploadDiagnostics
+    parameters:
+      - path: DiagnosticsState
+        value: "COMPLETED"
+        writable: true
+      - path: Interface
+        value: ""
+        writable: true
+      - path: UploadURL
+        value: ""
+        writable: true
+      - path: UploadTransports
+        value: "HTTP"
+      - path: UploadDiagnosticsMaxConnections
+        type: xsd:unsignedInt
+        value: "1"
+        writable: true
+      - path: UploadDiagnosticsMaxIncrementalResult
+        type: xsd:unsignedInt
+        value: "1"
+      - path: DSCP
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: EthernetPriority
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: TestFileLength
+        type: xsd:unsignedInt
+        value: "500000000"
+        writable: true
+      - path: TimeBasedTestDuration
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: TimeBasedTestMeasurementInterval
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: TimeBasedTestMeasurementOffset
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: ProtocolVersion
+        value: "ANY"
+        writable: true
+      - path: NumberOfConnections
+        type: xsd:unsignedInt
+        value: "1"
+        writable: true
+      - path: IPAddressUsed
+        value: "172.31.254.21"
+      - path: ROMTime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: BOMTime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: EOMTime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: TestBytesSent
+        type: xsd:unsignedInt
+        value: "500061053"
+      - path: TotalBytesReceived
+        type: xsd:unsignedInt
+        value: "1317392"
+      - path: TotalBytesSent
+        type: xsd:unsignedInt
+        value: "519982755"
+      - path: TestBytesSentUnderFullLoading
+        type: xsd:unsignedInt
+        value: "500061053"
+      - path: TotalBytesReceivedUnderFullLoading
+        type: xsd:unsignedInt
+        value: "1317392"
+      - path: TotalBytesSentUnderFullLoading
+        type: xsd:unsignedInt
+        value: "519982755"
+      - path: PeriodOfFullLoading
+        type: xsd:unsignedInt
+        value: "2691"
+      - path: TCPOpenRequestTime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: TCPOpenResponseTime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: EnablePerConnectionResults
+        type: xsd:boolean
+        value: "false"
+        writable: true

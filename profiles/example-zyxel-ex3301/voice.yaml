@@ -1,0 +1,158 @@
+# Device.Services.VoiceService.* (TR-104): the two FXS lines behind a
+# SIP client that make this gateway an IAD rather than a router. Line 1
+# is provisioned and registered on most units, with a minority failing;
+# line 2 exists and is disabled, which is what a two-port IAD on a
+# single-line package looks like and gives an ACS a populated row and
+# an empty one to tell apart.
+
+parameters:
+  - path: Device.Services.VoiceServiceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+
+groups:
+  - prefix: Device.Services.VoiceService.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Alias
+        value: "VOICE1"
+        writable: true
+
+  - prefix: Device.Services.VoiceService.1.Capabilities
+    parameters:
+      - path: MaxLineCount
+        type: xsd:unsignedInt
+        value: "2"
+      - path: MaxSessionCount
+        type: xsd:unsignedInt
+        value: "2"
+      - path: SignalingProtocols
+        value: "SIP"
+
+  - prefix: Device.Services.VoiceService.1.CallControl
+    parameters:
+      - path: LineNumberOfEntries
+        type: xsd:unsignedInt
+        value: "2"
+
+  - prefix: Device.Services.VoiceService.1.CallControl.Line.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "{cpe:rpick:Up,Up,Up,Up,Up,Up,Up,Up,Registering,Disabled,Error}"
+      - path: CallStatus
+        value: "Idle"
+      - path: DirectoryNumber
+        value: "441632{cpe:hex:6}"
+        writable: true
+      - path: Alias
+        value: "LINE1"
+        writable: true
+
+  - prefix: Device.Services.VoiceService.1.CallControl.Line.2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Status
+        value: "Disabled"
+      - path: CallStatus
+        value: "Idle"
+      - path: DirectoryNumber
+        value: ""
+        writable: true
+      - path: Alias
+        value: "LINE2"
+        writable: true
+
+  - prefix: Device.Services.VoiceService.1.SIP
+    parameters:
+      - path: ClientNumberOfEntries
+        type: xsd:unsignedInt
+        value: "2"
+      - path: NetworkNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+
+  - prefix: Device.Services.VoiceService.1.SIP.Client.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      # AuthUserName is writable because provisioning scripts set SIP
+      # credentials; the password is write-only in practice and reads
+      # back empty, which is what a real gateway does rather than
+      # handing an ACS the secret back.
+      - path: AuthUserName
+        value: "441632{cpe:hex:6}"
+        writable: true
+      - path: AuthPassword
+        value: ""
+        writable: true
+      - path: RegisterURI
+        value: "sip:441632{cpe:hex:6}@voice.example"
+        writable: true
+      - path: Alias
+        value: "SIPCLIENT1"
+        writable: true
+
+  - prefix: Device.Services.VoiceService.1.SIP.Client.2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Status
+        value: "Disabled"
+      - path: AuthUserName
+        value: ""
+        writable: true
+      - path: AuthPassword
+        value: ""
+        writable: true
+      - path: RegisterURI
+        value: ""
+        writable: true
+      - path: Alias
+        value: "SIPCLIENT2"
+        writable: true
+
+  - prefix: Device.Services.VoiceService.1.SIP.Network.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: ProxyServer
+        value: "sip.voice.example"
+        writable: true
+      - path: ProxyServerPort
+        type: xsd:unsignedInt
+        value: "5060"
+        writable: true
+      - path: RegistrarServer
+        value: "sip.voice.example"
+        writable: true
+      - path: RegistrarServerPort
+        type: xsd:unsignedInt
+        value: "5060"
+        writable: true
+      - path: RegistrationPeriod
+        type: xsd:unsignedInt
+        value: "3600"
+        writable: true
+      - path: Alias
+        value: "SIPNET1"
+        writable: true

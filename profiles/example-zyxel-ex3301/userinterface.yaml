@@ -1,0 +1,20 @@
+# Device.UserInterface.RemoteAccess: whether the gateway answers
+# management HTTP from the WAN. Off, which is how an ISP wants a fleet
+# to ship.
+
+groups:
+  - prefix: Device.UserInterface.RemoteAccess
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Port
+        type: xsd:unsignedInt
+        value: "8443"
+        writable: true
+      - path: Protocol
+        value: "HTTPS"
+        writable: true
+      - path: SupportedProtocols
+        value: "HTTP,HTTPS"

@@ -1,0 +1,492 @@
+# Device.Ethernet.* and Device.IP.*: one GbE WAN port at instance 1 plus
+# four GbE LAN ports, the layout the baseline TR-181 mappings expect
+# (WAN is Interface.1, LAN ports are Interface.2 through 5). Two LAN
+# ports have something plugged in (a desktop and the wired WX3100-T0),
+# two are empty, because a home with every port lit is rarer than one
+# with none.
+#
+# Interface.1.Stats is also the WAN half of experience scoring: the
+# error-rate component is ErrorsReceived over PacketsReceived, so a
+# profile missing either scores every device identically.
+
+parameters:
+  - path: Device.Ethernet.InterfaceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "5"
+  - path: Device.Ethernet.LinkNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+  - path: Device.IP.InterfaceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "2"
+
+objects:
+  - path: Device.Ethernet.Interface
+    instances: 5
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Alias
+        value: "PHY{i}"
+        writable: true
+      - path: LowerLayers
+        value: ""
+        writable: true
+      # One base MAC on every port, which is how this gateway's switch
+      # presents itself; the radios take locally administered variants
+      # (wifi.yaml) and the extenders their own (multiap.yaml).
+      - path: MACAddress
+        value: "00:00:5E:{cpe:mac:3}"
+      - path: DuplexMode
+        value: "Auto"
+        writable: true
+      - path: MaxBitRate
+        type: xsd:int
+        value: "1000"
+        writable: true
+
+# Direction, name and link state differ per port and are declared per
+# instance: the loader rejects a group that redeclares a path a table
+# already materialized, so a per-port value cannot be a table default
+# with an override.
+groups:
+  - prefix: Device.Ethernet.Interface.1
+    parameters:
+      - path: Status
+        value: "Up"
+      - path: Name
+        value: "eth4"
+      - path: Upstream
+        type: xsd:boolean
+        value: "true"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "1000"
+
+  - prefix: Device.Ethernet.Interface.2
+    parameters:
+      - path: Status
+        value: "Up"
+      - path: Name
+        value: "eth0"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "1000"
+
+  - prefix: Device.Ethernet.Interface.3
+    parameters:
+      - path: Status
+        value: "Up"
+      - path: Name
+        value: "eth1"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "1000"
+
+  - prefix: Device.Ethernet.Interface.4
+    parameters:
+      - path: Status
+        value: "Down"
+      - path: Name
+        value: "eth2"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.Ethernet.Interface.5
+    parameters:
+      - path: Status
+        value: "Down"
+      - path: Name
+        value: "eth3"
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.Ethernet.Interface.1.Stats
+    parameters:
+      - path: BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 11000000
+          jitter: 0.2
+      - path: BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 26000000
+          jitter: 0.2
+      - path: PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 7500
+          jitter: 0.3
+      - path: PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 15000
+          jitter: 0.3
+      # Cumulative since boot, drawn per device rather than fixed at
+      # zero: most lines are clean, a minority carry the count a
+      # marginal drop produces. Without the spread every device scores
+      # an identical, and therefore useless, perfect WAN.
+      - path: ErrorsReceived
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:0,0,0,0,0,0,0,0,3,9,28,115}"
+      - path: ErrorsSent
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:0,0,0,0,0,0,0,0,1,5,14,52}"
+      - path: DiscardPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: DiscardPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  # LAN port counters: the desktop on port 1 and the wired extender on
+  # port 2 move traffic, the two empty ports report zero. A port table
+  # without Stats faults on every baseline collection.
+
+  - prefix: Device.Ethernet.Interface.2.Stats
+    parameters:
+      - path: BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 6000000
+          jitter: 0.3
+      - path: BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 18000000
+          jitter: 0.3
+      - path: PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 5000
+          jitter: 0.3
+      - path: PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 12000
+          jitter: 0.3
+      - path: ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: DiscardPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: DiscardPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.Ethernet.Interface.3.Stats
+    parameters:
+      - path: BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 3000000
+          jitter: 0.3
+      - path: BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 9000000
+          jitter: 0.3
+      - path: PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 2500
+          jitter: 0.3
+      - path: PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 6000
+          jitter: 0.3
+      - path: ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: DiscardPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: DiscardPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.Ethernet.Interface.4.Stats
+    parameters:
+      - path: BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: DiscardPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: DiscardPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.Ethernet.Interface.5.Stats
+    parameters:
+      - path: BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: DiscardPacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: DiscardPacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+  # The link above the WAN port. Its MAC is what the LAN and the
+  # topology read as this gateway's identity when Data Elements is
+  # absent.
+  - prefix: Device.Ethernet.Link.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Alias
+        value: "WAN"
+        writable: true
+      - path: Name
+        value: "eth4"
+      - path: LowerLayers
+        value: "Device.Ethernet.Interface.1"
+        writable: true
+      - path: MACAddress
+        value: "00:00:5E:{cpe:mac:3}"
+
+  - prefix: Device.IP.Interface.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Name
+        value: "wan"
+      - path: Type
+        value: "Normal"
+      - path: LowerLayers
+        value: "Device.Ethernet.Link.1"
+        writable: true
+      - path: LastChange
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: uptime
+          interval: 30s
+
+  - prefix: Device.IP.Interface.1.IPv4Address.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: IPAddress
+        value: "{wan_ipv4}"
+      - path: SubnetMask
+        value: "255.192.0.0"
+      - path: AddressingType
+        value: "DHCP"
+
+  # The IPv6 address table is not optional decoration. The baseline
+  # TR-181 mapping walks Device.IP.Interface.{i}.IPv6Address. as a
+  # subtree, and a profile that advertises the interface without the
+  # table answers GPV fault 9005 on every session.
+  - prefix: Device.IP.Interface.1.IPv6Address.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Preferred"
+      - path: IPAddress
+        value: "{wan_ipv6}"
+      - path: Origin
+        value: "AutoConfigured"
+      - path: Prefix
+        value: ""
+
+  # Interface.2 is the LAN bridge. InterfaceNumberOfEntries claims two,
+  # so both have to exist: a count that overstates the table is the
+  # same 9005 by another route.
+  - prefix: Device.IP.Interface.2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Name
+        value: "br0"
+      - path: Type
+        value: "Normal"
+      - path: LowerLayers
+        value: "Device.Ethernet.Interface.2"
+        writable: true
+      - path: LastChange
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: uptime
+          interval: 30s
+
+  - prefix: Device.IP.Interface.2.IPv4Address.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: IPAddress
+        value: "192.168.1.1"
+      - path: SubnetMask
+        value: "255.255.255.0"
+      - path: AddressingType
+        value: "Static"
+
+  - prefix: Device.IP.Interface.2.IPv6Address.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Preferred"
+      - path: IPAddress
+        value: "{delegated_prefix}"
+      - path: Origin
+        value: "Static"
+      - path: Prefix
+        value: ""
