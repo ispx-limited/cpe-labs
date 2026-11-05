@@ -1,0 +1,154 @@
+# Zyxel EX3301-T0, TR-181 (Device.*) profile.
+#
+# The Dual-Band Wireless AX1800 Gigabit Ethernet IAD: one GbE WAN, four
+# GbE LAN, two FXS lines, two 2x2 Wi-Fi 6 radios, and an EasyMesh
+# controller (Zyxel calls it MPro Mesh) with WX3100-T0 extenders as its
+# agents. In the UK it is the standard-package gateway at Hyperoptic,
+# Ogi, Quickline and Voneus.
+#
+# The firmware carries both a CWMP client and a TR-369 agent, so this is
+# the profile to run dual-stack: --acs-url for CWMP and --usp-broker for
+# USP, one tree behind both. Run it CWMP-only to model the WX3100-T0
+# fleets' gateways as most ISPs manage them today.
+#
+# Modelled from Zyxel's published datasheets and the TR-181 2.21 data
+# model, not from a device capture. The parameter tree is standard
+# TR-181 (no X_ZYXEL_ leaves are invented), the identity strings are the
+# published model codes and firmware builds, and the OUI is the
+# documentation OUI (00005E) rather than a Zyxel registration: real OUIs
+# belong to real hardware, and a fabricated one in a public profile is
+# exactly the kind of value someone would paste into a production
+# mapping. Bind a production profile to an OUI observed from a device,
+# not from here.
+#
+# The two extenders are visible only through this gateway's
+# Device.WiFi.MultiAP and Device.WiFi.DataElements trees (multiap.yaml),
+# which is how an ACS sees a WX3100-T0 that is not managed directly.
+
+deviceIdPaths:
+  manufacturer: Device.DeviceInfo.Manufacturer
+  oui:          Device.DeviceInfo.ManufacturerOUI
+  productClass: Device.DeviceInfo.ProductClass
+  serialNumber: Device.DeviceInfo.SerialNumber
+
+fleet:
+  count: 1
+  # Zyxel-style shape: S, a YYWW date code, an 8-character tail. The
+  # prefix has to differ from every other profile that shares the
+  # documentation OUI (example-zyxel-ex5601 uses S22), because device
+  # identity at the ACS is OUI plus serial and two cohorts minting the
+  # same pattern would collide into one device population.
+  serialPattern: "S2042{cpe:ALNUM:8}"
+  pools:
+    wan_ipv4:
+      type: ipv4
+      cidr: "100.64.0.0/10"
+    wan_ipv6:
+      type: ipv6
+      cidr: "2001:db8:4::/64"
+    delegated_prefix:
+      type: ipv6prefix
+      super: "2001:db8:e000::/36"
+      sublen: 56
+
+periodicInformPaths:
+  interval: Device.ManagementServer.PeriodicInformInterval
+  enable:   Device.ManagementServer.PeriodicInformEnable
+
+# ACS auth identity read live from the tree, so credential rotation
+# via SetParameterValues lands on the next session. Empty values fall
+# back to --acs-username/--acs-password.
+acsCredentialPaths:
+  username: Device.ManagementServer.Username
+  password: Device.ManagementServer.Password
+
+connectionRequest:
+  scheme: digest
+  realm: cpe-sim
+  throttleWindow: 5s
+  usernameParameter: Device.ManagementServer.ConnectionRequestUsername
+  passwordParameter: Device.ManagementServer.ConnectionRequestPassword
+
+# A Download with FileType "1 Firmware Upgrade Image" is applied for
+# real: the image is fetched, its declared version written to
+# versionPath after a dark window, and announced in a boot session.
+# Over USP the same window is the agent's dropped MQTT session between
+# Activate() and Boot!. Ninety seconds is what a flashing EX3301 takes
+# to come back.
+transfer:
+  firmware:
+    versionPath: Device.DeviceInfo.SoftwareVersion
+    applyDelay: 90s
+    fetch: true
+
+# A reboot takes the better part of a minute and a factory reset about
+# two, which is when an ACS that expects the post-event Inform at once
+# shows its impatience.
+eventSchedule:
+  rebootDelay: 50s
+  factoryResetDelay: 120s
+
+# The WAN can be cut with SIGUSR1: the uplink goes dark for three
+# minutes with no disconnect, both protocols stop, and the unit comes
+# back with its account of the outage on Device.IP.Interface.1.
+faults:
+  link:
+    interface: Device.IP.Interface.1
+    duration: 3m
+    reboot: false
+
+# Triggered diagnostics (TR-143 and the neighbour scan): an ACS writes
+# DiagnosticsState and polls it; after a few seconds the state lands on
+# Complete and the neighbour scan fills its count.
+diagnostics:
+  - statePath: Device.IP.Diagnostics.IPPing.DiagnosticsState
+    duration: 4s
+  - statePath: Device.IP.Diagnostics.TraceRoute.DiagnosticsState
+    duration: 6s
+  - statePath: Device.IP.Diagnostics.DownloadDiagnostics.DiagnosticsState
+    duration: 12s
+  - statePath: Device.IP.Diagnostics.UploadDiagnostics.DiagnosticsState
+    duration: 12s
+  - statePath: Device.WiFi.NeighboringWiFiDiagnostic.DiagnosticsState
+    duration: 8s
+    countPath: Device.WiFi.NeighboringWiFiDiagnostic.ResultNumberOfEntries
+    resultCount: 6
+
+informParameters:
+  bootstrap:
+    - Device.DeviceInfo.Manufacturer
+    - Device.DeviceInfo.ManufacturerOUI
+    - Device.DeviceInfo.ModelName
+    - Device.DeviceInfo.ProductClass
+    - Device.DeviceInfo.SerialNumber
+    - Device.DeviceInfo.HardwareVersion
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.ManagementServer.URL
+    - Device.ManagementServer.ParameterKey
+    - Device.IP.Interface.1.IPv4Address.1.IPAddress
+  boot:
+    # SoftwareVersion is a forced Inform parameter (TR-069 Annex A),
+    # and it is the boot after a firmware Download where it matters:
+    # without it the ACS learns the new build on the next periodic
+    # Inform, up to an interval later.
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.DeviceInfo.UpTime
+  periodic:
+    # Identity repeats on every periodic Inform, not just bootstrap, so
+    # a device whose bootstrap the ACS missed still carries a model and
+    # a build. Real CPEs report these every session for the same reason.
+    - Device.DeviceInfo.ModelName
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.DeviceInfo.UpTime
+    - Device.Ethernet.Interface.1.Stats.BytesSent
+    - Device.Ethernet.Interface.1.Stats.BytesReceived
+    - Device.Ethernet.Interface.1.Stats.ErrorsReceived
+    - Device.Ethernet.Interface.1.Stats.PacketsReceived
+    - Device.Services.VoiceService.1.CallControl.Line.1.Status
+  valueChange:
+    - Device.WiFi.AccessPoint.1.AssociatedDeviceNumberOfEntries
+    - Device.WiFi.AccessPoint.2.AssociatedDeviceNumberOfEntries
+    - Device.WiFi.SSID.1.Status
+    - Device.WiFi.SSID.2.Status
+  connectionRequest:
+    - Device.DeviceInfo.UpTime

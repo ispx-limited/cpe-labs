@@ -1,0 +1,113 @@
+# Device.DeviceInfo: a Zyxel EX3301-T0, the AX1800 Ethernet IAD that
+# Hyperoptic, Ogi, Quickline and Voneus hand out on their standard
+# packages. Identity strings are the published model codes; the OUI is
+# the documentation OUI (00005E), see _top.yaml.
+
+groups:
+  - prefix: Device.DeviceInfo
+    parameters:
+      - path: Manufacturer
+        value: "Zyxel"
+      - path: ManufacturerOUI
+        value: "00005E"
+      - path: ModelName
+        value: "EX3301-T0"
+      - path: Description
+        value: "Zyxel EX3301-T0 Dual-Band Wireless AX1800 Gigabit Ethernet IAD"
+      - path: ProductClass
+        value: "EX3301-T0"
+      - path: SerialNumber
+        value: "BASE"
+      - path: HardwareVersion
+        value: "V1.0"
+      # Zyxel writes a build as V<train>(<board code>.<release>)C0. ABVY
+      # is the EX3301-T0 board, and the releases here are the ones
+      # Zyxel has published for it: 7.2 is current, 6 is the build that
+      # removed a TR-369 certificate CGI with a published vulnerability,
+      # so a fleet on this spread has something to upgrade and a
+      # compliance finding to clear.
+      - path: SoftwareVersion
+        value: "{cpe:rpick:V5.50(ABVY.7.2)C0,V5.50(ABVY.7.2)C0,V5.50(ABVY.7.2)C0,V5.50(ABVY.7.1)C0,V5.50(ABVY.7.1)C0,V5.50(ABVY.7)C0,V5.50(ABVY.6)C0}"
+      - path: AdditionalSoftwareVersion
+        value: ""
+      - path: SpecVersion
+        value: "1.0"
+      - path: ProvisioningCode
+        value: ""
+        writable: true
+      - path: UpTime
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: uptime
+          interval: 30s
+      - path: FirstUseDate
+        type: xsd:dateTime
+        value: "2025-03-14T09:30:00Z"
+      - path: DeviceLog
+        value: ""
+
+  - prefix: Device.DeviceInfo.MemoryStatus
+    parameters:
+      - path: Total
+        type: xsd:unsignedInt
+        value: "262144"
+      - path: Free
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:118784,104448,96256,131072,88064}"
+
+  - prefix: Device.DeviceInfo.ProcessStatus
+    parameters:
+      - path: CPUUsage
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:6,9,11,14,18,27}"
+
+  # One temperature sensor, the SoC. The reading drifts across the
+  # range a gateway in a cupboard sits in, so a fleet dashboard has a
+  # distribution to draw rather than one number.
+  - prefix: Device.DeviceInfo.TemperatureStatus
+    parameters:
+      - path: TemperatureSensorNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+  - prefix: Device.DeviceInfo.TemperatureStatus.TemperatureSensor.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: Name
+        value: "cpu"
+      - path: Value
+        type: xsd:int
+        value: "57"
+        writable: true
+        generator:
+          type: drift
+          interval: 120s
+          min: 44
+          max: 71
+          stepMax: 2
+      - path: Units
+        value: "Celsius"
+
+  # Device.GatewayInfo exists on every TR-181 device and is empty on a
+  # gateway: it names the gateway a LAN-side device sits behind, and
+  # this unit sits behind nobody. An extender profile fills it in.
+  - prefix: Device.GatewayInfo
+    parameters:
+      - path: ManufacturerOUI
+        value: ""
+      - path: ProductClass
+        value: ""
+      - path: SerialNumber
+        value: ""
+      - path: MACAddress
+        value: ""
+      - path: ManagementProtocol
+        value: ""
+      - path: EndpointID
+        value: ""

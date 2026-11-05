@@ -1,0 +1,655 @@
+# Device.WiFi.*: two 2x2 Wi-Fi 6 radios (574 Mbps on 2.4 GHz, 1201 Mbps
+# on 5 GHz), each with a main SSID and a guest SSID. Zyxel ships the
+# same network name on both bands with the guest networks disabled, so
+# SSID.1 and SSID.2 carry the home and SSID.3 and SSID.4 exist, are
+# off, and give an ACS a disabled row to render.
+#
+# The associated-device table carries every per-client measurement the
+# standard defines (signal, noise, SNR, rates, retries, bytes,
+# association time), which is what a per-client analytics pipeline
+# reads and what most profiles stop short of. Signal drifts because a
+# fleet pinned at one RSSI produces a flat score that hides the very
+# variation an operator is looking for. The 5 GHz table also carries
+# the landing extender's backhaul station: a mesh agent on a wireless
+# backhaul is a client of the gateway's 5 GHz radio, and a real
+# gateway lists it there alongside the phones.
+
+parameters:
+  - path: Device.WiFi.RadioNumberOfEntries
+    type: xsd:unsignedInt
+    value: "2"
+  - path: Device.WiFi.SSIDNumberOfEntries
+    type: xsd:unsignedInt
+    value: "4"
+  - path: Device.WiFi.AccessPointNumberOfEntries
+    type: xsd:unsignedInt
+    value: "4"
+
+objects:
+  - path: Device.WiFi.Radio
+    instances: 2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Alias
+        value: "RADIO{i}"
+        writable: true
+      - path: Name
+        value: "wifi{i}"
+      - path: AutoChannelEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: AutoChannelSupported
+        type: xsd:boolean
+        value: "true"
+      - path: AutoChannelRefreshPeriod
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: TransmitPower
+        type: xsd:int
+        value: "100"
+        writable: true
+      - path: TransmitPowerSupported
+        value: "25,50,75,100"
+      - path: RegulatoryDomain
+        value: "GB"
+        writable: true
+      - path: IEEE80211hSupported
+        type: xsd:boolean
+        value: "true"
+      - path: IEEE80211hEnabled
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: ChannelLastChange
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: uptime
+          interval: 30s
+      - path: ChannelLastSelectionReason
+        value: "Auto_Startup"
+      - path: Stats.Noise
+        type: xsd:int
+        value: "-92"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -98
+          max: -84
+          stepMax: 2
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 9000000
+          jitter: 0.3
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 3000000
+          jitter: 0.3
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 6000
+          jitter: 0.3
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 4000
+          jitter: 0.3
+      - path: Stats.ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsReceived
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:0,0,0,2,7,19}"
+      - path: Stats.FCSErrorCount
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:0,12,40,113,390,1207}"
+      - path: Stats.TotalChannelChangeCount
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:1,1,1,2,3,6}"
+      - path: Stats.ManualChannelChangeCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.AutoStartupChannelChangeCount
+        type: xsd:unsignedInt
+        value: "1"
+      - path: Stats.AutoDFSChannelChangeCount
+        type: xsd:unsignedInt
+        value: "0"
+
+  - path: Device.WiFi.SSID
+    instances: 4
+    parameters:
+      - path: Alias
+        value: "SSID{i}"
+        writable: true
+      - path: Name
+        value: "wl{i}"
+      - path: SSID
+        value: "Zyxel_{cpe:HEX:4}"
+        writable: true
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 4000000
+          jitter: 0.4
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 1400000
+          jitter: 0.4
+      - path: Stats.RetransCount
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 180
+          jitter: 0.6
+      - path: Stats.FailedRetransCount
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 4
+          jitter: 0.9
+
+  - path: Device.WiFi.AccessPoint
+    instances: 4
+    parameters:
+      - path: Alias
+        value: "AP{i}"
+        writable: true
+      - path: SSIDReference
+        value: "Device.WiFi.SSID.{i}"
+        writable: true
+      - path: SSIDAdvertisementEnabled
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: WMMCapability
+        type: xsd:boolean
+        value: "true"
+      - path: WMMEnable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: MaxAssociatedDevices
+        type: xsd:unsignedInt
+        value: "64"
+        writable: true
+      - path: IsolationEnable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Security.ModesSupported
+        value: "None,WPA2-Personal,WPA3-Personal,WPA3-Personal-Transition"
+      - path: Security.KeyPassphrase
+        value: ""
+        writable: true
+      - path: WPS.Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: WPS.ConfigMethodsSupported
+        value: "PushButton,PIN"
+
+  # ---- 2.4 GHz stations: the phone and the doorbell ----
+  - path: Device.WiFi.AccessPoint.1.AssociatedDevice
+    instances: 2
+    parameters:
+      - path: MACAddress
+        value: "A2:00:0{i}:{cpe:mac:3}"
+      - path: AuthenticationState
+        type: xsd:boolean
+        value: "true"
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      # Rate is drawn per device, not animated: TR-181 types these as
+      # xsd:unsignedInt and the drift generator only targets signed
+      # gauges, so the standard type wins over the animation. The
+      # spread still gives the phy_rate component something real to
+      # score, it just varies across the fleet rather than over time.
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:573500,573500,286800,229400,172100,114700,57300}"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:286800,286800,229400,172100,114700,86000,43000}"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-58"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -84
+          max: -41
+          stepMax: 4
+      - path: Noise
+        type: xsd:int
+        value: "-92"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -97
+          max: -86
+          stepMax: 2
+      - path: SNR
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:34,30,27,22,18,12}"
+      - path: Retransmissions
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:2,3,5,8,14,27}"
+      - path: OperatingStandard
+        value: "{cpe:rpick:ax,ax,n,n,g}"
+      - path: AssociationTime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 900000
+          jitter: 0.6
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 300000
+          jitter: 0.6
+      - path: Stats.RetransCount
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 60
+          jitter: 0.8
+      - path: Stats.FailedRetransCount
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 2
+          jitter: 0.9
+
+  # ---- 5 GHz stations: the laptop, the TV and the other phone, then
+  # the landing extender's backhaul radio as the fourth station ----
+  - path: Device.WiFi.AccessPoint.2.AssociatedDevice
+    instances: 4
+    parameters:
+      - path: AuthenticationState
+        type: xsd:boolean
+        value: "true"
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: LastDataDownlinkRate
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:1201000,1201000,960800,720600,480400,240100}"
+      - path: LastDataUplinkRate
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:960800,960800,720600,480400,360300,180100}"
+      - path: SignalStrength
+        type: xsd:int
+        value: "-52"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -76
+          max: -37
+          stepMax: 4
+      - path: Noise
+        type: xsd:int
+        value: "-94"
+        writable: true
+        generator:
+          type: drift
+          interval: 60s
+          min: -99
+          max: -88
+          stepMax: 2
+      - path: SNR
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:42,38,33,29,24,17}"
+      - path: Retransmissions
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:1,2,3,5,9,18}"
+      - path: OperatingStandard
+        value: "ax"
+      - path: AssociationTime
+        type: xsd:dateTime
+        value: "2026-01-01T00:00:00Z"
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 4000000
+          jitter: 0.6
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 1200000
+          jitter: 0.6
+      - path: Stats.RetransCount
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 40
+          jitter: 0.8
+      - path: Stats.FailedRetransCount
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: counter
+          interval: 30s
+          min: 0
+          max: 4294967295
+          step: 1
+          jitter: 0.9
+
+groups:
+  - prefix: Device.WiFi.Radio.1
+    parameters:
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+        writable: true
+      - path: SupportedFrequencyBands
+        value: "2.4GHz"
+      - path: SupportedStandards
+        value: "b,g,n,ax"
+      - path: OperatingStandards
+        value: "b,g,n,ax"
+        writable: true
+      - path: PossibleChannels
+        value: "1,2,3,4,5,6,7,8,9,10,11,12,13"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:1,6,11,6,1,11,6}"
+        writable: true
+      - path: SupportedOperatingChannelBandwidths
+        value: "20MHz,40MHz,Auto"
+      - path: OperatingChannelBandwidth
+        value: "{cpe:rpick:20MHz,20MHz,20MHz,40MHz}"
+        writable: true
+      - path: MaxBitRate
+        type: xsd:unsignedInt
+        value: "574"
+      - path: CurrentOperatingChannelBandwidth
+        value: "20MHz"
+      - path: ExtensionChannel
+        value: "Auto"
+        writable: true
+      - path: GuardInterval
+        value: "Auto"
+        writable: true
+
+  - prefix: Device.WiFi.Radio.2
+    parameters:
+      - path: OperatingFrequencyBand
+        value: "5GHz"
+        writable: true
+      - path: SupportedFrequencyBands
+        value: "5GHz"
+      - path: SupportedStandards
+        value: "a,n,ac,ax"
+      - path: OperatingStandards
+        value: "a,n,ac,ax"
+        writable: true
+      - path: PossibleChannels
+        value: "36,40,44,48,52,56,60,64,100,104,108,112,116,120,124,128,132,136,140"
+      # Auto-channel across the UK 5 GHz plan. Repeats weight the
+      # result: the low band is picked more often because indoor
+      # gateways avoid DFS, which is why real fleets bunch at 36-48.
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:36,40,44,48,36,40,44,48,52,100,116,132}"
+        writable: true
+      - path: SupportedOperatingChannelBandwidths
+        value: "20MHz,40MHz,80MHz,Auto"
+      - path: OperatingChannelBandwidth
+        value: "{cpe:rpick:80MHz,80MHz,80MHz,80MHz,80MHz,40MHz}"
+        writable: true
+      - path: MaxBitRate
+        type: xsd:unsignedInt
+        value: "1201"
+      - path: CurrentOperatingChannelBandwidth
+        value: "80MHz"
+      - path: ExtensionChannel
+        value: "Auto"
+        writable: true
+      - path: GuardInterval
+        value: "Auto"
+        writable: true
+
+  # SSID.1 and SSID.2: the home network on each band. BSSIDs are
+  # locally administered variants of the base MAC, distinct per radio.
+  - prefix: Device.WiFi.SSID.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: BSSID
+        value: "02:00:5E:{cpe:mac:3}"
+      - path: MACAddress
+        value: "02:00:5E:{cpe:mac:3}"
+      - path: LowerLayers
+        value: "Device.WiFi.Radio.1"
+        writable: true
+  - prefix: Device.WiFi.SSID.2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: BSSID
+        value: "06:00:5E:{cpe:mac:3}"
+      - path: MACAddress
+        value: "06:00:5E:{cpe:mac:3}"
+      - path: LowerLayers
+        value: "Device.WiFi.Radio.2"
+        writable: true
+  # SSID.3 and SSID.4: the guest network, present and off.
+  - prefix: Device.WiFi.SSID.3
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Status
+        value: "Down"
+      - path: BSSID
+        value: "0A:00:5E:{cpe:mac:3}"
+      - path: MACAddress
+        value: "0A:00:5E:{cpe:mac:3}"
+      - path: LowerLayers
+        value: "Device.WiFi.Radio.1"
+        writable: true
+  - prefix: Device.WiFi.SSID.4
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Status
+        value: "Down"
+      - path: BSSID
+        value: "0E:00:5E:{cpe:mac:3}"
+      - path: MACAddress
+        value: "0E:00:5E:{cpe:mac:3}"
+      - path: LowerLayers
+        value: "Device.WiFi.Radio.2"
+        writable: true
+
+  - prefix: Device.WiFi.AccessPoint.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: AssociatedDeviceNumberOfEntries
+        type: xsd:unsignedInt
+        value: "2"
+      - path: Security.ModeEnabled
+        value: "{cpe:rpick:WPA3-Personal-Transition,WPA3-Personal-Transition,WPA2-Personal}"
+        writable: true
+  - prefix: Device.WiFi.AccessPoint.2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: AssociatedDeviceNumberOfEntries
+        type: xsd:unsignedInt
+        value: "4"
+      - path: Security.ModeEnabled
+        value: "{cpe:rpick:WPA3-Personal-Transition,WPA3-Personal-Transition,WPA2-Personal}"
+        writable: true
+  - prefix: Device.WiFi.AccessPoint.3
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Status
+        value: "Disabled"
+      - path: AssociatedDeviceNumberOfEntries
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Security.ModeEnabled
+        value: "WPA2-Personal"
+        writable: true
+  - prefix: Device.WiFi.AccessPoint.4
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Status
+        value: "Disabled"
+      - path: AssociatedDeviceNumberOfEntries
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Security.ModeEnabled
+        value: "WPA2-Personal"
+        writable: true
+
+  # The 5 GHz stations' addresses, per instance: three clients from the
+  # host table, then the landing extender's backhaul radio.
+  - prefix: Device.WiFi.AccessPoint.2.AssociatedDevice.1
+    parameters:
+      - path: MACAddress
+        value: "A2:00:03:{cpe:mac:3}"
+  - prefix: Device.WiFi.AccessPoint.2.AssociatedDevice.2
+    parameters:
+      - path: MACAddress
+        value: "A2:00:04:{cpe:mac:3}"
+  - prefix: Device.WiFi.AccessPoint.2.AssociatedDevice.3
+    parameters:
+      - path: MACAddress
+        value: "A2:00:05:{cpe:mac:3}"
+  - prefix: Device.WiFi.AccessPoint.2.AssociatedDevice.4
+    parameters:
+      - path: MACAddress
+        value: "1A:00:5E:{cpe:mac:3}"
