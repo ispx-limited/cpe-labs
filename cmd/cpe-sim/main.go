@@ -105,6 +105,14 @@ type cpeStack struct {
 	// firmware simulation on both protocols.
 	firmware *paramtree.FirmwareConfig
 
+	// rebootDelay is eventSchedule.rebootDelay, the time a reboot keeps the
+	// device dark, and scheduleReboot the deferred CWMP boot session built
+	// from it (nil when the delay is zero). A reboot asked for over USP
+	// drives both halves of a dual-stack CPE through these, so the ACS
+	// sees the boot Inform and the controller the Boot! after one window.
+	rebootDelay    time.Duration
+	scheduleReboot handlers.RebootSchedule
+
 	// uspFirmwareBusy serializes USP firmware operations for this CPE: one
 	// Download()/Activate() in flight at a time, a second is refused with
 	// 7005 (see uspFirmwareOperate). Accessed from the agent's dispatch
@@ -946,6 +954,10 @@ type cpeStackInputs struct {
 // cost memory for nothing. The tree is the only mutable per-CPE state,
 // so it is the only thing cloned.
 func buildCPEStack(cfg cpeconfig.Config, template *paramtree.Profile, in cpeStackInputs) (*cpeStack, error) {
+	// The deferred CWMP boot session a reboot runs when the profile sets
+	// eventSchedule.rebootDelay. Declared here because the USP agent's
+	// Reboot() drives it too, and the stack carries it for that.
+	var scheduleReboot handlers.RebootSchedule
 	profCopy := *template
 	prof := &profCopy
 	prof.Tree = template.Tree.Clone()
@@ -1113,7 +1125,6 @@ func buildCPEStack(cfg cpeconfig.Config, template *paramtree.Profile, in cpeStac
 			return nil
 		}
 
-		var scheduleReboot handlers.RebootSchedule
 		if prof.EventSchedule.RebootDelay > 0 {
 			scheduleReboot = buildRebootScheduler(in.sched, in.id, tracker, prof.EventSchedule.RebootDelay, runner, pendingCancels, in.logger)
 		}
@@ -1329,6 +1340,8 @@ func buildCPEStack(cfg cpeconfig.Config, template *paramtree.Profile, in cpeStac
 		uspBootParams:   uspBootParameters(prof),
 		firmware:        prof.Transfer.Firmware,
 		softwareModules: smManager,
+		rebootDelay:     prof.EventSchedule.RebootDelay,
+		scheduleReboot:  scheduleReboot,
 	}, nil
 }
 

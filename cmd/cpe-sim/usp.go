@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/ispx-limited/cpe-labs/internal/cpeconfig"
 	"github.com/ispx-limited/cpe-labs/internal/cwmp/inform"
@@ -185,12 +186,17 @@ type uspAnnouncer interface {
 // it simulates the management plane, not the OS), it produces the events a
 // real CPE would announce afterwards.
 //
-// Reboot and FactoryReset run synchronously. Dual-stack (tracker present):
-// the CWMP EventTracker queues the reboot / bootstrap events and the next
-// CWMP session reports them, which keeps a dual-stack CPE self-consistent.
-// USP-only (tracker nil): there is no CWMP session to ever drain those
-// queues, so the agent re-announces itself the way a restarted device would:
-// Boot! for a reboot, OnBoardRequest then Boot! for a factory reset.
+// Reboot and FactoryReset answer synchronously and the device comes back
+// the way a restarted one does on every protocol it speaks. USP-only
+// (tracker nil): the agent re-announces itself, Boot! for a reboot,
+// OnBoardRequest then Boot! for a factory reset. Dual-stack (tracker
+// present): the CWMP side queues its reboot or bootstrap events for a boot
+// session, deferred by eventSchedule.rebootDelay when the profile sets one,
+// and the USP side drops its MTP session for that same window and comes
+// back with the same announcements. It used to leave the USP side silent
+// and the CWMP events for whatever session came next, so a controller that
+// rebooted a dual-stack gateway never saw its Boot!, and an ACS saw the
+// reboot reported up to a periodic interval later.
 //
 // The firmware commands (Device.DeviceInfo.FirmwareImage.{i}.Download() and
 // Activate()) are asynchronous, matched by suffix under any FirmwareImage
@@ -200,44 +206,67 @@ type uspAnnouncer interface {
 // usp_softwaremodules.go.
 func uspOperateFunc(st *cpeStack, log *slog.Logger, agent func() uspAnnouncer, fwAgent func() uspFirmwareAgent) uspagent.OperateFunc {
 	return func(command, commandKey string, inputArgs map[string]string) (*uspagent.OperateResult, error) {
+		// comeBack is the USP half of a restart: the MTP session goes for
+		// the reboot window, as a real agent's does, and the device
+		// announces itself again when it is back. Without a transport to
+		// drop (tests, a stack whose agent has not started) it announces
+		// at once.
+		comeBack := func(announce func(uspAnnouncer) error, what string) error {
+			a := agent()
+			if a == nil {
+				return fmt.Errorf("no USP announcer wired for this CPE")
+			}
+			fw := fwAgent()
+			if fw == nil || st.rebootDelay <= 0 {
+				if err := announce(a); err != nil {
+					return fmt.Errorf("re-announce after %s: %w", what, err)
+				}
+				log.Info("usp/agent: simulated "+what+", re-announced", "command_key", commandKey)
+				return nil
+			}
+			go func() {
+				log.Info("usp/agent: device dark for "+what, "command_key", commandKey, "delay", st.rebootDelay.String())
+				fw.DisconnectTransport()
+				time.Sleep(st.rebootDelay)
+				if err := fw.ConnectTransport(context.Background()); err != nil {
+					log.Warn("usp/agent: reconnect after "+what+" failed", "command_key", commandKey, "err", err.Error())
+					return
+				}
+				if err := announce(a); err != nil {
+					log.Warn("usp/agent: re-announce after "+what+" failed", "command_key", commandKey, "err", err.Error())
+					return
+				}
+				log.Info("usp/agent: simulated "+what+", re-announced", "command_key", commandKey)
+			}()
+			return nil
+		}
+
 		switch command {
 		case "Device.Reboot()":
 			if st.tracker != nil {
-				st.tracker.QueueMethodReboot(commandKey)
+				// The CWMP half: the boot session after the window the
+				// profile declares, or the queued event for the next
+				// session when it declares none.
+				if st.scheduleReboot != nil {
+					st.scheduleReboot(commandKey)
+				} else {
+					st.tracker.QueueMethodReboot(commandKey)
+				}
 				log.Info("usp/agent: simulated reboot", "command_key", commandKey)
-				return nil, nil
 			}
-			a := agent()
-			if a == nil {
-				return nil, fmt.Errorf("no CWMP tracker and no USP announcer wired for this CPE")
-			}
-			if err := a.Boot("RemoteReboot"); err != nil {
-				return nil, fmt.Errorf("re-announce after reboot: %w", err)
-			}
-			log.Info("usp/agent: simulated reboot, re-sent Boot!", "command_key", commandKey)
-			return nil, nil
+			return nil, comeBack(func(a uspAnnouncer) error { return a.Boot("RemoteReboot") }, "reboot")
 
 		case "Device.FactoryReset()":
 			if st.tracker != nil {
-				// A factory reset re-arms BOOTSTRAP, which is what tells a
-				// controller the device came back as a stranger rather than a
+				// A factory reset re-arms BOOTSTRAP, which is what tells an
+				// ACS the device came back as a stranger rather than a
 				// reboot of a device it already knows.
 				st.tracker.ResetBootstrap()
 				log.Info("usp/agent: simulated factory reset", "command_key", commandKey)
-				return nil, nil
-			}
-			a := agent()
-			if a == nil {
-				return nil, fmt.Errorf("no CWMP tracker and no USP announcer wired for this CPE")
 			}
 			// The USP analogue of re-armed BOOTSTRAP: a wiped device
 			// re-introduces itself from scratch.
-			if err := a.Announce("RemoteFactoryReset"); err != nil {
-				return nil, fmt.Errorf("re-announce after factory reset: %w", err)
-			}
-			log.Info("usp/agent: simulated factory reset, re-sent OnBoardRequest and Boot!",
-				"command_key", commandKey)
-			return nil, nil
+			return nil, comeBack(func(a uspAnnouncer) error { return a.Announce("RemoteFactoryReset") }, "factory reset")
 
 		default:
 			if cmd, ok := parseFirmwareCommand(command); ok {

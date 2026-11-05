@@ -123,10 +123,15 @@ nine. That matters more than it sounds: a Controller that batches its reads
 otherwise loses a whole cycle of telemetry to one stale path.
 
 `Operate` does not restart the process. The simulator simulates the management
-plane, not the OS, so a reboot queues the events a real CPE would announce
-afterwards and a factory reset re-arms BOOTSTRAP so the device comes back as a
-stranger. Both protocols route through the same event tracker, so a Controller
-that reboots over USP still sees the CWMP side report it.
+plane, not the OS, so a reboot produces what a real CPE announces afterwards
+and a factory reset re-arms BOOTSTRAP so the device comes back as a stranger.
+On a dual-stack CPE both protocols see it: the MQTT session drops for the
+profile's `eventSchedule.rebootDelay` (at once when it declares none), the
+CWMP side runs its boot session (`1 BOOT, M Reboot`, or `1 BOOT, 0 BOOTSTRAP`
+after a reset) when that window ends, and the agent reconnects and sends
+`Boot!`, or `OnBoardRequest` then `Boot!` after a reset. A controller that
+reboots over USP therefore sees the device come back on both protocols after
+one window, which is what a dual-stack gateway does.
 
 A firmware activation is the exception with a visible lifecycle: the agent
 drops its MQTT session for the profile's `applyDelay` (the dark window a
