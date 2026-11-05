@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/ispx-limited/cpe-labs/compare/v0.10.1...v0.11.0) (2026-11-05)
+
+
+### Added
+
+* **profiles:** a Zyxel EX3301-T0 gateway with two WX3100-T0 mesh extenders, dual-stack ([#78](https://github.com/ispx-limited/cpe-labs/issues/78)) ([a855b2c](https://github.com/ispx-limited/cpe-labs/commit/a855b2c452703c1e95fb736b202a472489010ac4))
+
 ## [0.10.1](https://github.com/ispx-limited/cpe-labs/compare/v0.10.0...v0.10.1) (2026-10-09)
 
 
