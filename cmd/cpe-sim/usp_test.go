@@ -198,24 +198,58 @@ func TestUSPOperateUSPOnlyReannounces(t *testing.T) {
 	}
 }
 
-// TestUSPOperateDualStackUsesTracker pins that the dual-stack path is
-// untouched: with a CWMP tracker present the events queue there for the next
-// CWMP session, and the agent does not re-announce.
-func TestUSPOperateDualStackUsesTracker(t *testing.T) {
+// TestUSPOperateDualStackComesBackOnBothProtocols pins that a dual-stack
+// CPE restarts on both of its protocols: the CWMP tracker queues the reboot
+// or bootstrap events for a boot session, and the USP agent announces itself
+// again, Boot! for a reboot and OnBoardRequest then Boot! for a factory
+// reset. It used to leave the USP side silent, so a controller that rebooted
+// a dual-stack gateway never saw it come back.
+func TestUSPOperateDualStackComesBackOnBothProtocols(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	fake := &fakeAnnouncer{}
-	st := &cpeStack{tracker: cwmp.NewEventTracker(nil)}
+	tracker := cwmp.NewEventTracker(nil)
+	st := &cpeStack{tracker: tracker}
 	op := uspOperateFunc(st, log, func() uspAnnouncer { return fake }, func() uspFirmwareAgent { return nil })
 
 	if _, err := op("Device.Reboot()", "k1", nil); err != nil {
 		t.Fatalf("Reboot: %v", err)
 	}
+	if len(fake.boots) != 1 || fake.boots[0] != "RemoteReboot" {
+		t.Errorf("Reboot should send one Boot! with cause RemoteReboot, got %v", fake.boots)
+	}
+	if len(fake.announces) != 0 {
+		t.Errorf("Reboot must not re-onboard, got announces %v", fake.announces)
+	}
 	if _, err := op("Device.FactoryReset()", "k2", nil); err != nil {
 		t.Fatalf("FactoryReset: %v", err)
 	}
-	if len(fake.boots) != 0 || len(fake.announces) != 0 {
-		t.Errorf("dual-stack must route through the tracker, not the announcer: boots=%v announces=%v",
-			fake.boots, fake.announces)
+	if len(fake.announces) != 1 || fake.announces[0] != "RemoteFactoryReset" {
+		t.Errorf("FactoryReset should announce once with cause RemoteFactoryReset, got %v", fake.announces)
+	}
+}
+
+// TestUSPOperateDualStackDefersToTheRebootSchedule pins that a profile with
+// eventSchedule.rebootDelay gets the same deferred CWMP boot session from a
+// USP Reboot() as from a CWMP Reboot RPC, rather than an event queued for
+// whatever session comes next.
+func TestUSPOperateDualStackDefersToTheRebootSchedule(t *testing.T) {
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	fake := &fakeAnnouncer{}
+	var scheduled []string
+	st := &cpeStack{
+		tracker:        cwmp.NewEventTracker(nil),
+		scheduleReboot: func(commandKey string) { scheduled = append(scheduled, commandKey) },
+	}
+	op := uspOperateFunc(st, log, func() uspAnnouncer { return fake }, func() uspFirmwareAgent { return nil })
+
+	if _, err := op("Device.Reboot()", "k9", nil); err != nil {
+		t.Fatalf("Reboot: %v", err)
+	}
+	if len(scheduled) != 1 || scheduled[0] != "k9" {
+		t.Errorf("Reboot should hand its command key to the reboot schedule, got %v", scheduled)
+	}
+	if len(fake.boots) != 1 {
+		t.Errorf("Reboot should still announce over USP, got %v", fake.boots)
 	}
 }
 
