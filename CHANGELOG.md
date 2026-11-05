@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.0](https://github.com/ispx-limited/cpe-labs/compare/v0.11.0...v0.12.0) (2026-11-05)
+
+
+### Added
+
+* **profiles:** a Zyxel WX3100-T0 mesh extender, paired with the EX3301-T0 gateway profile ([#81](https://github.com/ispx-limited/cpe-labs/issues/81)) ([c3a547d](https://github.com/ispx-limited/cpe-labs/commit/c3a547d6793d8ea62fb32d1664b37fdc8b0a7ea5))
+* **profiles:** the EX3301-T0 declares its two firmware banks, so a USP controller can upgrade it ([#82](https://github.com/ispx-limited/cpe-labs/issues/82)) ([ee695eb](https://github.com/ispx-limited/cpe-labs/commit/ee695eb016159778ea5b9a5db2779160c4120600))
+
 ## [0.11.0](https://github.com/ispx-limited/cpe-labs/compare/v0.10.1...v0.11.0) (2026-11-05)
 
 
