@@ -111,3 +111,45 @@ groups:
         value: ""
       - path: EndpointID
         value: ""
+
+  # The firmware banks, TR-181 Device.DeviceInfo.FirmwareImage.{i}: the
+  # table a USP controller upgrades through (FirmwareImage.{i}.Download()
+  # and Activate()). Two banks, the running build in the first and the
+  # build it replaced in the second, which is what dual-image recovery
+  # looks like in the data model. The agent walks Status and rewrites
+  # Version itself, so the leaves stay read-only to the controller.
+  - prefix: Device.DeviceInfo
+    parameters:
+      - path: FirmwareImageNumberOfEntries
+        type: xsd:unsignedInt
+        value: "2"
+  - prefix: Device.DeviceInfo.FirmwareImage.1
+    parameters:
+      - path: Alias
+        value: "bank1"
+      - path: Name
+        value: "bank1"
+      - path: Version
+        value: "{cpe:rpick:V5.50(ABVY.7.2)C0,V5.50(ABVY.7.2)C0,V5.50(ABVY.7.2)C0,V5.50(ABVY.7.1)C0,V5.50(ABVY.7.1)C0,V5.50(ABVY.7)C0,V5.50(ABVY.6)C0}"
+      - path: Available
+        type: xsd:boolean
+        value: "true"
+      - path: Status
+        value: "Active"
+      - path: BootFailureLog
+        value: ""
+  - prefix: Device.DeviceInfo.FirmwareImage.2
+    parameters:
+      - path: Alias
+        value: "bank2"
+      - path: Name
+        value: "bank2"
+      - path: Version
+        value: "V5.50(ABVY.5)C0"
+      - path: Available
+        type: xsd:boolean
+        value: "true"
+      - path: Status
+        value: "Available"
+      - path: BootFailureLog
+        value: ""
