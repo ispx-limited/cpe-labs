@@ -1,0 +1,103 @@
+# Device.WiFi.NeighboringWiFiDiagnostic: what the extender heard on its
+# last scan, from the landing. The gateway's own networks are among the
+# neighbours, which is what makes an extender's scan worth having: it
+# measures the backhaul from the other end.
+
+parameters:
+  - path: Device.WiFi.NeighboringWiFiDiagnostic.DiagnosticsState
+    value: "Complete"
+    writable: true
+  - path: Device.WiFi.NeighboringWiFiDiagnostic.ResultNumberOfEntries
+    type: xsd:unsignedInt
+    value: "4"
+
+objects:
+  - path: Device.WiFi.NeighboringWiFiDiagnostic.Result
+    instances: 4
+    parameters:
+      - path: SignalStrength
+        type: xsd:int
+        value: "-66"
+        writable: true
+        generator:
+          type: drift
+          interval: 120s
+          min: -90
+          max: -40
+          stepMax: 3
+      - path: SecurityModeEnabled
+        value: "WPA3-Personal-Transition"
+      - path: EncryptionMode
+        value: "AES"
+      - path: OperatingStandards
+        value: "n,ax"
+      - path: BeaconPeriod
+        type: xsd:unsignedInt
+        value: "100"
+      - path: Mode
+        value: "Infrastructure"
+
+groups:
+  # The gateway's two networks, as heard from the landing.
+  - prefix: Device.WiFi.NeighboringWiFiDiagnostic.Result.1
+    parameters:
+      - path: SSID
+        value: "Zyxel_{cpe:HEX:4}"
+      - path: BSSID
+        value: "02:00:5E:{cpe:mac:3}"
+      - path: Radio
+        value: "Device.WiFi.Radio.1"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "6"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+      - path: OperatingChannelBandwidth
+        value: "20MHz"
+  - prefix: Device.WiFi.NeighboringWiFiDiagnostic.Result.2
+    parameters:
+      - path: SSID
+        value: "Zyxel_{cpe:HEX:4}"
+      - path: BSSID
+        value: "06:00:5E:{cpe:mac:3}"
+      - path: Radio
+        value: "Device.WiFi.Radio.2"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "36"
+      - path: OperatingFrequencyBand
+        value: "5GHz"
+      - path: OperatingChannelBandwidth
+        value: "80MHz"
+  # Two neighbours the gateway also hears, from the other side of the
+  # house.
+  - prefix: Device.WiFi.NeighboringWiFiDiagnostic.Result.3
+    parameters:
+      - path: SSID
+        value: "neighbour-{cpe:hex:4}-2"
+      - path: BSSID
+        value: "DE:AD:BE:{cpe:hex:2}:30:02"
+      - path: Radio
+        value: "Device.WiFi.Radio.1"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "6"
+      - path: OperatingFrequencyBand
+        value: "2.4GHz"
+      - path: OperatingChannelBandwidth
+        value: "20MHz"
+  - prefix: Device.WiFi.NeighboringWiFiDiagnostic.Result.4
+    parameters:
+      - path: SSID
+        value: "neighbour-{cpe:hex:4}-6"
+      - path: BSSID
+        value: "DE:AD:BE:{cpe:hex:2}:30:06"
+      - path: Radio
+        value: "Device.WiFi.Radio.2"
+      - path: Channel
+        type: xsd:unsignedInt
+        value: "44"
+      - path: OperatingFrequencyBand
+        value: "5GHz"
+      - path: OperatingChannelBandwidth
+        value: "80MHz"

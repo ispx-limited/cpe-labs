@@ -1,0 +1,120 @@
+# Zyxel WX3100-T0, TR-181 (Device.*) profile: the Dual-Band Wireless
+# AX1800 Gigabit Extender, the EasyMesh agent (Zyxel calls the family
+# MPro Mesh) that pairs with the EX3301-T0 gateway.
+#
+# An extender is a managed device of its own, with its own CWMP client,
+# and a host on its gateway's LAN. This profile is the first half: the
+# WX3100-T0 on the landing in example-zyxel-ex3301, on a 5 GHz wireless
+# backhaul to the gateway, serving the iPad and the thermostat. The
+# gateway profile describes the same unit from the other side, in its
+# MultiAP and Data Elements trees and its host table.
+#
+# The two profiles pair by construction. Every per-CPE token (the
+# {cpe:ALNUM:8} serial tail, the {cpe:mac:3} address tail) is drawn from
+# the same seeded stream for the same instance index, whatever profile
+# draws it, so instance 7 of this profile is the extender instance 7 of
+# the gateway profile lists: same serial, same bridge MAC, same backhaul
+# radio, same clients. Run both with the same --seed and the same
+# fleet.count and an ACS sees paired homes. Device.GatewayInfo names
+# the gateway the way TR-069 Annex F says a LAN device does, and the
+# three leaves ride every Inform as forced parameters.
+#
+# CWMP only: Zyxel publishes TR-069 and TR-181 for this model and no
+# TR-369. Modelled from the published datasheet and the TR-181 2.21
+# data model, not from a capture, with the documentation OUI (00005E),
+# as the gateway profile is.
+
+deviceIdPaths:
+  manufacturer: Device.DeviceInfo.Manufacturer
+  oui:          Device.DeviceInfo.ManufacturerOUI
+  productClass: Device.DeviceInfo.ProductClass
+  serialNumber: Device.DeviceInfo.SerialNumber
+
+fleet:
+  count: 1
+  # The serial the gateway profile reports for this extender in
+  # Device.WiFi.MultiAP.APDevice.2 and Device.WiFi.DataElements.Network.
+  # Device.2, token for token.
+  serialPattern: "S2211{cpe:ALNUM:8}"
+
+periodicInformPaths:
+  interval: Device.ManagementServer.PeriodicInformInterval
+  enable:   Device.ManagementServer.PeriodicInformEnable
+
+acsCredentialPaths:
+  username: Device.ManagementServer.Username
+  password: Device.ManagementServer.Password
+
+connectionRequest:
+  scheme: digest
+  realm: cpe-sim
+  throttleWindow: 5s
+  usernameParameter: Device.ManagementServer.ConnectionRequestUsername
+  passwordParameter: Device.ManagementServer.ConnectionRequestPassword
+
+transfer:
+  firmware:
+    versionPath: Device.DeviceInfo.SoftwareVersion
+    applyDelay: 75s
+    fetch: true
+
+eventSchedule:
+  rebootDelay: 40s
+  factoryResetDelay: 90s
+
+# The backhaul going away is what an outage looks like from an
+# extender: it keeps its power and loses its gateway. SIGUSR1 darkens
+# the bridge interface for two minutes.
+faults:
+  link:
+    interface: Device.IP.Interface.1
+    duration: 2m
+    reboot: false
+
+# Ping and traceroute, which an extender can run; the TR-143 throughput
+# tests are the gateway's. The neighbour scan fills its count.
+diagnostics:
+  - statePath: Device.IP.Diagnostics.IPPing.DiagnosticsState
+    duration: 4s
+  - statePath: Device.IP.Diagnostics.TraceRoute.DiagnosticsState
+    duration: 6s
+  - statePath: Device.WiFi.NeighboringWiFiDiagnostic.DiagnosticsState
+    duration: 8s
+    countPath: Device.WiFi.NeighboringWiFiDiagnostic.ResultNumberOfEntries
+    resultCount: 4
+
+informParameters:
+  bootstrap:
+    - Device.DeviceInfo.Manufacturer
+    - Device.DeviceInfo.ManufacturerOUI
+    - Device.DeviceInfo.ModelName
+    - Device.DeviceInfo.ProductClass
+    - Device.DeviceInfo.SerialNumber
+    - Device.DeviceInfo.HardwareVersion
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.ManagementServer.URL
+    - Device.ManagementServer.ParameterKey
+    - Device.GatewayInfo.ManufacturerOUI
+    - Device.GatewayInfo.ProductClass
+    - Device.GatewayInfo.SerialNumber
+    - Device.IP.Interface.1.IPv4Address.1.IPAddress
+  boot:
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.DeviceInfo.UpTime
+    - Device.GatewayInfo.ManufacturerOUI
+    - Device.GatewayInfo.ProductClass
+    - Device.GatewayInfo.SerialNumber
+  periodic:
+    - Device.DeviceInfo.ModelName
+    - Device.DeviceInfo.SoftwareVersion
+    - Device.DeviceInfo.UpTime
+    - Device.GatewayInfo.ManufacturerOUI
+    - Device.GatewayInfo.ProductClass
+    - Device.GatewayInfo.SerialNumber
+    - Device.WiFi.EndPoint.1.Stats.SignalStrength
+  valueChange:
+    - Device.WiFi.AccessPoint.1.AssociatedDeviceNumberOfEntries
+    - Device.WiFi.AccessPoint.2.AssociatedDeviceNumberOfEntries
+    - Device.WiFi.EndPoint.1.Status
+  connectionRequest:
+    - Device.DeviceInfo.UpTime

@@ -1,0 +1,55 @@
+# Device.Hosts.*: the two clients bridged through this extender, with
+# the addresses the gateway leased them. An extender in bridge mode
+# learns these rather than leasing them, which is what AddressSource
+# "None" means on a host table that is not a DHCP server's.
+
+parameters:
+  - path: Device.Hosts.HostNumberOfEntries
+    type: xsd:unsignedInt
+    value: "2"
+
+objects:
+  - path: Device.Hosts.Host
+    instances: 2
+    parameters:
+      - path: Active
+        type: xsd:boolean
+        value: "true"
+      - path: AddressSource
+        value: "None"
+      - path: LeaseTimeRemaining
+        type: xsd:int
+        value: "-1"
+      - path: Layer3Interface
+        value: "Device.IP.Interface.1"
+      - path: Alias
+        value: "host-{i}"
+        writable: true
+      - path: IPv4AddressNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+      - path: IPv6AddressNumberOfEntries
+        type: xsd:unsignedInt
+        value: "0"
+
+groups:
+  - prefix: Device.Hosts.Host.1
+    parameters:
+      - path: PhysAddress
+        value: "A2:00:07:{cpe:mac:3}"
+      - path: IPAddress
+        value: "192.168.1.27"
+      - path: HostName
+        value: "iPad"
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.2"
+  - prefix: Device.Hosts.Host.2
+    parameters:
+      - path: PhysAddress
+        value: "A2:00:08:{cpe:mac:3}"
+      - path: IPAddress
+        value: "192.168.1.28"
+      - path: HostName
+        value: "Nest-Thermostat"
+      - path: Layer1Interface
+        value: "Device.WiFi.SSID.1"

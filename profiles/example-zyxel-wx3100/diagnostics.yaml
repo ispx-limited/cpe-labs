@@ -1,0 +1,108 @@
+# Device.IP.Diagnostics: ping and traceroute, the two an extender can
+# run from behind its gateway. The TR-143 throughput tests are not here
+# because the firmware does not offer them on this model; an ACS that
+# asks gets the 9005 a real unit gives. The triggered runs are declared
+# in _top.yaml; these are the leaves they read and write.
+
+parameters:
+  - path: Device.IP.Diagnostics.TraceRoute.RouteHopsNumberOfEntries
+    type: xsd:unsignedInt
+    value: "0"
+
+groups:
+  - prefix: Device.IP.Diagnostics.IPPing
+    parameters:
+      - path: DiagnosticsState
+        value: "None"
+        writable: true
+      - path: Interface
+        value: ""
+        writable: true
+      - path: ProtocolVersion
+        value: "ANY"
+        writable: true
+      - path: Host
+        value: ""
+        writable: true
+      - path: NumberOfRepetitions
+        type: xsd:unsignedInt
+        value: "1"
+        writable: true
+      - path: Timeout
+        type: xsd:unsignedInt
+        value: "1"
+        writable: true
+      - path: DataBlockSize
+        type: xsd:unsignedInt
+        value: "56"
+        writable: true
+      - path: DSCP
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: IPAddressUsed
+        value: ""
+      - path: SuccessCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: FailureCount
+        type: xsd:unsignedInt
+        value: "0"
+      - path: AverageResponseTime
+        type: xsd:unsignedInt
+        value: "0"
+      - path: MinimumResponseTime
+        type: xsd:unsignedInt
+        value: "0"
+      - path: MaximumResponseTime
+        type: xsd:unsignedInt
+        value: "0"
+      - path: AverageResponseTimeDetailed
+        type: xsd:unsignedInt
+        value: "0"
+      - path: MinimumResponseTimeDetailed
+        type: xsd:unsignedInt
+        value: "0"
+      - path: MaximumResponseTimeDetailed
+        type: xsd:unsignedInt
+        value: "0"
+
+  - prefix: Device.IP.Diagnostics.TraceRoute
+    parameters:
+      - path: DiagnosticsState
+        value: "None"
+        writable: true
+      - path: Interface
+        value: ""
+        writable: true
+      - path: ProtocolVersion
+        value: "ANY"
+        writable: true
+      - path: Host
+        value: ""
+        writable: true
+      - path: NumberOfTries
+        type: xsd:unsignedInt
+        value: "3"
+        writable: true
+      - path: Timeout
+        type: xsd:unsignedInt
+        value: "5000"
+        writable: true
+      - path: DataBlockSize
+        type: xsd:unsignedInt
+        value: "38"
+        writable: true
+      - path: DSCP
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+      - path: MaxHopCount
+        type: xsd:unsignedInt
+        value: "30"
+        writable: true
+      - path: IPAddressUsed
+        value: ""
+      - path: ResponseTime
+        type: xsd:unsignedInt
+        value: "0"

@@ -1,0 +1,107 @@
+# Device.DeviceInfo and Device.GatewayInfo. The identity strings are the
+# published model codes; the OUI is the documentation OUI, see _top.yaml.
+
+groups:
+  - prefix: Device.DeviceInfo
+    parameters:
+      - path: Manufacturer
+        value: "Zyxel"
+      - path: ManufacturerOUI
+        value: "00005E"
+      - path: ModelName
+        value: "WX3100-T0"
+      - path: Description
+        value: "Zyxel WX3100-T0 Dual-Band Wireless AX1800 Gigabit Extender"
+      - path: ProductClass
+        value: "WX3100-T0"
+      - path: SerialNumber
+        value: "BASE"
+      - path: HardwareVersion
+        value: "V1.0"
+      # ABVL is the WX3100-T0 board. 4.9 is the build Zyxel's advisory
+      # names as the fix for the extender's published vulnerability, so
+      # the tail of this spread has something to upgrade for and a
+      # finding to clear.
+      - path: SoftwareVersion
+        value: "{cpe:rpick:V5.50(ABVL.4.9)C0,V5.50(ABVL.4.9)C0,V5.50(ABVL.4.9)C0,V5.50(ABVL.4.7)C0,V5.50(ABVL.4.7)C0,V5.50(ABVL.4.5)C0}"
+      - path: AdditionalSoftwareVersion
+        value: ""
+      - path: SpecVersion
+        value: "1.0"
+      - path: ProvisioningCode
+        value: ""
+        writable: true
+      - path: UpTime
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: uptime
+          interval: 30s
+      - path: FirstUseDate
+        type: xsd:dateTime
+        value: "2025-03-14T10:05:00Z"
+      - path: DeviceLog
+        value: ""
+
+  - prefix: Device.DeviceInfo.MemoryStatus
+    parameters:
+      - path: Total
+        type: xsd:unsignedInt
+        value: "131072"
+      - path: Free
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:61440,55296,49152,67584}"
+
+  - prefix: Device.DeviceInfo.ProcessStatus
+    parameters:
+      - path: CPUUsage
+        type: xsd:unsignedInt
+        value: "{cpe:rpick:4,6,9,13,21}"
+
+  - prefix: Device.DeviceInfo.TemperatureStatus
+    parameters:
+      - path: TemperatureSensorNumberOfEntries
+        type: xsd:unsignedInt
+        value: "1"
+  - prefix: Device.DeviceInfo.TemperatureStatus.TemperatureSensor.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: Name
+        value: "cpu"
+      - path: Value
+        type: xsd:int
+        value: "52"
+        writable: true
+        generator:
+          type: drift
+          interval: 120s
+          min: 40
+          max: 66
+          stepMax: 2
+      - path: Units
+        value: "Celsius"
+
+  # The gateway this extender took its address from, as TR-069 Annex F
+  # has a LAN device report it: the EX3301-T0 of the same instance,
+  # serial for serial. An ACS resolves these to the gateway's own row
+  # and hangs this unit's page off its map.
+  - prefix: Device.GatewayInfo
+    parameters:
+      - path: ManufacturerOUI
+        value: "00005E"
+      - path: ProductClass
+        value: "EX3301-T0"
+      - path: SerialNumber
+        value: "S2042{cpe:ALNUM:8}"
+      - path: MACAddress
+        value: "00:00:5E:{cpe:mac:3}"
+      - path: ManagementProtocol
+        value: "CWMP"
+      - path: EndpointID
+        value: ""
