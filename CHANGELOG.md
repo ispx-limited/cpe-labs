@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.1](https://github.com/ispx-limited/cpe-labs/compare/v0.12.0...v0.12.1) (2026-11-05)
+
+
+### Fixed
+
+* **usp:** a reboot or factory reset over USP brings a dual-stack CPE back on both protocols ([#84](https://github.com/ispx-limited/cpe-labs/issues/84)) ([241010e](https://github.com/ispx-limited/cpe-labs/commit/241010e23fcbf416c2b637b73e01a666a0fb950d))
+
 ## [0.12.0](https://github.com/ispx-limited/cpe-labs/compare/v0.11.0...v0.12.0) (2026-11-05)
 
 
