@@ -1,0 +1,19 @@
+# Device.UserInterface.RemoteAccess: the extender has a web UI of its
+# own and does not answer it from outside the home. Off, as it ships.
+
+groups:
+  - prefix: Device.UserInterface.RemoteAccess
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "false"
+        writable: true
+      - path: Port
+        type: xsd:unsignedInt
+        value: "8443"
+        writable: true
+      - path: Protocol
+        value: "HTTPS"
+        writable: true
+      - path: SupportedProtocols
+        value: "HTTP,HTTPS"

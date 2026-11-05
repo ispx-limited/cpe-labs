@@ -1,0 +1,151 @@
+# Device.Ethernet.* and Device.IP.*: two GbE LAN ports, both empty on
+# the landing (this unit's backhaul is wireless; the office one in the
+# gateway profile is wired), and one bridge interface that takes its
+# address from the gateway over DHCP. No WAN: an extender has an
+# upstream, not an uplink of its own, and nothing here is Upstream.
+#
+# The bridge MAC is the one the gateway lists this unit by in its host
+# table and in Device.WiFi.MultiAP.APDevice.2, so an ACS can tell that
+# host is this device.
+
+parameters:
+  - path: Device.Ethernet.InterfaceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "2"
+  - path: Device.Ethernet.LinkNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+  - path: Device.IP.InterfaceNumberOfEntries
+    type: xsd:unsignedInt
+    value: "1"
+
+objects:
+  - path: Device.Ethernet.Interface
+    instances: 2
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Down"
+      - path: Alias
+        value: "PHY{i}"
+        writable: true
+      - path: Name
+        value: "eth{i}"
+      - path: LowerLayers
+        value: ""
+        writable: true
+      - path: Upstream
+        type: xsd:boolean
+        value: "false"
+      - path: MACAddress
+        value: "12:00:5E:{cpe:mac:3}"
+      - path: DuplexMode
+        value: "Auto"
+        writable: true
+      - path: MaxBitRate
+        type: xsd:int
+        value: "1000"
+        writable: true
+      - path: CurrentBitRate
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BytesSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.BytesReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.PacketsReceived
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsSent
+        type: xsd:unsignedInt
+        value: "0"
+      - path: Stats.ErrorsReceived
+        type: xsd:unsignedInt
+        value: "0"
+
+groups:
+  - prefix: Device.Ethernet.Link.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Alias
+        value: "BRIDGE"
+        writable: true
+      - path: Name
+        value: "br0"
+      - path: LowerLayers
+        value: "Device.Ethernet.Interface.1,Device.Ethernet.Interface.2,Device.WiFi.SSID.3"
+        writable: true
+      - path: MACAddress
+        value: "12:00:5E:{cpe:mac:3}"
+
+  - prefix: Device.IP.Interface.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Up"
+      - path: Name
+        value: "br0"
+      - path: Type
+        value: "Normal"
+      - path: LowerLayers
+        value: "Device.Ethernet.Link.1"
+        writable: true
+      - path: LastChange
+        type: xsd:unsignedInt
+        value: "0"
+        writable: true
+        generator:
+          type: uptime
+          interval: 30s
+
+  # The address the gateway leased this unit: 192.168.1.11, the same
+  # row the gateway's host table carries for it.
+  - prefix: Device.IP.Interface.1.IPv4Address.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Enabled"
+      - path: IPAddress
+        value: "192.168.1.11"
+      - path: SubnetMask
+        value: "255.255.255.0"
+      - path: AddressingType
+        value: "DHCP"
+
+  # The IPv6 address table is not optional decoration: the baseline
+  # TR-181 mapping walks Device.IP.Interface.{i}.IPv6Address. as a
+  # subtree on every interface, and a profile that advertises the
+  # interface without the table answers GPV fault 9005 every session.
+  - prefix: Device.IP.Interface.1.IPv6Address.1
+    parameters:
+      - path: Enable
+        type: xsd:boolean
+        value: "true"
+        writable: true
+      - path: Status
+        value: "Preferred"
+      - path: IPAddress
+        value: "fe80::1000:5eff:fe00:{cpe:hex:4}"
+      - path: Origin
+        value: "AutoConfigured"
+      - path: Prefix
+        value: ""
